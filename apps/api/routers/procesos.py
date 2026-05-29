@@ -6,7 +6,7 @@ from services.sync import sincronizar_procesos
 
 router = APIRouter(prefix="/procesos", tags=["procesos"])
 
-NOMBRE_MONITORADO = "Juan Manuel Londoño"
+from config import NOMBRE_MONITORADO
 
 @router.get("/")
 def listar_procesos(

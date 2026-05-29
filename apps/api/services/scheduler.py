@@ -7,9 +7,8 @@ from services.sync import sincronizar_procesos
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-NOMBRES_A_MONITOREAR = [
-    "Juan Manuel Londoño",
-]
+from config import NOMBRE_MONITORADO
+NOMBRES_A_MONITOREAR = [NOMBRE_MONITORADO]
 
 def job_sincronizar():
     logger.info("Iniciando sincronización automática...")
