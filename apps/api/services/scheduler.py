@@ -2,25 +2,22 @@ import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from models import init_db
 from models.database import SessionLocal
-from services.sync import sincronizar_procesos
+from services.sync import sincronizar_radicados
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-from config import NOMBRE_MONITORADO
-NOMBRES_A_MONITOREAR = [NOMBRE_MONITORADO]
 
 def job_sincronizar():
     logger.info("Iniciando sincronización automática...")
     db = SessionLocal()
     try:
-        for nombre in NOMBRES_A_MONITOREAR:
-            resultado = sincronizar_procesos(nombre, db)
-            logger.info(
-                f"[{nombre}] Total: {resultado['total_consultados']} | "
-                f"Nuevos: {resultado['nuevos']} | "
-                f"Actualizados: {resultado['actualizados']}"
-            )
+        resultado = sincronizar_radicados(db)
+        logger.info(
+            f"Total radicados: {resultado['total_consultados']} | "
+            f"Nuevos: {resultado['nuevos']} | "
+            f"Actualizados: {resultado['actualizados']} | "
+            f"Emails: {len(resultado['emails_enviados'])}"
+        )
     except Exception as e:
         logger.error(f"Error en sincronización: {e}")
     finally:

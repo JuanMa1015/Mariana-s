@@ -80,3 +80,34 @@ def buscar_por_nombre(
             pagina=pag.get("pagina", 1),
         ),
     )
+
+
+def buscar_por_radicado(numero: str, solo_activos: bool = False, pagina: int = 1) -> ResultadoBusqueda:
+    params = {
+        "numero": numero,
+        "soloActivos": str(solo_activos).lower(),
+        "pagina": pagina,
+    }
+
+    with httpx.Client(timeout=30, headers=HEADERS) as client:
+        response = client.get(
+            f"{BASE_URL}/NumeroRadicacion",
+            params=params,
+        )
+        print(f"Status: {response.status_code}")
+        print(f"Body: {response.text[:500]}")
+        response.raise_for_status()
+        data = response.json()
+
+    procesos = [_parsear_proceso(p) for p in data.get("procesos", [])]
+    pag = data.get("paginacion", {})
+
+    return ResultadoBusqueda(
+        procesos=procesos,
+        paginacion=Paginacion(
+            cantidad_registros=pag.get("cantidadRegistros", 0),
+            registros_pagina=pag.get("registrosPagina", 20),
+            cantidad_paginas=pag.get("cantidadPaginas", 0),
+            pagina=pag.get("pagina", 1),
+        ),
+    )
