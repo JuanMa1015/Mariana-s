@@ -1,8 +1,14 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from models.database import get_db
 from models.proceso import Proceso
 from services.sync import sincronizar_radicados
+from services.auth import get_current_user, oauth2_scheme
+from config import API_TOKEN
+from fastapi import Depends as _Depends
+from typing import Optional
+from sqlalchemy.orm import Session as _Session
+from models.user import User
 
 router = APIRouter(prefix="/procesos", tags=["procesos"])
 
@@ -13,12 +19,13 @@ from typing import Optional
 @router.get("/")
 def listar_procesos(
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     despacho: str = Query(None),
     departamento: str = Query(None),
     skip: int = 0,
     limit: int = 10,
 ):
-    query = db.query(Proceso)
+    query = db.query(Proceso).filter(Proceso.user_id == current_user.id)
 
     if despacho:
         query = query.filter(Proceso.despacho.ilike(f"%{despacho}%"))
@@ -54,8 +61,8 @@ def listar_procesos(
 
 
 @router.get("/{llave_proceso}")
-def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db)):
-    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
+def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
@@ -75,8 +82,8 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db)):
     }
 
 @router.get("/novedades")
-def listar_novedades(db: Session = Depends(get_db)):
-    procesos = db.query(Proceso).filter(Proceso.notificado == False).all()
+def listar_novedades(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    procesos = db.query(Proceso).filter(Proceso.notificado == False, Proceso.user_id == current_user.id).all()
     return {
         "total": len(procesos),
         "novedades": [
@@ -92,8 +99,33 @@ def listar_novedades(db: Session = Depends(get_db)):
     }
 
 @router.post("/sync")
-def sync_manual(db: Session = Depends(get_db)):
-    resultado = sincronizar_radicados(db)
+async def _auth_for_sync(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    """Dependencia que permite usar un `API_TOKEN` (workflow/CI) o la autenticación normal.
+
+    - Si `API_TOKEN` está configurado: el header `Authorization: Bearer <API_TOKEN>` autoriza la petición y se retorna `None`.
+    - Si `API_TOKEN` está configurado y no coincide: se devuelve 401.
+    - Si `API_TOKEN` está vacío: se usa la autenticación normal (token JWT) y se retorna el `User`.
+    """
+    auth_header = (request.headers.get("authorization") or "")
+    # Si hay API_TOKEN configurado, permitir solo si coincide
+    if API_TOKEN:
+        if auth_header.startswith("Bearer "):
+            token_value = auth_header.split(" ", 1)[1]
+            if token_value == API_TOKEN:
+                return None
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
+
+    # En desarrollo/local, usamos autenticación normal
+    return get_current_user(token=token, db=db)
+
+
+@router.post("/sync")
+def sync_manual(db: Session = Depends(get_db), current_user: Optional[User] = Depends(_auth_for_sync)):
+    # Si `current_user` es None significa que la petición vino con `API_TOKEN` válido — sincronizamos globalmente.
+    if current_user is None:
+        resultado = sincronizar_radicados(db)
+    else:
+        resultado = sincronizar_radicados(db, user_id=current_user.id)
     return resultado
 
 
@@ -105,8 +137,8 @@ class AddRadicado(BaseModel):
 
 
 @router.post("/add")
-def add_radicado(payload: AddRadicado, db: Session = Depends(get_db)):
-    existente = db.query(Proceso).filter(Proceso.llave_proceso == payload.llave_proceso).first()
+def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    existente = db.query(Proceso).filter(Proceso.llave_proceso == payload.llave_proceso, Proceso.user_id == current_user.id).first()
     if existente:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Radicado ya existe")
 
@@ -116,6 +148,7 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db)):
         departamento=payload.departamento or "",
         sujetos_procesales=payload.sujetos_procesales or "",
         notificado=True,
+        user_id=current_user.id,
     )
     db.add(nuevo)
     db.commit()
@@ -123,9 +156,9 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db)):
 
 
 @router.get("/options")
-def opciones_filtros(db: Session = Depends(get_db)):
-    despachos = [d[0] for d in db.query(Proceso.despacho).distinct().all() if d[0]]
-    departamentos = [d[0] for d in db.query(Proceso.departamento).distinct().all() if d[0]]
+def opciones_filtros(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    despachos = [d[0] for d in db.query(Proceso.despacho).filter(Proceso.user_id == current_user.id).distinct().all() if d[0]]
+    departamentos = [d[0] for d in db.query(Proceso.departamento).filter(Proceso.user_id == current_user.id).distinct().all() if d[0]]
     return {"despachos": sorted(list(set(despachos))), "departamentos": sorted(list(set(departamentos)))}
 
 
@@ -138,8 +171,8 @@ class UpdateProceso(BaseModel):
 
 
 @router.delete("/{llave_proceso}")
-def delete_proceso(llave_proceso: str, db: Session = Depends(get_db)):
-    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
+def delete_proceso(llave_proceso: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
     db.delete(proceso)
@@ -148,8 +181,8 @@ def delete_proceso(llave_proceso: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{llave_proceso}")
-def update_proceso(llave_proceso: str, payload: UpdateProceso, db: Session = Depends(get_db)):
-    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
+def update_proceso(llave_proceso: str, payload: UpdateProceso, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
