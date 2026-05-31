@@ -11,8 +11,14 @@ jobs:
     steps:
       - name: Wake up server
         run: |
-          curl "${{ secrets.API_URL }}/health" || true
-          sleep 30
+          for i in {1..24}; do
+            if curl -fsS "${{ secrets.API_URL }}/health"; then
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "API did not become ready in time"
+          exit 1
 
       - name: Trigger sync
         run: |
