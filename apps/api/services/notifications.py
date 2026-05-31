@@ -3,7 +3,7 @@ import smtplib
 import re
 from email.message import EmailMessage
 
-from config import EMAIL_FROM, EMAIL_TO, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USE_TLS, SMTP_USER
+from config import EMAIL_FROM, EMAIL_TO, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USE_TLS, SMTP_USER, APP_URL
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,11 @@ def notificar_cambio_radicado(llave_proceso: str, despacho: str, departamento: s
         f"Departamento: {departamento}\n"
         f"Última actuación: {fecha_ultima_actuacion or 'N/D'}\n\n"
         f"Sujetos procesales:\n{sujetos_procesales}\n"
+        f"\n"
+        f"Ver proceso en Rama Judicial:\n"
+        f"https://consultaprocesos.ramajudicial.gov.co/procesos/bienvenida\n\n"
+        f"Ver en Mariana's:\n"
+        f"{APP_URL}\n"
     )
 
     mensaje = EmailMessage()
