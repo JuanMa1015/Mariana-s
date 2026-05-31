@@ -5,9 +5,7 @@ from models.proceso import Proceso
 from services.sync import sincronizar_radicados
 from services.auth import get_current_user, oauth2_scheme
 from config import API_TOKEN
-from fastapi import Depends as _Depends
 from typing import Optional
-from sqlalchemy.orm import Session as _Session
 from models.user import User
 
 router = APIRouter(prefix="/procesos", tags=["procesos"])
@@ -59,28 +57,6 @@ def listar_procesos(
         ],
     }
 
-
-@router.get("/{llave_proceso}")
-def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
-    if not proceso:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
-
-    return {
-        "llave_proceso": proceso.llave_proceso,
-        "despacho": proceso.despacho,
-        "departamento": proceso.departamento,
-        "sujetos_procesales": proceso.sujetos_procesales,
-        "tipo_proceso": proceso.tipo_proceso,
-        "clase_proceso": proceso.clase_proceso,
-        "es_privado": proceso.es_privado,
-        "fecha_proceso": proceso.fecha_proceso,
-        "fecha_ultima_actuacion": proceso.fecha_ultima_actuacion,
-        "notificado": proceso.notificado,
-        "creado_en": proceso.creado_en,
-        "actualizado_en": proceso.actualizado_en,
-    }
-
 @router.get("/novedades")
 def listar_novedades(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     procesos = db.query(Proceso).filter(Proceso.notificado == False, Proceso.user_id == current_user.id).all()
@@ -98,8 +74,8 @@ def listar_novedades(db: Session = Depends(get_db), current_user: User = Depends
         ],
     }
 
-@router.post("/sync")
-async def _auth_for_sync(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+
+def _auth_for_sync(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     """Dependencia que permite usar un `API_TOKEN` (workflow/CI) o la autenticación normal.
 
     - Si `API_TOKEN` está configurado: el header `Authorization: Bearer <API_TOKEN>` autoriza la petición y se retorna `None`.
@@ -160,6 +136,28 @@ def opciones_filtros(db: Session = Depends(get_db), current_user: User = Depends
     despachos = [d[0] for d in db.query(Proceso.despacho).filter(Proceso.user_id == current_user.id).distinct().all() if d[0]]
     departamentos = [d[0] for d in db.query(Proceso.departamento).filter(Proceso.user_id == current_user.id).distinct().all() if d[0]]
     return {"despachos": sorted(list(set(despachos))), "departamentos": sorted(list(set(departamentos)))}
+
+
+@router.get("/{llave_proceso}")
+def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
+    if not proceso:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
+
+    return {
+        "llave_proceso": proceso.llave_proceso,
+        "despacho": proceso.despacho,
+        "departamento": proceso.departamento,
+        "sujetos_procesales": proceso.sujetos_procesales,
+        "tipo_proceso": proceso.tipo_proceso,
+        "clase_proceso": proceso.clase_proceso,
+        "es_privado": proceso.es_privado,
+        "fecha_proceso": proceso.fecha_proceso,
+        "fecha_ultima_actuacion": proceso.fecha_ultima_actuacion,
+        "notificado": proceso.notificado,
+        "creado_en": proceso.creado_en,
+        "actualizado_en": proceso.actualizado_en,
+    }
 
 
 class UpdateProceso(BaseModel):
