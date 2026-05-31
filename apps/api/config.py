@@ -18,3 +18,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440
 # Token que permite invocar endpoints protegidos desde CI/CD o workflows.
 # Si está vacío, el endpoint mantiene el comportamiento por defecto (desarrollo local).
 API_TOKEN = os.getenv("API_TOKEN", "")
+
+# URL pública de la aplicación (usada en notificaciones para enlaces)
+APP_URL = os.getenv("APP_URL", "https://marianas.vercel.app")
