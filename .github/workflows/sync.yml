@@ -1,0 +1,24 @@
+name: Sync Procesos Judiciales
+
+on:
+  schedule:
+    - cron: '0 6,12,18,0 * * *'  # 4 veces al día: 6am, 12pm, 6pm, 12am (UTC-5 Colombia = UTC+0 +5)
+  workflow_dispatch:  # permite correrlo manualmente desde GitHub
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger sync
+        run: |
+          curl -X POST "${{ secrets.API_URL }}/procesos/sync" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
+            --fail \
+            --retry 3 \
+            --retry-delay 10
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          curl -X POST "${{ secrets.API_URL }}/health" || echo "API unreachable"

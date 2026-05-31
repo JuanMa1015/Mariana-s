@@ -10,8 +10,11 @@ from services.notifications import notificar_cambio_radicado
 logger = logging.getLogger(__name__)
 
 
-def sincronizar_radicados(db: Session) -> dict:
-    radicados = db.query(Proceso).order_by(Proceso.id.asc()).all()
+def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
+    query = db.query(Proceso)
+    if user_id is not None:
+        query = query.filter(Proceso.user_id == user_id)
+    radicados = query.order_by(Proceso.id.asc()).all()
     nuevos = []
     actualizados = []
     emails_enviados = []

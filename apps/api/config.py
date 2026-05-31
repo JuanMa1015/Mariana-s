@@ -10,3 +10,11 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 EMAIL_FROM = os.getenv("EMAIL_FROM", SMTP_USER)
 EMAIL_TO = os.getenv("EMAIL_TO", "")
+
+SECRET_KEY = os.getenv("SECRET_KEY", "un_secreto_muy_seguro_para_desarrollo")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")) # 24 hours
+
+# Token que permite invocar endpoints protegidos desde CI/CD o workflows.
+# Si está vacío, el endpoint mantiene el comportamiento por defecto (desarrollo local).
+API_TOKEN = os.getenv("API_TOKEN", "")

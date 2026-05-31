@@ -1,12 +1,15 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Integer
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from models.database import Base
 
 class Proceso(Base):
     __tablename__ = "procesos"
+    __table_args__ = (UniqueConstraint('user_id', 'llave_proceso', name='uix_user_radicado'),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    llave_proceso = Column(String, unique=True, index=True, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    llave_proceso = Column(String, index=True, nullable=False)
     despacho = Column(String)
     departamento = Column(String)
     sujetos_procesales = Column(String)
@@ -18,3 +21,5 @@ class Proceso(Base):
     notificado = Column(Boolean, default=False)
     creado_en = Column(DateTime, server_default=func.now())
     actualizado_en = Column(DateTime, onupdate=func.now())
+
+    user = relationship("User", back_populates="procesos")

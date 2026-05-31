@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from models import init_db
 from services.scheduler import iniciar_scheduler
 from routers.procesos import router as procesos_router
+from routers.auth import router as auth_router
 
 
 
@@ -28,4 +29,5 @@ app.add_middleware(
 def health():
     return {"status": "ok"}
 
+app.include_router(auth_router)
 app.include_router(procesos_router)
