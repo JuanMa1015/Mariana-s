@@ -4,8 +4,10 @@ import toast from "react-hot-toast"
 import type { DetalleProceso, ListaProcesos, ListaNovedades } from "./types"
 import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
+import { useNavigate } from "react-router-dom"
 
 export default function App() {
+  const navigate = useNavigate()
   const [procesos, setProcesos] = useState<ListaProcesos | null>(null)
   const [novedades, setNovedades] = useState<ListaNovedades | null>(null)
   const [newRadicado, setNewRadicado] = useState({ llave_proceso: "" })
@@ -48,20 +50,20 @@ export default function App() {
     const url = new URL(window.location.href)
     url.searchParams.set("view", "detalle")
     url.searchParams.set("radicado", llaveProceso)
-    window.location.href = url.toString()
+    navigate(`${url.pathname}${url.search}${url.hash}`)
   }
 
   const volverLista = () => {
     const url = new URL(window.location.href)
     url.searchParams.delete("view")
     url.searchParams.delete("radicado")
-    window.location.href = url.toString()
+    navigate(`${url.pathname}${url.search}${url.hash}`)
   }
 
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("email")
-    window.location.href = "/login"
+    navigate("/login", { replace: true })
   }
 
   return (
