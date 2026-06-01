@@ -6,7 +6,7 @@ from models.database import get_db
 from models.actuacion import Actuacion
 from models.proceso import Proceso
 from services.sync import sincronizar_radicados
-from scraper.rama_client import buscar_por_radicado, buscar_actuaciones
+from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones
 from services.auth import get_current_user, oauth2_scheme
 from config import API_TOKEN
 from typing import Optional
@@ -135,13 +135,14 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
     try:
         resultado = buscar_por_radicado(payload.llave_proceso, solo_activos=False)
         if resultado.procesos:
-            from services.sync import _upsert_actuacion, _serializar_texto, _latest_actuacion
             acts = buscar_actuaciones(resultado.procesos[0].id_proceso)
+            ultima_fecha = None
             for a in acts.actuaciones:
                 _upsert_actuacion(db, nuevo, a)
-            latest = _latest_actuacion(acts.actuaciones)
-            if latest is not None:
-                nuevo.fecha_ultima_actuacion = _serializar_texto(latest.fecha_actuacion)
+                if a.fecha_actuacion and (ultima_fecha is None or a.fecha_actuacion > ultima_fecha):
+                    ultima_fecha = a.fecha_actuacion
+            if ultima_fecha:
+                nuevo.fecha_ultima_actuacion = ultima_fecha
             db.commit()
     except Exception as exc:
         logger.warning("Sync inicial falló para %s: %s", payload.llave_proceso, exc)
@@ -227,23 +228,41 @@ def obtener_proceso_publico(llave_proceso: str):
         return {"error": str(exc)}
 
 
+def _upsert_actuacion(db, proceso, remota):
+    existente = db.query(Actuacion).filter(Actuacion.proceso_id == proceso.id, Actuacion.id_reg_actuacion == remota.id_reg_actuacion).first()
+    if existente is None:
+        existente = Actuacion(proceso_id=proceso.id, id_reg_actuacion=remota.id_reg_actuacion)
+        db.add(existente)
+    existente.cons_actuacion = remota.cons_actuacion
+    existente.fecha_actuacion = remota.fecha_actuacion
+    existente.actuacion = remota.actuacion
+    existente.anotacion = remota.anotacion
+    existente.fecha_inicial = remota.fecha_inicial
+    existente.fecha_final = remota.fecha_final
+    existente.fecha_registro = remota.fecha_registro
+    existente.cod_regla = remota.cod_regla
+    existente.con_documentos = bool(remota.con_documentos)
+    existente.cant = remota.cant
+    return existente
+
+
 @router.get("/{llave_proceso}")
 def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
-    from services.sync import _upsert_actuacion, _serializar_texto, _latest_actuacion
-
     try:
         resultado = buscar_por_radicado(llave_proceso, solo_activos=False)
         if resultado.procesos:
             acts = buscar_actuaciones(resultado.procesos[0].id_proceso)
+            ultima_fecha = None
             for a in acts.actuaciones:
                 _upsert_actuacion(db, proceso, a)
-            latest = _latest_actuacion(acts.actuaciones)
-            if latest is not None:
-                proceso.fecha_ultima_actuacion = _serializar_texto(latest.fecha_actuacion)
+                if a.fecha_actuacion and (ultima_fecha is None or a.fecha_actuacion > ultima_fecha):
+                    ultima_fecha = a.fecha_actuacion
+            if ultima_fecha:
+                proceso.fecha_ultima_actuacion = ultima_fecha
             db.commit()
     except Exception as exc:
         logger.warning("Sync directo falló para %s: %s", llave_proceso, exc)
