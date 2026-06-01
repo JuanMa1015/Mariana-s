@@ -9,6 +9,17 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Validate required secrets
+        run: |
+          if [ -z "${{ secrets.API_URL }}" ]; then
+            echo "ERROR: Repository secret API_URL is not set. Add it in Settings -> Secrets -> Actions." >&2
+            exit 1
+          fi
+          if [ -z "${{ secrets.API_TOKEN }}" ]; then
+            echo "ERROR: Repository secret API_TOKEN is not set. Add it in Settings -> Secrets -> Actions." >&2
+            exit 1
+          fi
+
       - name: Wake up server
         run: |
           for i in {1..24}; do
