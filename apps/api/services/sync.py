@@ -226,6 +226,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
                 anotacion=latest_remote.anotacion,
                 fecha_registro=latest_remote.fecha_registro,
                 con_documentos=latest_remote.con_documentos,
+                total_actualizadas=len(actualizados),
             ):
                 emails_enviados.append(radicado.llave_proceso)
 

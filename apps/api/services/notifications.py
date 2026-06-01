@@ -18,6 +18,8 @@ def notificar_cambio_radicado(
     anotacion: str | None = None,
     fecha_registro: str | None = None,
     con_documentos: bool | None = None,
+    num_actuaciones: int | None = None,
+    total_actualizadas: int | None = None,
 ) -> bool:
     destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
 
@@ -25,23 +27,33 @@ def notificar_cambio_radicado(
         logger.info("Correo no configurado; se omite notificación para %s", llave_proceso)
         return False
 
-    asunto = f"Nueva actuación en radicado {llave_proceso}"
+    asunto = f"Novedad judicial: {llave_proceso}"
     cuerpo = (
-        f"Se detectó una nueva actuación en el radicado {llave_proceso}.\n\n"
-        f"Despacho: {despacho}\n"
-        f"Departamento: {departamento}\n"
-        f"Última actuación: {fecha_ultima_actuacion or 'N/D'}\n\n"
-        f"Actuación: {actuacion or 'N/D'}\n"
-        f"Anotación: {anotacion or 'N/D'}\n"
-        f"Fecha de registro: {fecha_registro or 'N/D'}\n"
-        f"Con documentos: {'Sí' if con_documentos else 'No'}\n\n"
-        f"Sujetos procesales:\n{sujetos_procesales}\n"
+        f"╔══════════════════════════════════════════╗\n"
+        f"║  MARIANA'S — MONITOR JUDICIAL            ║\n"
+        f"╚══════════════════════════════════════════╝\n\n"
+        f"Se detectó una nueva actuación en el proceso:\n\n"
+        f"  Radicado:     {llave_proceso}\n"
+        f"  Despacho:     {despacho}\n"
+        f"  Departamento: {departamento}\n"
+        f"  Última act.:  {fecha_ultima_actuacion or 'N/D'}\n\n"
+        f"── Nueva actuación ──\n"
+        f"  Actuación:    {actuacion or 'N/D'}\n"
+        f"  Anotación:    {anotacion or 'N/D'}\n"
+        f"  Fecha registro: {fecha_registro or 'N/D'}\n"
+        f"  Documentos:   {'Sí' if con_documentos else 'No'}\n\n"
+        f"  Sujetos procesales:\n"
+        f"  {sujetos_procesales}\n"
         f"\n"
-        f"Ver proceso en Rama Judicial:\n"
-        f"https://consultaprocesos.ramajudicial.gov.co/procesos/bienvenida\n\n"
-        f"Ver en Mariana's:\n"
-        f"{APP_URL}\n"
+        f"──────────\n"
+        f"  Ver en Rama Judicial:\n"
+        f"  https://consultaprocesos.ramajudicial.gov.co/procesos/bienvenida\n"
+        f"\n"
+        f"  Ver en Mariana's:\n"
+        f"  {APP_URL}\n"
     )
+    if total_actualizadas is not None:
+        asunto = f"[{total_actualizadas} novedades] {asunto}"
 
     mensaje = EmailMessage()
     mensaje["From"] = EMAIL_FROM

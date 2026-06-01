@@ -108,7 +108,7 @@ export default function App() {
                 </div>
               </div>
             ) : detalle ? (
-              <DetalleView detalle={detalle} onVolver={volverLista} />
+              <DetalleView detalle={detalle} onVolver={volverLista} onActualizado={cargarDatos} />
             ) : (
               <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
                 No se encontró el radicado solicitado.
