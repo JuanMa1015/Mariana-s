@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from models.database import get_db
 from models.actuacion import Actuacion
 from models.proceso import Proceso
-from services.sync import sincronizar_radicados
+from services.sync import sincronizar_radicado, sincronizar_radicados
 from services.auth import get_current_user, oauth2_scheme
 from config import API_TOKEN
 from typing import Optional
@@ -148,6 +148,8 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
     proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
+
+    sincronizar_radicado(db, proceso)
 
     actuaciones = (
         db.query(Actuacion)
