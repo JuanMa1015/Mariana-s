@@ -214,8 +214,8 @@ def obtener_proceso_publico(llave_proceso: str):
 
 
 @router.get("/{llave_proceso}")
-def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
+def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db)):
+    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
