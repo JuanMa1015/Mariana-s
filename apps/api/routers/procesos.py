@@ -132,12 +132,6 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
     db.add(nuevo)
     db.commit()
 
-    # Consultamos de inmediato para evitar que el radicado quede vacío hasta el siguiente sync automático.
-    try:
-        sincronizar_radicado(db, nuevo)
-    except Exception as exc:
-        logger.warning("Sync inicial falló para %s: %s", payload.llave_proceso, exc)
-
     return {"created": True, "llave_proceso": payload.llave_proceso}
 
 
@@ -225,11 +219,7 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
-    try:
-        sincronizar_radicado(db, proceso)
-    except Exception as exc:
-        logger.warning("Sync en vivo falló para %s: %s", llave_proceso, exc)
-
+    # Primero devolvemos datos cacheados inmediatamente
     actuaciones = (
         db.query(Actuacion)
         .filter(Actuacion.proceso_id == proceso.id)
