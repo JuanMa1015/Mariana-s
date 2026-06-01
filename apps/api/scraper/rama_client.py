@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import httpx
+import warnings
 from typing import Optional
 from dataclasses import dataclass, field
+
+warnings.filterwarnings("ignore", message=".*verify.*", category=UserWarning)
 
 TIMEOUT = 10
 
@@ -14,6 +17,10 @@ HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Referer": "https://consultaprocesos.ramajudicial.gov.co/procesos/bienvenida",
 }
+
+
+def _cliente():
+    return httpx.Client(timeout=TIMEOUT, headers=HEADERS, verify=False)
 
 @dataclass
 class Paginacion:
@@ -128,7 +135,7 @@ def buscar_por_nombre(
         "pagina": pagina,
     }
 
-    with httpx.Client(timeout=TIMEOUT, headers=HEADERS) as client:
+    with _cliente() as client:
         response = client.get(
             f"{BASE_URL}/NombreRazonSocial",
             params=params,
@@ -204,7 +211,7 @@ def _parsear_actuacion(raw: dict) -> Actuacion:
 
 
 def buscar_detalle_proceso(id_proceso: int) -> DetalleProceso:
-    with httpx.Client(timeout=TIMEOUT, headers=HEADERS) as client:
+    with _cliente() as client:
         response = client.get(f"{BASE_ROOT}/Proceso/Detalle/{id_proceso}")
         response.raise_for_status()
         data = response.json()
@@ -212,7 +219,7 @@ def buscar_detalle_proceso(id_proceso: int) -> DetalleProceso:
 
 
 def buscar_actuaciones(id_proceso: int, pagina: int = 1) -> ResultadoActuaciones:
-    with httpx.Client(timeout=TIMEOUT, headers=HEADERS) as client:
+    with _cliente() as client:
         response = client.get(f"{BASE_ROOT}/Proceso/Actuaciones/{id_proceso}", params={"pagina": pagina})
         response.raise_for_status()
         data = response.json()
@@ -231,7 +238,7 @@ def buscar_actuaciones(id_proceso: int, pagina: int = 1) -> ResultadoActuaciones
 
 
 def buscar_documentos_actuacion(id_reg_actuacion: int) -> list[DocumentoActuacion]:
-    with httpx.Client(timeout=TIMEOUT, headers=HEADERS) as client:
+    with _cliente() as client:
         response = client.get(f"{BASE_ROOT}/Proceso/DocumentosActuacion/{id_reg_actuacion}")
         response.raise_for_status()
         data = response.json()
@@ -246,7 +253,7 @@ def buscar_por_radicado(numero: str, solo_activos: bool = False, pagina: int = 1
         "pagina": pagina,
     }
 
-    with httpx.Client(timeout=TIMEOUT, headers=HEADERS) as client:
+    with _cliente() as client:
         response = client.get(
             f"{BASE_URL}/NumeroRadicacion",
             params=params,
