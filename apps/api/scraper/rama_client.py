@@ -25,6 +25,8 @@ class Proceso:
     sujetos_procesales: str
     tipo_proceso: str
     clase_proceso: str
+    es_privado: Optional[bool]
+    fecha_proceso: Optional[str]
     fecha_ultima_actuacion: Optional[str]
 
 @dataclass
@@ -33,6 +35,10 @@ class ResultadoBusqueda:
     paginacion: Paginacion
 
 def _parsear_proceso(raw: dict) -> Proceso:
+    es_privado = raw.get("esPrivado")
+    if isinstance(es_privado, str):
+        es_privado = es_privado.strip().lower() in {"true", "1", "si", "sí"}
+
     return Proceso(
         numero_radicacion=raw.get("llaveProceso", ""),
         despacho=raw.get("despacho", "").strip(),
@@ -40,6 +46,8 @@ def _parsear_proceso(raw: dict) -> Proceso:
         sujetos_procesales=raw.get("sujetosProcesales", ""),
         tipo_proceso=raw.get("tipoProceso", ""),
         clase_proceso=raw.get("claseProceso", ""),
+        es_privado=es_privado,
+        fecha_proceso=raw.get("fechaProceso"),
         fecha_ultima_actuacion=raw.get("fechaUltimaActuacion"),
     )
 

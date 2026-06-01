@@ -21,6 +21,7 @@ def _puntaje_proceso(proceso: ResultadoBusqueda | object) -> int:
         getattr(proceso, "sujetos_procesales", None),
         getattr(proceso, "tipo_proceso", None),
         getattr(proceso, "clase_proceso", None),
+        getattr(proceso, "fecha_proceso", None),
         getattr(proceso, "fecha_ultima_actuacion", None),
     ]
     return sum(1 for campo in campos if _normalizar_texto(campo))
@@ -34,7 +35,7 @@ def _rellenar_campos(proceso: Proceso, remoto) -> bool:
     """Copiar datos no vacíos desde Rama y reportar si hubo cambios."""
     changed = False
 
-    for campo in ("despacho", "departamento", "sujetos_procesales", "tipo_proceso", "clase_proceso"):
+    for campo in ("despacho", "departamento", "sujetos_procesales", "tipo_proceso", "clase_proceso", "fecha_proceso"):
         valor_remoto = _normalizar_texto(getattr(remoto, campo, None))
         valor_local = _normalizar_texto(getattr(proceso, campo, None))
 
@@ -46,6 +47,11 @@ def _rellenar_campos(proceso: Proceso, remoto) -> bool:
     fecha_local = _normalizar_texto(proceso.fecha_ultima_actuacion)
     if fecha_remota and fecha_local != fecha_remota:
         proceso.fecha_ultima_actuacion = fecha_remota
+        changed = True
+
+    es_privado_remoto = getattr(remoto, "es_privado", None)
+    if es_privado_remoto is not None and proceso.es_privado != es_privado_remoto:
+        proceso.es_privado = es_privado_remoto
         changed = True
 
     return changed
@@ -87,6 +93,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
                 radicado.sujetos_procesales,
                 radicado.tipo_proceso,
                 radicado.clase_proceso,
+                radicado.fecha_proceso,
                 radicado.fecha_ultima_actuacion,
             )
         )
