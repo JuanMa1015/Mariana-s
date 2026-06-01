@@ -20,11 +20,9 @@ app = FastAPI(title="Mariana's - Monitor Judicial", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://mariana-app-nu.vercel.app", "http://localhost:5173", "http://localhost:5174"],
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["*"],
 )
 
 @app.get("/health")
