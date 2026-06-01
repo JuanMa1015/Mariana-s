@@ -1,5 +1,6 @@
 import logging
 import re
+from datetime import date
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -43,6 +44,16 @@ def _elegir_mejor_proceso(resultados: list[object]):
 def _serializar_texto(valor: str | None) -> str | None:
     valor_normalizado = _normalizar_texto(valor)
     return valor_normalizado or None
+
+
+def _es_hoy(fecha_str: str | None) -> bool:
+    if not fecha_str:
+        return False
+    try:
+        fecha = fecha_str[:10]
+        return fecha == date.today().isoformat()
+    except (ValueError, IndexError):
+        return False
 
 
 def _actualizar_campos_proceso(proceso: Proceso, resumen, detalle) -> bool:
@@ -183,6 +194,12 @@ def sincronizar_radicado(db: Session, radicado: Proceso) -> bool:
             for documento_remoto in documentos:
                 _upsert_documento(db, actuacion_db, documento_remoto)
 
+    logger.info(
+        "Radicado %s sincronizado: %d actuaciones, última: %s",
+        radicado.llave_proceso,
+        len(resultado_actuaciones.actuaciones),
+        latest_remote.fecha_actuacion if latest_remote else "N/A",
+    )
     db.commit()
     return True
 
@@ -261,8 +278,24 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
         )
 
         if is_initial_sync:
-            radicado.notificado = True
-            nuevos.append(radicado.llave_proceso)
+            if latest_remote is not None and _es_hoy(latest_remote.fecha_actuacion):
+                radicado.notificado = False
+                actualizados.append(radicado.llave_proceso)
+                if notificar_cambio_radicado(
+                    llave_proceso=radicado.llave_proceso,
+                    despacho=radicado.despacho or "",
+                    departamento=radicado.departamento or "",
+                    fecha_ultima_actuacion=radicado.fecha_ultima_actuacion,
+                    sujetos_procesales=radicado.sujetos_procesales or "",
+                    actuacion=latest_remote.actuacion,
+                    anotacion=latest_remote.anotacion,
+                    fecha_registro=latest_remote.fecha_registro,
+                    con_documentos=latest_remote.con_documentos,
+                ):
+                    emails_enviados.append(radicado.llave_proceso)
+            else:
+                radicado.notificado = True
+                nuevos.append(radicado.llave_proceso)
         elif latest_remote is not None and latest_stored_id != previous_latest_id:
             radicado.notificado = False
             actualizados.append(radicado.llave_proceso)

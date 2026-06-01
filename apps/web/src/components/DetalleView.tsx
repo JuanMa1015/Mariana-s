@@ -324,8 +324,8 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
         ) : (
           <div className="flex flex-col items-center gap-2 py-10 text-slate-400">
             <IconDocument />
-            <p className="text-sm">Aún no hay actuaciones guardadas para este radicado.</p>
-            <p className="text-xs">Las actuaciones se sincronizarán automáticamente cada 6 horas.</p>
+            <p className="text-sm">No se encontraron actuaciones en Rama Judicial.</p>
+            <p className="text-xs">Verifica que el radicado sea correcto o intenta más tarde.</p>
           </div>
         )}
       </div>
