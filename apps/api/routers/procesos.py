@@ -1,8 +1,9 @@
 import logging
+import threading
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from models.database import get_db
+from models.database import get_db, SessionLocal
 from models.actuacion import Actuacion
 from models.proceso import Proceso
 from services.sync import sincronizar_radicado, sincronizar_radicados
@@ -12,6 +13,21 @@ from typing import Optional
 from models.user import User
 
 logger = logging.getLogger(__name__)
+
+
+def _sincronizar_en_background(proceso: Proceso):
+    def _run():
+        try:
+            db = SessionLocal()
+            try:
+                radicado = db.query(Proceso).filter(Proceso.id == proceso.id).first()
+                if radicado:
+                    sincronizar_radicado(db, radicado)
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.error("Error en sync background para %s: %s", proceso.llave_proceso, exc)
+    threading.Thread(target=_run, daemon=True).start()
 
 router = APIRouter(prefix="/procesos", tags=["procesos"])
 
@@ -153,8 +169,7 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
-    if not sincronizar_radicado(db, proceso):
-        logger.warning("No se pudieron traer datos en vivo de Rama para %s. Mostrando datos en caché.", llave_proceso)
+    _sincronizar_en_background(proceso)
 
     actuaciones = (
         db.query(Actuacion)
