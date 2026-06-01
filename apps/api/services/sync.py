@@ -137,6 +137,56 @@ def _latest_actuacion(actuaciones: list[object]):
     )
 
 
+def sincronizar_radicado(db: Session, radicado: Proceso) -> bool:
+    """Sincroniza un solo radicado contra Rama Judicial en vivo.
+    Busca datos del proceso, actuaciones y documentos, y los persiste en DB.
+    Retorna True si se pudo sincronizar, False si falló.
+    """
+    if not re.fullmatch(r"\d{23}", radicado.llave_proceso or ""):
+        return False
+
+    try:
+        resultado: ResultadoBusqueda = buscar_por_radicado(radicado.llave_proceso, solo_activos=False)
+    except Exception as exc:
+        logger.warning("No se pudo consultar radicado %s: %s", radicado.llave_proceso, exc)
+        return False
+
+    if not resultado.procesos:
+        return False
+
+    resumen = _elegir_mejor_proceso(resultado.procesos)
+
+    try:
+        detalle = buscar_detalle_proceso(resumen.id_proceso)
+        resultado_actuaciones = buscar_actuaciones(resumen.id_proceso)
+    except Exception as exc:
+        logger.warning("No se pudo traer detalle de Rama para %s: %s", radicado.llave_proceso, exc)
+        return False
+
+    _actualizar_campos_proceso(radicado, resumen, detalle)
+
+    latest_remote = _latest_actuacion(resultado_actuaciones.actuaciones)
+    if latest_remote is not None:
+        radicado.fecha_ultima_actuacion = _serializar_texto(latest_remote.fecha_actuacion)
+
+    for actuacion_remota in resultado_actuaciones.actuaciones:
+        actuacion_db = _upsert_actuacion(db, radicado, actuacion_remota)
+        if actuacion_remota.con_documentos:
+            try:
+                documentos = buscar_documentos_actuacion(actuacion_remota.id_reg_actuacion)
+            except Exception as exc:
+                logger.warning(
+                    "No se pudieron traer documentos de la actuación %s: %s",
+                    actuacion_remota.id_reg_actuacion, exc,
+                )
+                documentos = []
+            for documento_remoto in documentos:
+                _upsert_documento(db, actuacion_db, documento_remoto)
+
+    db.commit()
+    return True
+
+
 def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
     query = db.query(Proceso)
     if user_id is not None:
