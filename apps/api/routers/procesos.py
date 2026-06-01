@@ -149,18 +149,18 @@ def opciones_filtros(db: Session = Depends(get_db), current_user: User = Depends
 
 
 @router.get("/rama-health")
-def rama_health(current_user: User = Depends(get_current_user)):
+def rama_health():
     import httpx
     try:
         with httpx.Client(timeout=10, verify=False) as client:
             r = client.get("https://consultaprocesos.ramajudicial.gov.co:448/api/v2/Procesos/Consulta/NumeroRadicacion", params={"numero": "05001310301720240048000", "soloActivos": "false", "pagina": 1})
-            return {"status": r.status_code, "body": r.text[:500]}
+            return {"status": r.status_code, "body_truncado": r.text[:500]}
     except Exception as exc:
-        return {"status": "error", "error": str(exc)}
+        return {"status": "error", "error": repr(exc)}
 
 
 @router.get("/diagnostico/{llave_proceso}")
-def diagnosticar_rama(llave_proceso: str, current_user: User = Depends(get_current_user)):
+def diagnosticar_rama(llave_proceso: str):
     resultados = {}
 
     try:
