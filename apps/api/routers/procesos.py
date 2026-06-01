@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from models.database import get_db
@@ -8,6 +10,8 @@ from services.auth import get_current_user, oauth2_scheme
 from config import API_TOKEN
 from typing import Optional
 from models.user import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/procesos", tags=["procesos"])
 
@@ -149,7 +153,8 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
-    sincronizar_radicado(db, proceso)
+    if not sincronizar_radicado(db, proceso):
+        logger.warning("No se pudieron traer datos en vivo de Rama para %s. Mostrando datos en caché.", llave_proceso)
 
     actuaciones = (
         db.query(Actuacion)
