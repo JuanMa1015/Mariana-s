@@ -123,11 +123,15 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
         despacho=payload.despacho or "",
         departamento=payload.departamento or "",
         sujetos_procesales=payload.sujetos_procesales or "",
-        notificado=True,
+        notificado=False,
         user_id=current_user.id,
     )
     db.add(nuevo)
     db.commit()
+
+    # Consultamos de inmediato para evitar que el radicado quede vacío hasta el siguiente sync automático.
+    sincronizar_radicados(db, user_id=current_user.id)
+
     return {"created": True, "llave_proceso": payload.llave_proceso}
 
 
