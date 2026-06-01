@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { loginUser } from "../api"
 import { Link, useNavigate } from "react-router-dom"
 import toast from "react-hot-toast"
@@ -7,7 +7,16 @@ export default function Login() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(false)
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const remembered = localStorage.getItem("rememberedEmail")
+    if (remembered) {
+      setEmail(remembered)
+      setRememberMe(true)
+    }
+  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -16,6 +25,11 @@ export default function Login() {
       const data = await loginUser({ email, password })
       localStorage.setItem("token", data.access_token)
       localStorage.setItem("email", data.email)
+      if (rememberMe) {
+        localStorage.setItem("rememberedEmail", email)
+      } else {
+        localStorage.removeItem("rememberedEmail")
+      }
       toast.success("¡Bienvenido!", { id: loadingToast })
       navigate("/")
     } catch (err: any) {
@@ -70,6 +84,16 @@ export default function Login() {
                 )}
               </button>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              id="remember"
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded text-violet-500"
+            />
+            <label htmlFor="remember" className="text-sm text-slate-600">Recordarme</label>
           </div>
           <button type="submit" className="mt-2 w-full rounded-2xl border border-violet-300 bg-violet-400 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 active:scale-95">
             Ingresar
