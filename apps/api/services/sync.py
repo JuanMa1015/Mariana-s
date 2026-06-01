@@ -10,6 +10,47 @@ from services.notifications import notificar_cambio_radicado
 logger = logging.getLogger(__name__)
 
 
+def _normalizar_texto(valor: str | None) -> str:
+    return (valor or "").strip()
+
+
+def _puntaje_proceso(proceso: ResultadoBusqueda | object) -> int:
+    campos = [
+        getattr(proceso, "despacho", None),
+        getattr(proceso, "departamento", None),
+        getattr(proceso, "sujetos_procesales", None),
+        getattr(proceso, "tipo_proceso", None),
+        getattr(proceso, "clase_proceso", None),
+        getattr(proceso, "fecha_ultima_actuacion", None),
+    ]
+    return sum(1 for campo in campos if _normalizar_texto(campo))
+
+
+def _elegir_mejor_proceso(resultados: list[object]):
+    return max(resultados, key=_puntaje_proceso)
+
+
+def _rellenar_campos(proceso: Proceso, remoto) -> bool:
+    """Copiar datos no vacíos desde Rama y reportar si hubo cambios."""
+    changed = False
+
+    for campo in ("despacho", "departamento", "sujetos_procesales", "tipo_proceso", "clase_proceso"):
+        valor_remoto = _normalizar_texto(getattr(remoto, campo, None))
+        valor_local = _normalizar_texto(getattr(proceso, campo, None))
+
+        if valor_remoto and valor_local != valor_remoto:
+            setattr(proceso, campo, valor_remoto)
+            changed = True
+
+    fecha_remota = _normalizar_texto(getattr(remoto, "fecha_ultima_actuacion", None))
+    fecha_local = _normalizar_texto(proceso.fecha_ultima_actuacion)
+    if fecha_remota and fecha_local != fecha_remota:
+        proceso.fecha_ultima_actuacion = fecha_remota
+        changed = True
+
+    return changed
+
+
 def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
     query = db.query(Proceso)
     if user_id is not None:
@@ -36,29 +77,32 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
         if not resultado.procesos:
             continue
 
-        remoto = resultado.procesos[0]
+        remoto = _elegir_mejor_proceso(resultado.procesos)
+        fecha_anterior = _normalizar_texto(radicado.fecha_ultima_actuacion)
+        tenia_campos_vacios = any(
+            not _normalizar_texto(valor)
+            for valor in (
+                radicado.despacho,
+                radicado.departamento,
+                radicado.sujetos_procesales,
+                radicado.tipo_proceso,
+                radicado.clase_proceso,
+                radicado.fecha_ultima_actuacion,
+            )
+        )
 
-        if radicado.fecha_ultima_actuacion is None:
-            radicado.despacho = remoto.despacho
-            radicado.departamento = remoto.departamento
-            radicado.sujetos_procesales = remoto.sujetos_procesales
-            radicado.tipo_proceso = remoto.tipo_proceso
-            radicado.clase_proceso = remoto.clase_proceso
-            radicado.fecha_ultima_actuacion = remoto.fecha_ultima_actuacion
+        if fecha_anterior == "":
+            _rellenar_campos(radicado, remoto)
             radicado.notificado = True
             nuevos.append(radicado.llave_proceso)
             db.commit()
             continue
 
-        if radicado.fecha_ultima_actuacion != remoto.fecha_ultima_actuacion:
-            radicado.despacho = remoto.despacho
-            radicado.departamento = remoto.departamento
-            radicado.sujetos_procesales = remoto.sujetos_procesales
-            radicado.tipo_proceso = remoto.tipo_proceso
-            radicado.clase_proceso = remoto.clase_proceso
-            radicado.fecha_ultima_actuacion = remoto.fecha_ultima_actuacion
+        cambio_datos = _rellenar_campos(radicado, remoto)
+        fecha_cambio = fecha_anterior != _normalizar_texto(radicado.fecha_ultima_actuacion)
+
+        if fecha_cambio:
             radicado.notificado = False
-            db.commit()
             actualizados.append(radicado.llave_proceso)
             if notificar_cambio_radicado(
                 llave_proceso=radicado.llave_proceso,
@@ -68,6 +112,9 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
                 sujetos_procesales=radicado.sujetos_procesales or "",
             ):
                 emails_enviados.append(radicado.llave_proceso)
+
+        if cambio_datos or fecha_cambio or tenia_campos_vacios:
+            db.commit()
 
     return {
         "total_consultados": len(radicados),
