@@ -6,6 +6,7 @@ from models.database import get_db
 from models.actuacion import Actuacion
 from models.proceso import Proceso
 from services.sync import sincronizar_radicado, sincronizar_radicados
+from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones
 from services.auth import get_current_user, oauth2_scheme
 from config import API_TOKEN
 from typing import Optional
@@ -145,6 +146,55 @@ def opciones_filtros(db: Session = Depends(get_db), current_user: User = Depends
     despachos = [d[0] for d in db.query(Proceso.despacho).filter(Proceso.user_id == current_user.id).distinct().all() if d[0]]
     departamentos = [d[0] for d in db.query(Proceso.departamento).filter(Proceso.user_id == current_user.id).distinct().all() if d[0]]
     return {"despachos": sorted(list(set(despachos))), "departamentos": sorted(list(set(departamentos)))}
+
+
+@router.get("/rama-health")
+def rama_health(current_user: User = Depends(get_current_user)):
+    import httpx
+    try:
+        with httpx.Client(timeout=10, verify=False) as client:
+            r = client.get("https://consultaprocesos.ramajudicial.gov.co:448/api/v2/Procesos/Consulta/NumeroRadicacion", params={"numero": "05001310301720240048000", "soloActivos": "false", "pagina": 1})
+            return {"status": r.status_code, "body": r.text[:500]}
+    except Exception as exc:
+        return {"status": "error", "error": str(exc)}
+
+
+@router.get("/diagnostico/{llave_proceso}")
+def diagnosticar_rama(llave_proceso: str, current_user: User = Depends(get_current_user)):
+    resultados = {}
+
+    try:
+        busqueda = buscar_por_radicado(llave_proceso, solo_activos=False)
+        resultados["busqueda"] = {
+            "ok": True,
+            "procesos": len(busqueda.procesos),
+            "id_proceso": busqueda.procesos[0].id_proceso if busqueda.procesos else None,
+        }
+        if busqueda.procesos:
+            id_proc = busqueda.procesos[0].id_proceso
+            try:
+                detalle = buscar_detalle_proceso(id_proc)
+                resultados["detalle"] = {"ok": True, "despacho": detalle.despacho}
+            except Exception as exc:
+                resultados["detalle"] = {"ok": False, "error": str(exc)}
+
+            try:
+                acts = buscar_actuaciones(id_proc)
+                resultados["actuaciones"] = {
+                    "ok": True,
+                    "total": acts.paginacion.cantidad_registros,
+                    "traidas": len(acts.actuaciones),
+                    "primera": {
+                        "fecha": acts.actuaciones[0].fecha_actuacion,
+                        "actuacion": acts.actuaciones[0].actuacion,
+                    } if acts.actuaciones else None,
+                }
+            except Exception as exc:
+                resultados["actuaciones"] = {"ok": False, "error": str(exc)}
+    except Exception as exc:
+        resultados["busqueda"] = {"ok": False, "error": str(exc)}
+
+    return resultados
 
 
 @router.get("/{llave_proceso}")
