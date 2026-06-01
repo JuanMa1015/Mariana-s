@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from models.database import get_db
+from models.actuacion import Actuacion
 from models.proceso import Proceso
 from services.sync import sincronizar_radicados
 from services.auth import get_current_user, oauth2_scheme
@@ -148,6 +149,13 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
+    actuaciones = (
+        db.query(Actuacion)
+        .filter(Actuacion.proceso_id == proceso.id)
+        .order_by(Actuacion.fecha_actuacion.desc().nullslast(), Actuacion.id_reg_actuacion.desc())
+        .all()
+    )
+
     return {
         "llave_proceso": proceso.llave_proceso,
         "despacho": proceso.despacho,
@@ -161,6 +169,33 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
         "notificado": proceso.notificado,
         "creado_en": proceso.creado_en,
         "actualizado_en": proceso.actualizado_en,
+        "actuaciones": [
+            {
+                "id_reg_actuacion": a.id_reg_actuacion,
+                "cons_actuacion": a.cons_actuacion,
+                "fecha_actuacion": a.fecha_actuacion,
+                "actuacion": a.actuacion,
+                "anotacion": a.anotacion,
+                "fecha_inicial": a.fecha_inicial,
+                "fecha_final": a.fecha_final,
+                "fecha_registro": a.fecha_registro,
+                "cod_regla": a.cod_regla,
+                "con_documentos": a.con_documentos,
+                "cant": a.cant,
+                "documentos": [
+                    {
+                        "id_reg_documento": d.id_reg_documento,
+                        "guid_documento_sxxiw": d.guid_documento_sxxiw,
+                        "nombre": d.nombre,
+                        "descripcion": d.descripcion,
+                        "tipo": d.tipo,
+                        "fecha_carga": d.fecha_carga,
+                    }
+                    for d in a.documentos
+                ],
+            }
+            for a in actuaciones
+        ],
     }
 
 

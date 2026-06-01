@@ -60,6 +60,8 @@ export default function DetalleView({ detalle, onVolver }: Props) {
     toast.success("Radicado copiado al portapapeles")
   }
 
+  const actuaciones = detalle.actuaciones ?? []
+
   const fechaUltima = detalle.fecha_ultima_actuacion
     ? new Date(detalle.fecha_ultima_actuacion).toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" })
     : null
@@ -164,6 +166,75 @@ export default function DetalleView({ detalle, onVolver }: Props) {
           <p className="whitespace-pre-line text-sm leading-7 text-slate-700">{detalle.sujetos_procesales}</p>
         </div>
       )}
+
+      {/* ── Actuaciones ── */}
+      <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-400">Actuaciones</p>
+            <h3 className="mt-1 text-lg font-semibold text-slate-800">Historial consultado desde Rama</h3>
+          </div>
+          <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
+            {actuaciones.length} registros
+          </span>
+        </div>
+
+        {actuaciones.length ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-[0.2em] text-slate-400">
+                  <th className="border-b border-slate-100 px-3 py-3">Fecha</th>
+                  <th className="border-b border-slate-100 px-3 py-3">Actuación</th>
+                  <th className="border-b border-slate-100 px-3 py-3">Anotación</th>
+                  <th className="border-b border-slate-100 px-3 py-3">Término</th>
+                  <th className="border-b border-slate-100 px-3 py-3">Registro</th>
+                  <th className="border-b border-slate-100 px-3 py-3">Docs</th>
+                </tr>
+              </thead>
+              <tbody>
+                {actuaciones.map((actuacion) => (
+                  <tr key={actuacion.id_reg_actuacion} className="align-top">
+                    <td className="border-b border-slate-100 px-3 py-3 whitespace-nowrap text-slate-700">
+                      {actuacion.fecha_actuacion ? new Date(actuacion.fecha_actuacion).toLocaleDateString("es-CO") : "Sin dato"}
+                    </td>
+                    <td className="border-b border-slate-100 px-3 py-3 font-medium text-slate-800">
+                      <div>{actuacion.actuacion}</div>
+                      {actuacion.con_documentos && (
+                        <div className="mt-1 text-[11px] font-semibold text-emerald-600">Con documentos adjuntos</div>
+                      )}
+                    </td>
+                    <td className="border-b border-slate-100 px-3 py-3 text-slate-700">
+                      {actuacion.anotacion || <span className="italic text-slate-400">Sin anotación</span>}
+                    </td>
+                    <td className="border-b border-slate-100 px-3 py-3 whitespace-nowrap text-slate-700">
+                      {actuacion.fecha_inicial || "—"} / {actuacion.fecha_final || "—"}
+                    </td>
+                    <td className="border-b border-slate-100 px-3 py-3 whitespace-nowrap text-slate-700">
+                      {actuacion.fecha_registro || "—"}
+                    </td>
+                    <td className="border-b border-slate-100 px-3 py-3 text-slate-700">
+                      {actuacion.documentos?.length ? (
+                        <ul className="space-y-1">
+                          {actuacion.documentos.map((doc) => (
+                            <li key={doc.id_reg_documento} className="rounded-lg bg-slate-50 px-2 py-1 text-[11px] text-slate-600">
+                              {doc.nombre}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="italic text-slate-400">Sin documentos</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-500">Aún no hay actuaciones guardadas para este radicado.</p>
+        )}
+      </div>
     </div>
   )
 }

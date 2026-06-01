@@ -1,10 +1,19 @@
+import logging
 import re
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-import logging
 
+from models.actuacion import Actuacion
+from models.documento_actuacion import DocumentoActuacion
 from models.proceso import Proceso
-from scraper.rama_client import buscar_por_radicado, ResultadoBusqueda
+from scraper.rama_client import (
+    ResultadoBusqueda,
+    buscar_actuaciones,
+    buscar_detalle_proceso,
+    buscar_documentos_actuacion,
+    buscar_por_radicado,
+)
 from services.notifications import notificar_cambio_radicado
 
 logger = logging.getLogger(__name__)
@@ -31,30 +40,101 @@ def _elegir_mejor_proceso(resultados: list[object]):
     return max(resultados, key=_puntaje_proceso)
 
 
-def _rellenar_campos(proceso: Proceso, remoto) -> bool:
-    """Copiar datos no vacíos desde Rama y reportar si hubo cambios."""
+def _serializar_texto(valor: str | None) -> str | None:
+    valor_normalizado = _normalizar_texto(valor)
+    return valor_normalizado or None
+
+
+def _actualizar_campos_proceso(proceso: Proceso, resumen, detalle) -> bool:
     changed = False
 
-    for campo in ("despacho", "departamento", "sujetos_procesales", "tipo_proceso", "clase_proceso", "fecha_proceso"):
-        valor_remoto = _normalizar_texto(getattr(remoto, campo, None))
-        valor_local = _normalizar_texto(getattr(proceso, campo, None))
-
-        if valor_remoto and valor_local != valor_remoto:
-            setattr(proceso, campo, valor_remoto)
+    def set_if_changed(field_name: str, value: str | None):
+        nonlocal changed
+        normalized = _serializar_texto(value)
+        current = _serializar_texto(getattr(proceso, field_name, None))
+        if normalized and normalized != current:
+            setattr(proceso, field_name, normalized)
             changed = True
 
-    fecha_remota = _normalizar_texto(getattr(remoto, "fecha_ultima_actuacion", None))
-    fecha_local = _normalizar_texto(proceso.fecha_ultima_actuacion)
-    if fecha_remota and fecha_local != fecha_remota:
-        proceso.fecha_ultima_actuacion = fecha_remota
-        changed = True
+    set_if_changed("despacho", detalle.despacho or resumen.despacho)
+    set_if_changed("departamento", resumen.departamento)
+    set_if_changed("sujetos_procesales", resumen.sujetos_procesales)
+    set_if_changed("tipo_proceso", detalle.tipo_proceso or resumen.tipo_proceso)
+    set_if_changed("clase_proceso", detalle.clase_proceso or resumen.clase_proceso)
+    set_if_changed("fecha_proceso", detalle.fecha_proceso or resumen.fecha_proceso)
 
-    es_privado_remoto = getattr(remoto, "es_privado", None)
-    if es_privado_remoto is not None and proceso.es_privado != es_privado_remoto:
-        proceso.es_privado = es_privado_remoto
+    if proceso.es_privado != detalle.es_privado:
+        proceso.es_privado = detalle.es_privado
         changed = True
 
     return changed
+
+
+def _upsert_actuacion(db: Session, proceso_db: Proceso, actuacion_remota) -> Actuacion:
+    existente = (
+        db.query(Actuacion)
+        .filter(Actuacion.proceso_id == proceso_db.id, Actuacion.id_reg_actuacion == actuacion_remota.id_reg_actuacion)
+        .first()
+    )
+
+    if existente is None:
+        existente = Actuacion(proceso_id=proceso_db.id, id_reg_actuacion=actuacion_remota.id_reg_actuacion)
+        db.add(existente)
+
+    existente.cons_actuacion = actuacion_remota.cons_actuacion
+    existente.fecha_actuacion = _serializar_texto(actuacion_remota.fecha_actuacion)
+    existente.actuacion = _serializar_texto(actuacion_remota.actuacion)
+    existente.anotacion = _serializar_texto(actuacion_remota.anotacion)
+    existente.fecha_inicial = _serializar_texto(actuacion_remota.fecha_inicial)
+    existente.fecha_final = _serializar_texto(actuacion_remota.fecha_final)
+    existente.fecha_registro = _serializar_texto(actuacion_remota.fecha_registro)
+    existente.cod_regla = _serializar_texto(actuacion_remota.cod_regla)
+    existente.con_documentos = bool(actuacion_remota.con_documentos)
+    existente.cant = actuacion_remota.cant
+
+    return existente
+
+
+def _upsert_documento(db: Session, actuacion_db: Actuacion, documento_remoto) -> DocumentoActuacion:
+    existente = (
+        db.query(DocumentoActuacion)
+        .filter(
+            DocumentoActuacion.actuacion_id == actuacion_db.id,
+            DocumentoActuacion.id_reg_documento == documento_remoto.id_reg_documento,
+        )
+        .first()
+    )
+
+    if existente is None:
+        existente = DocumentoActuacion(
+            actuacion_id=actuacion_db.id,
+            id_reg_documento=documento_remoto.id_reg_documento,
+            guid_documento_sxxiw=documento_remoto.guid_documento_sxxiw,
+            nombre=documento_remoto.nombre,
+        )
+        db.add(existente)
+
+    existente.id_conexion = documento_remoto.id_conexion
+    existente.cons_actuacion = documento_remoto.cons_actuacion
+    existente.guid_documento_sxxiw = documento_remoto.guid_documento_sxxiw
+    existente.nombre = documento_remoto.nombre
+    existente.descripcion = documento_remoto.descripcion
+    existente.tipo = documento_remoto.tipo
+    existente.fecha_carga = documento_remoto.fecha_carga
+
+    return existente
+
+
+def _latest_actuacion(actuaciones: list[object]):
+    if not actuaciones:
+        return None
+    return max(
+        actuaciones,
+        key=lambda actuacion: (
+            _normalizar_texto(getattr(actuacion, "fecha_actuacion", None)),
+            int(getattr(actuacion, "id_reg_actuacion", 0) or 0),
+        ),
+    )
 
 
 def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
@@ -62,6 +142,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
     if user_id is not None:
         query = query.filter(Proceso.user_id == user_id)
     radicados = query.order_by(Proceso.id.asc()).all()
+
     nuevos = []
     actualizados = []
     emails_enviados = []
@@ -83,32 +164,56 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
         if not resultado.procesos:
             continue
 
-        remoto = _elegir_mejor_proceso(resultado.procesos)
-        fecha_anterior = _normalizar_texto(radicado.fecha_ultima_actuacion)
-        tenia_campos_vacios = any(
-            not _normalizar_texto(valor)
-            for valor in (
-                radicado.despacho,
-                radicado.departamento,
-                radicado.sujetos_procesales,
-                radicado.tipo_proceso,
-                radicado.clase_proceso,
-                radicado.fecha_proceso,
-                radicado.fecha_ultima_actuacion,
-            )
-        )
+        resumen = _elegir_mejor_proceso(resultado.procesos)
 
-        if fecha_anterior == "":
-            _rellenar_campos(radicado, remoto)
-            radicado.notificado = True
-            nuevos.append(radicado.llave_proceso)
-            db.commit()
+        try:
+            detalle = buscar_detalle_proceso(resumen.id_proceso)
+            resultado_actuaciones = buscar_actuaciones(resumen.id_proceso)
+        except Exception as exc:
+            logger.warning("No se pudo traer el detalle de Rama para %s: %s", radicado.llave_proceso, exc)
+            errores.append(radicado.llave_proceso)
             continue
 
-        cambio_datos = _rellenar_campos(radicado, remoto)
-        fecha_cambio = fecha_anterior != _normalizar_texto(radicado.fecha_ultima_actuacion)
+        previous_latest_id = (
+            db.query(func.max(Actuacion.id_reg_actuacion))
+            .filter(Actuacion.proceso_id == radicado.id)
+            .scalar()
+        )
+        is_initial_sync = previous_latest_id is None
 
-        if fecha_cambio:
+        datos_cambiaron = _actualizar_campos_proceso(radicado, resumen, detalle)
+
+        latest_remote = _latest_actuacion(resultado_actuaciones.actuaciones)
+        if latest_remote is not None:
+            radicado.fecha_ultima_actuacion = _serializar_texto(latest_remote.fecha_actuacion)
+
+        for actuacion_remota in resultado_actuaciones.actuaciones:
+            actuacion_db = _upsert_actuacion(db, radicado, actuacion_remota)
+            if actuacion_remota.con_documentos:
+                try:
+                    documentos = buscar_documentos_actuacion(actuacion_remota.id_reg_actuacion)
+                except Exception as exc:
+                    logger.warning(
+                        "No se pudieron traer documentos de la actuación %s: %s",
+                        actuacion_remota.id_reg_actuacion,
+                        exc,
+                    )
+                    documentos = []
+                for documento_remoto in documentos:
+                    _upsert_documento(db, actuacion_db, documento_remoto)
+
+        db.flush()
+
+        latest_stored_id = (
+            db.query(func.max(Actuacion.id_reg_actuacion))
+            .filter(Actuacion.proceso_id == radicado.id)
+            .scalar()
+        )
+
+        if is_initial_sync:
+            radicado.notificado = True
+            nuevos.append(radicado.llave_proceso)
+        elif latest_remote is not None and latest_stored_id != previous_latest_id:
             radicado.notificado = False
             actualizados.append(radicado.llave_proceso)
             if notificar_cambio_radicado(
@@ -117,10 +222,14 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
                 departamento=radicado.departamento or "",
                 fecha_ultima_actuacion=radicado.fecha_ultima_actuacion,
                 sujetos_procesales=radicado.sujetos_procesales or "",
+                actuacion=latest_remote.actuacion,
+                anotacion=latest_remote.anotacion,
+                fecha_registro=latest_remote.fecha_registro,
+                con_documentos=latest_remote.con_documentos,
             ):
                 emails_enviados.append(radicado.llave_proceso)
 
-        if cambio_datos or fecha_cambio or tenia_campos_vacios:
+        if datos_cambiaron or latest_remote is not None or is_initial_sync:
             db.commit()
 
     return {

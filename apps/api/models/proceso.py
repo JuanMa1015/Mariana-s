@@ -23,3 +23,4 @@ class Proceso(Base):
     actualizado_en = Column(DateTime, onupdate=func.now())
 
     user = relationship("User", back_populates="procesos")
+    actuaciones = relationship("Actuacion", back_populates="proceso", cascade="all, delete-orphan")

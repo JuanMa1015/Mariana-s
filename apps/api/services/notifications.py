@@ -8,7 +8,17 @@ from config import EMAIL_FROM, EMAIL_TO, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SM
 logger = logging.getLogger(__name__)
 
 
-def notificar_cambio_radicado(llave_proceso: str, despacho: str, departamento: str, fecha_ultima_actuacion: str | None, sujetos_procesales: str) -> bool:
+def notificar_cambio_radicado(
+    llave_proceso: str,
+    despacho: str,
+    departamento: str,
+    fecha_ultima_actuacion: str | None,
+    sujetos_procesales: str,
+    actuacion: str | None = None,
+    anotacion: str | None = None,
+    fecha_registro: str | None = None,
+    con_documentos: bool | None = None,
+) -> bool:
     destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
 
     if not SMTP_HOST or not destinatarios:
@@ -21,6 +31,10 @@ def notificar_cambio_radicado(llave_proceso: str, despacho: str, departamento: s
         f"Despacho: {despacho}\n"
         f"Departamento: {departamento}\n"
         f"Última actuación: {fecha_ultima_actuacion or 'N/D'}\n\n"
+        f"Actuación: {actuacion or 'N/D'}\n"
+        f"Anotación: {anotacion or 'N/D'}\n"
+        f"Fecha de registro: {fecha_registro or 'N/D'}\n"
+        f"Con documentos: {'Sí' if con_documentos else 'No'}\n\n"
         f"Sujetos procesales:\n{sujetos_procesales}\n"
         f"\n"
         f"Ver proceso en Rama Judicial:\n"
