@@ -13,6 +13,30 @@ export interface Proceso {
   actualizado_en?: string | null
 }
 
+export interface DocumentoActuacion {
+  id_reg_documento: number
+  guid_documento_sxxiw: string
+  nombre: string
+  descripcion?: string | null
+  tipo?: string | null
+  fecha_carga?: string | null
+}
+
+export interface Actuacion {
+  id_reg_actuacion: number
+  cons_actuacion: number
+  fecha_actuacion?: string | null
+  actuacion: string
+  anotacion?: string | null
+  fecha_inicial?: string | null
+  fecha_final?: string | null
+  fecha_registro?: string | null
+  cod_regla?: string | null
+  con_documentos: boolean
+  cant?: number | null
+  documentos?: DocumentoActuacion[]
+}
+
 export interface ListaProcesos {
   total: number
   skip?: number
@@ -40,4 +64,6 @@ export interface ResultadoSync {
   actualizados: number
 }
 
-export interface DetalleProceso extends Proceso {}
+export interface DetalleProceso extends Proceso {
+  actuaciones?: Actuacion[]
+}
