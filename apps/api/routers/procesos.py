@@ -7,6 +7,7 @@ from models.database import get_db, SessionLocal
 from models.actuacion import Actuacion
 from models.proceso import Proceso
 from services.sync import sincronizar_radicado, sincronizar_radicados
+from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones
 from services.auth import get_current_user, oauth2_scheme
 from config import API_TOKEN
 from typing import Optional
@@ -207,6 +208,28 @@ def diagnosticar_rama(llave_proceso: str):
         resultados["busqueda"] = {"ok": False, "error": str(exc)}
 
     return resultados
+
+
+@router.get("/publico/{llave_proceso}")
+def obtener_proceso_publico(llave_proceso: str):
+    """Endpoint publico temporal para probar CORS desde el frontend."""
+    try:
+        busqueda = buscar_por_radicado(llave_proceso, solo_activos=False)
+        if not busqueda.procesos:
+            return {"actuaciones": []}
+        acts = buscar_actuaciones(busqueda.procesos[0].id_proceso)
+        return {
+            "actuaciones": [
+                {
+                    "fecha_actuacion": a.fecha_actuacion,
+                    "actuacion": a.actuacion,
+                    "anotacion": a.anotacion,
+                }
+                for a in acts.actuaciones
+            ]
+        }
+    except Exception as exc:
+        return {"error": str(exc)}
 
 
 @router.get("/{llave_proceso}")
