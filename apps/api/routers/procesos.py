@@ -1,12 +1,12 @@
 import logging
+import threading
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from sqlalchemy.orm import Session
-from models.database import get_db
+from models.database import get_db, SessionLocal
 from models.actuacion import Actuacion
 from models.proceso import Proceso
 from services.sync import sincronizar_radicado, sincronizar_radicados
-from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones
 from services.auth import get_current_user, oauth2_scheme
 from config import API_TOKEN
 from typing import Optional
@@ -14,6 +14,21 @@ from pydantic import BaseModel, constr
 from models.user import User
 
 logger = logging.getLogger(__name__)
+
+
+def _sincronizar_en_background(proceso: Proceso):
+    def _run():
+        try:
+            db = SessionLocal()
+            try:
+                radicado = db.query(Proceso).filter(Proceso.id == proceso.id).first()
+                if radicado:
+                    sincronizar_radicado(db, radicado)
+            finally:
+                db.close()
+        except Exception as exc:
+            logger.error("Error en sync background para %s: %s", proceso.llave_proceso, exc)
+    threading.Thread(target=_run, daemon=True).start()
 
 router = APIRouter(prefix="/procesos", tags=["procesos"])
 
@@ -133,10 +148,7 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
     db.commit()
 
     # Consultamos de inmediato para evitar que el radicado quede vacío hasta el siguiente sync automático.
-    try:
-        sincronizar_radicado(db, nuevo)
-    except Exception as exc:
-        logger.warning("Sync inicial falló para %s: %s", payload.llave_proceso, exc)
+    _sincronizar_en_background(nuevo)
 
     return {"created": True, "llave_proceso": payload.llave_proceso}
 
@@ -203,10 +215,7 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
-    try:
-        sincronizar_radicado(db, proceso)
-    except Exception as exc:
-        logger.warning("Sync falló para %s, usando cache: %s", llave_proceso, exc)
+    _sincronizar_en_background(proceso)
 
     actuaciones = (
         db.query(Actuacion)
