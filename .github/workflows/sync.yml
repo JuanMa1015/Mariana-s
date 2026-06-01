@@ -22,20 +22,52 @@ jobs:
 
       - name: Wake up server
         run: |
+          echo "⏳ Esperando a que el servidor responda..."
           for i in {1..24}; do
             if curl -fsS "${{ secrets.API_URL }}/health"; then
+              echo "✅ Servidor listo"
               exit 0
             fi
+            echo "  Intento $i/24 — aún no responde, esperando 5s..."
             sleep 5
           done
-          echo "API did not become ready in time"
+          echo "❌ El servidor no respondió a tiempo"
           exit 1
 
       - name: Trigger sync
+        id: sync
         run: |
-          curl -X POST "${{ secrets.API_URL }}/procesos/sync" \
+          echo "🔄 Sincronizando procesos judiciales..."
+          RESULT=$(curl -s -X POST "${{ secrets.API_URL }}/procesos/sync" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
-            --fail \
             --retry 3 \
-            --retry-delay 15
+            --retry-delay 15)
+
+          echo "Resultado: $RESULT"
+          echo "result=$RESULT" >> $GITHUB_OUTPUT
+
+          CONSULTADOS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_consultados', 0))" 2>/dev/null || echo "?")
+          NUEVOS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('nuevos', 0))" 2>/dev/null || echo "?")
+          ACTUALIZADOS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('actualizados', 0))" 2>/dev/null || echo "?")
+          EMAILS=$(echo "$RESULT" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('emails_enviados', [])))" 2>/dev/null || echo "?")
+          ERRORES=$(echo "$RESULT" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('radicados_error_consulta', [])))" 2>/dev/null || echo "?")
+
+          echo ""
+          echo "============= RESUMEN DE SINCRONIZACION ============="
+          echo "  Consultados:    $CONSULTADOS"
+          echo "  Nuevos:         $NUEVOS"
+          echo "  Actualizados:   $ACTUALIZADOS"
+          echo "  Notificaciones: $EMAILS"
+          echo "  Errores:        $ERRORES"
+          echo "====================================================="
+          echo ""
+          if [ "$EMAILS" -gt 0 ] 2>/dev/null; then
+            echo "📧 Se enviaron $EMAILS notificaciones por correo con los detalles de las nuevas actuaciones."
+          fi
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ La sincronización falló."
+          echo "Revisa los logs del workflow para más detalles."
