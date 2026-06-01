@@ -132,6 +132,11 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
     db.add(nuevo)
     db.commit()
 
+    try:
+        sincronizar_radicado(db, nuevo)
+    except Exception as exc:
+        logger.warning("Sync inicial falló para %s: %s", payload.llave_proceso, exc)
+
     return {"created": True, "llave_proceso": payload.llave_proceso}
 
 
@@ -214,12 +219,16 @@ def obtener_proceso_publico(llave_proceso: str):
 
 
 @router.get("/{llave_proceso}")
-def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db)):
-    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
+def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
-    # Primero devolvemos datos cacheados inmediatamente
+    try:
+        sincronizar_radicado(db, proceso)
+    except Exception as exc:
+        logger.warning("Sync falló para %s: %s", llave_proceso, exc)
+
     actuaciones = (
         db.query(Actuacion)
         .filter(Actuacion.proceso_id == proceso.id)
