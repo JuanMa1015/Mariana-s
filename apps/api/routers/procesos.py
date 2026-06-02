@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -9,6 +9,7 @@ from models.proceso import Proceso
 from services.sync import sincronizar_radicados
 from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones
 from services.auth import get_current_user, oauth2_scheme
+from services.notifications import notificar_cambio_radicado
 from config import API_TOKEN
 from typing import Optional
 from pydantic import BaseModel, constr
@@ -133,6 +134,7 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
     db.add(nuevo)
     db.commit()
 
+    last_remote = None
     try:
         resultado = buscar_por_radicado(payload.llave_proceso, solo_activos=False)
         if resultado.procesos:
@@ -142,12 +144,30 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
                 _upsert_actuacion(db, nuevo, a)
                 if a.fecha_actuacion and (ultima_fecha is None or a.fecha_actuacion > ultima_fecha):
                     ultima_fecha = a.fecha_actuacion
+                    last_remote = a
             if ultima_fecha:
                 nuevo.fecha_ultima_actuacion = ultima_fecha
             db.commit()
     except Exception as exc:
         logger.warning("Sync inicial falló para %s: %s", payload.llave_proceso, exc)
         db.rollback()
+
+    # Notify only if the latest actuación is from today
+    if last_remote is not None and _es_hoy(last_remote.fecha_actuacion):
+        notificar_cambio_radicado(
+            llave_proceso=nuevo.llave_proceso,
+            despacho=nuevo.despacho or "",
+            departamento=nuevo.departamento or "",
+            fecha_ultima_actuacion=nuevo.fecha_ultima_actuacion,
+            sujetos_procesales=nuevo.sujetos_procesales or "",
+            actuacion=last_remote.actuacion,
+            anotacion=last_remote.anotacion,
+            fecha_registro=last_remote.fecha_registro,
+            con_documentos=last_remote.con_documentos,
+        )
+    else:
+        nuevo.notificado = True
+        db.commit()
 
     return {"created": True, "llave_proceso": payload.llave_proceso}
 
@@ -228,6 +248,15 @@ def obtener_proceso_publico(llave_proceso: str):
         }
     except Exception as exc:
         return {"error": str(exc)}
+
+
+def _es_hoy(fecha_str: str | None) -> bool:
+    if not fecha_str:
+        return False
+    try:
+        return fecha_str[:10] == date.today().isoformat()
+    except (ValueError, IndexError):
+        return False
 
 
 def _sincronizar_radicado_actuaciones(db, proceso):
