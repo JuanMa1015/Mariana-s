@@ -14,7 +14,7 @@ class DocumentoActuacion(Base):
     id_reg_documento = Column(BigInteger, nullable=False, index=True)
     id_conexion = Column(Integer)
     cons_actuacion = Column(BigInteger)
-    guid_documento_sxxiw = Column(String, nullable=False)
+    guid_documento_sxxiw = Column(String, nullable=True)
     nombre = Column(String, nullable=False)
     descripcion = Column(Text)
     tipo = Column(String)
