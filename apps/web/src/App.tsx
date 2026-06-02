@@ -15,6 +15,8 @@ export default function App() {
   const [loadingDetalle, setLoadingDetalle] = useState(false)
   const [page, setPage] = useState(1)
   const [limit] = useState(10)
+  const [filtroCategoria, setFiltroCategoria] = useState("")
+  const [busqueda, setBusqueda] = useState("")
 
   const searchParams = new URLSearchParams(window.location.search)
   const view = searchParams.get("view")
@@ -24,14 +26,14 @@ export default function App() {
 
   const cargarLista = async () => {
     const skip = (page - 1) * limit
-    const [p, n] = await Promise.all([getProcesos(undefined, undefined, skip, limit), getNovedades()])
+    const [p, n] = await Promise.all([getProcesos(undefined, undefined, skip, limit, filtroCategoria || undefined, busqueda || undefined), getNovedades()])
     setProcesos(p)
     setNovedades(n)
   }
 
   useEffect(() => {
     cargarLista()
-  }, [page, limit])
+  }, [page, limit, filtroCategoria, busqueda])
 
   useEffect(() => {
     if (!esDetalle || !radicadoDetalle) return
@@ -182,6 +184,31 @@ export default function App() {
             <div className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-semibold text-violet-600 sm:text-xs">
               {procesos?.total ?? 0} guardados · {novedades?.total ?? 0} novedades
             </div>
+          </div>
+
+          {/* ── Filters ── */}
+          <div className="flex flex-col gap-2 border-b border-violet-50 px-4 py-3 sm:flex-row sm:items-center sm:px-5">
+            <div className="flex gap-1">
+              {["", "Trabajo", "Consultorio"].map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => { setFiltroCategoria(cat); setPage(1) }}
+                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                    filtroCategoria === cat
+                      ? "bg-violet-200 text-violet-800"
+                      : "bg-violet-50 text-violet-600 hover:bg-violet-100"
+                  }`}
+                >
+                  {cat || "Todas"}
+                </button>
+              ))}
+            </div>
+            <input
+              placeholder="Buscar radicado..."
+              value={busqueda}
+              onChange={(e) => { setBusqueda(e.target.value); setPage(1) }}
+              className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-2 text-sm outline-none transition placeholder:text-violet-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100 sm:w-64"
+            />
           </div>
 
           <div className="min-h-0 flex-1 border-t border-violet-50">

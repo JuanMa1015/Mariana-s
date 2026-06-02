@@ -25,6 +25,8 @@ def listar_procesos(
     current_user: User = Depends(get_current_user),
     despacho: str = Query(None),
     departamento: str = Query(None),
+    categoria: str = Query(None),
+    q: str = Query(None),
     skip: int = 0,
     limit: int = 10,
 ):
@@ -34,6 +36,10 @@ def listar_procesos(
         query = query.filter(Proceso.despacho.ilike(f"%{despacho}%"))
     if departamento:
         query = query.filter(Proceso.departamento.ilike(f"%{departamento}%"))
+    if categoria:
+        query = query.filter(Proceso.categoria == categoria)
+    if q:
+        query = query.filter(Proceso.llave_proceso.ilike(f"%{q}%"))
 
     total = query.count()
     procesos = query.offset(skip).limit(limit).all()

@@ -37,10 +37,12 @@ export async function registerUser(payload: any) {
   return res.json()
 }
 
-export async function getProcesos(despacho?: string, departamento?: string, skip = 0, limit = 10) {
+export async function getProcesos(despacho?: string, departamento?: string, skip = 0, limit = 10, categoria?: string, q?: string) {
   const params = new URLSearchParams()
   if (despacho) params.append("despacho", despacho)
   if (departamento) params.append("departamento", departamento)
+  if (categoria) params.append("categoria", categoria)
+  if (q) params.append("q", q)
   params.append("skip", String(skip))
   params.append("limit", String(limit))
   const res = await fetchWithAuth(`${BASE_URL}/procesos/?${params}`)
