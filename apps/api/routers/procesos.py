@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -152,8 +152,8 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
         logger.warning("Sync inicial falló para %s: %s", payload.llave_proceso, exc)
         db.rollback()
 
-    # Notify only if the latest actuación is from today
-    if last_remote is not None and _es_hoy(last_remote.fecha_actuacion):
+    # Always notify when user adds a radicado (they need to know its state)
+    if last_remote is not None:
         notificar_cambio_radicado(
             llave_proceso=nuevo.llave_proceso,
             despacho=nuevo.despacho or "",
@@ -248,15 +248,6 @@ def obtener_proceso_publico(llave_proceso: str):
         }
     except Exception as exc:
         return {"error": str(exc)}
-
-
-def _es_hoy(fecha_str: str | None) -> bool:
-    if not fecha_str:
-        return False
-    try:
-        return fecha_str[:10] == date.today().isoformat()
-    except (ValueError, IndexError):
-        return False
 
 
 def _sincronizar_radicado_actuaciones(db, proceso):
