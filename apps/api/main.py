@@ -65,20 +65,30 @@ def health():
 
 @app.get("/test-email")
 def test_email():
-    from services.notifications import notificar_cambio_radicado
-    from config import EMAIL_TO, SMTP_HOST
-    ok = notificar_cambio_radicado(
-        llave_proceso="TEST-123456789012345678901",
-        despacho="TEST Despacho",
-        departamento="TEST",
-        fecha_ultima_actuacion="2026-06-01",
-        sujetos_procesales="Test de notificación",
-        actuacion="TEST Actuación",
-        anotacion="Mensaje de prueba desde Mariana's",
-        fecha_registro="2026-06-01T12:00:00",
-        con_documentos=False,
-    )
-    return {"email_enviado": ok, "destinatario": EMAIL_TO, "smtp_host": SMTP_HOST}
+    import smtplib
+    from email.message import EmailMessage
+    from config import EMAIL_FROM, EMAIL_TO, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USE_TLS, SMTP_USER, APP_URL
+
+    destinatarios = [c.strip() for c in EMAIL_TO.replace(",", " ").split() if c.strip()]
+    if not SMTP_HOST or not destinatarios:
+        return {"email_enviado": False, "error": "SMTP no configurado", "smtp_host": SMTP_HOST, "destinatario": EMAIL_TO}
+
+    mensaje = EmailMessage()
+    mensaje["From"] = EMAIL_FROM or SMTP_USER
+    mensaje["To"] = ", ".join(destinatarios)
+    mensaje["Subject"] = "TEST - Mariana's Monitor Judicial"
+    mensaje.set_content("Este es un correo de prueba desde Mariana's.\n\nSi recibes esto, las notificaciones funcionan correctamente.")
+
+    try:
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
+            if SMTP_USE_TLS:
+                server.starttls()
+            if SMTP_USER:
+                server.login(SMTP_USER, SMTP_PASSWORD)
+            server.send_message(mensaje, to_addrs=destinatarios)
+        return {"email_enviado": True, "destinatario": EMAIL_TO, "smtp_host": SMTP_HOST, "smtp_user": SMTP_USER}
+    except Exception as exc:
+        return {"email_enviado": False, "destinatario": EMAIL_TO, "smtp_host": SMTP_HOST, "smtp_user": SMTP_USER, "error": repr(exc)}
 
 app.include_router(auth_router)
 app.include_router(procesos_router)
