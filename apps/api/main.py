@@ -27,7 +27,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     logger.exception("Error no manejado en %s: %s", request.url, exc)
     return JSONResponse(
         status_code=500,
-        content={"error": str(exc), "type": type(exc).__name__},
+        content={
+            "detail": f"{type(exc).__name__}: {exc}",
+            "error": str(exc),
+            "type": type(exc).__name__,
+        },
         headers={
             "Access-Control-Allow-Origin": "https://mariana-app-nu.vercel.app",
             "Access-Control-Allow-Credentials": "true",
