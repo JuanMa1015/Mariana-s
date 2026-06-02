@@ -228,6 +228,23 @@ def obtener_proceso_publico(llave_proceso: str):
         return {"error": str(exc)}
 
 
+def _sincronizar_radicado_actuaciones(db, proceso):
+    try:
+        resultado = buscar_por_radicado(proceso.llave_proceso, solo_activos=False)
+        if resultado.procesos:
+            acts = buscar_actuaciones(resultado.procesos[0].id_proceso)
+            ultima_fecha = None
+            for a in acts.actuaciones:
+                _upsert_actuacion(db, proceso, a)
+                if a.fecha_actuacion and (ultima_fecha is None or a.fecha_actuacion > ultima_fecha):
+                    ultima_fecha = a.fecha_actuacion
+            if ultima_fecha:
+                proceso.fecha_ultima_actuacion = ultima_fecha
+            db.commit()
+    except Exception as exc:
+        logger.warning("Sync falló para %s: %s", proceso.llave_proceso, exc)
+
+
 def _upsert_actuacion(db, proceso, remota):
     existente = db.query(Actuacion).filter(Actuacion.proceso_id == proceso.id, Actuacion.id_reg_actuacion == remota.id_reg_actuacion).first()
     if existente is None:
@@ -252,20 +269,7 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
-    try:
-        resultado = buscar_por_radicado(llave_proceso, solo_activos=False)
-        if resultado.procesos:
-            acts = buscar_actuaciones(resultado.procesos[0].id_proceso)
-            ultima_fecha = None
-            for a in acts.actuaciones:
-                _upsert_actuacion(db, proceso, a)
-                if a.fecha_actuacion and (ultima_fecha is None or a.fecha_actuacion > ultima_fecha):
-                    ultima_fecha = a.fecha_actuacion
-            if ultima_fecha:
-                proceso.fecha_ultima_actuacion = ultima_fecha
-            db.commit()
-    except Exception as exc:
-        logger.warning("Sync directo falló para %s: %s", llave_proceso, exc)
+    _sincronizar_radicado_actuaciones(db, proceso)
 
     actuaciones = (
         db.query(Actuacion)
