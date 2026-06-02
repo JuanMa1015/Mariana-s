@@ -14,6 +14,16 @@ def init_db():
     except Exception:
         pass  # SQLite doesn't support ALTER COLUMN TYPE; ignore
 
+    # Migrate documentos_actuacion columns to BigInteger
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE documentos_actuacion ALTER COLUMN id_reg_documento TYPE BIGINT"))
+            conn.execute(text("ALTER TABLE documentos_actuacion ALTER COLUMN cons_actuacion TYPE BIGINT"))
+            conn.commit()
+    except Exception:
+        pass
+
     # Migrate: add categoria column if missing
     try:
         from sqlalchemy import text

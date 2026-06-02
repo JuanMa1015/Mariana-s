@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, BigInteger, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -11,9 +11,9 @@ class DocumentoActuacion(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     actuacion_id = Column(Integer, ForeignKey("actuaciones.id"), nullable=False, index=True)
-    id_reg_documento = Column(Integer, nullable=False, index=True)
+    id_reg_documento = Column(BigInteger, nullable=False, index=True)
     id_conexion = Column(Integer)
-    cons_actuacion = Column(Integer)
+    cons_actuacion = Column(BigInteger)
     guid_documento_sxxiw = Column(String, nullable=False)
     nombre = Column(String, nullable=False)
     descripcion = Column(Text)
