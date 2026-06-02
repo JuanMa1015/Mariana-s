@@ -13,3 +13,12 @@ def init_db():
             conn.commit()
     except Exception:
         pass  # SQLite doesn't support ALTER COLUMN TYPE; ignore
+
+    # Migrate: add categoria column if missing
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE procesos ADD COLUMN categoria VARCHAR DEFAULT 'General'"))
+            conn.commit()
+    except Exception:
+        pass  # Column already exists or not supported

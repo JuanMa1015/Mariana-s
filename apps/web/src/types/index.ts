@@ -6,6 +6,7 @@ export interface Proceso {
   tipo_proceso: string
   clase_proceso?: string | null
   es_privado?: boolean | null
+  categoria?: string | null
   fecha_proceso?: string | null
   fecha_ultima_actuacion: string | null
   notificado: boolean

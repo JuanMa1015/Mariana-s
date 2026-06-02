@@ -52,6 +52,7 @@ def listar_procesos(
                 "tipo_proceso": p.tipo_proceso,
                 "clase_proceso": p.clase_proceso,
                 "es_privado": p.es_privado,
+                "categoria": p.categoria,
                 "fecha_proceso": p.fecha_proceso,
                 "fecha_ultima_actuacion": p.fecha_ultima_actuacion,
                 "notificado": p.notificado,
@@ -115,6 +116,7 @@ class AddRadicado(BaseModel):
     despacho: Optional[str] = None
     departamento: Optional[str] = None
     sujetos_procesales: Optional[str] = None
+    categoria: Optional[str] = None
 
 
 @router.post("/add")
@@ -128,6 +130,7 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
         despacho=payload.despacho or "",
         departamento=payload.departamento or "",
         sujetos_procesales=payload.sujetos_procesales or "",
+        categoria=payload.categoria or "General",
         notificado=False,
         user_id=current_user.id,
     )
@@ -323,6 +326,7 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
         "tipo_proceso": proceso.tipo_proceso,
         "clase_proceso": proceso.clase_proceso,
         "es_privado": proceso.es_privado,
+        "categoria": proceso.categoria,
         "fecha_proceso": proceso.fecha_proceso,
         "fecha_ultima_actuacion": proceso.fecha_ultima_actuacion,
         "notificado": proceso.notificado,

@@ -63,7 +63,7 @@ export async function postSync() {
   return res.json()
 }
 
-export async function postAddRadicado(payload: { llave_proceso: string; despacho?: string; departamento?: string; sujetos_procesales?: string }) {
+export async function postAddRadicado(payload: { llave_proceso: string; despacho?: string; departamento?: string; sujetos_procesales?: string; categoria?: string }) {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/add`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

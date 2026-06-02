@@ -19,6 +19,7 @@ class Proceso(Base):
     fecha_proceso = Column(String)
     fecha_ultima_actuacion = Column(String)
     notificado = Column(Boolean, default=False)
+    categoria = Column(String, default="General")
     creado_en = Column(DateTime, server_default=func.now())
     actualizado_en = Column(DateTime, onupdate=func.now())
 
