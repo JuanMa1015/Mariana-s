@@ -8,13 +8,20 @@ from dataclasses import dataclass, field
 
 warnings.filterwarnings("ignore", message=".*verify.*", category=UserWarning)
 
-TIMEOUT = 30
-MAX_RETRIES = 3
+TIMEOUT = httpx.Timeout(120.0, connect=20.0)
+MAX_RETRIES = 5
 
 
 def _request_with_retry(client: httpx.Client, method: str, url: str, **kwargs) -> httpx.Response:
     for attempt in range(1 + MAX_RETRIES):
-        response = client.request(method, url, **kwargs)
+        try:
+            response = client.request(method, url, **kwargs)
+        except (httpx.TimeoutException, httpx.ReadTimeout) as exc:
+            if attempt < MAX_RETRIES:
+                wait = 2 ** (attempt + 1)
+                time.sleep(wait)
+                continue
+            raise
         if response.status_code == 403 and attempt < MAX_RETRIES:
             wait = 2 ** (attempt + 1)
             time.sleep(wait)
