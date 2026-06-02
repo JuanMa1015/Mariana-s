@@ -3,6 +3,7 @@ import re
 import time
 from datetime import date
 
+import httpx
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -232,7 +233,9 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
             msg = f"{type(exc).__name__}: {exc}"
             logger.warning("No se pudo consultar radicado %s: %s", radicado.llave_proceso, msg)
             errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "buscar_por_radicado"})
-            if "403" in msg:
+            if "Timeout" in type(exc).__name__:
+                time.sleep(10)
+            elif "403" in msg:
                 time.sleep(8)
             continue
 
@@ -250,7 +253,9 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
             msg = f"{type(exc).__name__}: {exc}"
             logger.warning("No se pudo traer detalle de Rama para %s: %s", radicado.llave_proceso, msg)
             errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "detalle_o_actuaciones"})
-            if "403" in msg:
+            if "Timeout" in type(exc).__name__:
+                time.sleep(10)
+            elif "403" in msg:
                 time.sleep(5)
             continue
 
