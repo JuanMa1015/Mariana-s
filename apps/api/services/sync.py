@@ -224,8 +224,9 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
         try:
             resultado: ResultadoBusqueda = buscar_por_radicado(radicado.llave_proceso, solo_activos=False)
         except Exception as exc:
-            logger.warning("No se pudo consultar radicado %s: %s", radicado.llave_proceso, exc)
-            errores.append(radicado.llave_proceso)
+            msg = f"{type(exc).__name__}: {exc}"
+            logger.warning("No se pudo consultar radicado %s: %s", radicado.llave_proceso, msg)
+            errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "buscar_por_radicado"})
             continue
 
         if not resultado.procesos:
@@ -237,8 +238,9 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
             detalle = buscar_detalle_proceso(resumen.id_proceso)
             resultado_actuaciones = buscar_actuaciones(resumen.id_proceso)
         except Exception as exc:
-            logger.warning("No se pudo traer el detalle de Rama para %s: %s", radicado.llave_proceso, exc)
-            errores.append(radicado.llave_proceso)
+            msg = f"{type(exc).__name__}: {exc}"
+            logger.warning("No se pudo traer detalle de Rama para %s: %s", radicado.llave_proceso, msg)
+            errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "detalle_o_actuaciones"})
             continue
 
         previous_latest_id = (
