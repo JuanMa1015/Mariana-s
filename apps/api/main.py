@@ -65,32 +65,54 @@ def health():
 
 @app.get("/test-email")
 def test_email():
+    import json, urllib.request
     from config import EMAIL_TO, SENDGRID_API_KEY
 
     destinatarios = [c.strip() for c in EMAIL_TO.replace(",", " ").split() if c.strip()]
+    if not destinatarios:
+        return {"email_enviado": False, "error": "Sin destinatarios"}
+
+    data = json.dumps({
+        "personalizations": [{"to": [{"email": d} for d in destinatarios]}],
+        "from": {"email": "gonzalezjuanmanuel645@gmail.com"},
+        "subject": "TEST - Mariana's",
+        "content": [{"type": "text/plain", "value": "Correo de prueba desde Mariana's."}],
+    }).encode()
+
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=data,
+        headers={
+            "Authorization": f"Bearer {SENDGRID_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
     try:
-        from sendgrid import SendGridAPIClient
-        from sendgrid.helpers.mail import Mail, Email, To, Content
-        message = Mail(
-            from_email=Email("gonzalezjuanmanuel645@gmail.com"),
-            to_emails=[To(c) for c in destinatarios],
-            subject="TEST - Mariana's Monitor Judicial",
-            plain_text_content=Content("text/plain", "Correo de prueba desde Mariana's."),
-        )
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        response = sg.send(message)
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            body = resp.read().decode()
+            return {
+                "email_enviado": True,
+                "status": resp.status,
+                "body": body[:200],
+                "destinatario": EMAIL_TO,
+                "sendgrid_api_key_set": bool(SENDGRID_API_KEY),
+            }
+    except urllib.error.HTTPError as e:
         return {
-            "email_enviado": 200 <= response.status_code < 300,
-            "status_code": response.status_code,
+            "email_enviado": False,
+            "status": e.code,
+            "body": e.read().decode()[:500],
             "destinatario": EMAIL_TO,
             "sendgrid_api_key_set": bool(SENDGRID_API_KEY),
         }
     except Exception as exc:
         return {
             "email_enviado": False,
+            "error": repr(exc),
             "destinatario": EMAIL_TO,
             "sendgrid_api_key_set": bool(SENDGRID_API_KEY),
-            "error": repr(exc),
         }
 
 app.include_router(auth_router)
