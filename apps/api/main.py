@@ -65,48 +65,61 @@ def health():
 
 @app.get("/test-email")
 def test_email():
-    import socket, smtplib
-    from email.message import EmailMessage
-    from config import EMAIL_FROM, EMAIL_TO, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USE_TLS, SMTP_USER, APP_URL
+    import socket
+    from config import EMAIL_TO, SMTP_HOST, SMTP_USER, SMTP_PASSWORD
 
-    destinatarios = [c.strip() for c in EMAIL_TO.replace(",", " ").split() if c.strip()]
-    if not SMTP_HOST or not destinatarios:
-        return {"email_enviado": False, "error": "SMTP no configurado", "smtp_host": SMTP_HOST, "destinatario": EMAIL_TO}
+    # Solo DNS + ping básico, nada de SMTP para evitar timeouts
+    result = {"destinatario": EMAIL_TO, "smtp_host": SMTP_HOST, "smtp_user": SMTP_USER}
 
-    # Test DNS resolution
     try:
-        ips = socket.getaddrinfo(SMTP_HOST, SMTP_PORT)
-        dns_ok = ips[:2]
+        ips = socket.getaddrinfo(SMTP_HOST, 587)
+        result["dns"] = [f"{info[0]}:{info[4][0]}" for info in ips[:3]]
     except Exception as e:
-        dns_ok = f"DNS fail: {e}"
+        result["dns"] = f"DNS fail: {e}"
+        return {"email_enviado": False, **result}
 
-    mensaje = EmailMessage()
-    mensaje["From"] = EMAIL_FROM or SMTP_USER
-    mensaje["To"] = ", ".join(destinatarios)
-    mensaje["Subject"] = "TEST - Mariana's Monitor Judicial"
-    mensaje.set_content("Este es un correo de prueba desde Mariana's.\n\nSi recibes esto, las notificaciones funcionan correctamente.")
+    # Intentar conexión TCP rápida
+    for puerto in [587, 465]:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
+            sock.connect((SMTP_HOST, puerto))
+            sock.close()
+            result["tcp_ok"] = puerto
+            break
+        except Exception as e:
+            result[f"tcp_{puerto}"] = str(e)
 
-    # Try port 587 (STARTTLS)
-    try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as server:
-            if SMTP_USE_TLS:
-                server.starttls()
-            if SMTP_USER:
-                server.login(SMTP_USER, SMTP_PASSWORD)
-            server.send_message(mensaje, to_addrs=destinatarios)
-        return {"email_enviado": True, "destinatario": EMAIL_TO, "smtp_host": SMTP_HOST, "puerto": SMTP_PORT, "smtp_user": SMTP_USER, "dns": str(dns_ok)}
-    except Exception as exc:
-        pass
+    if "tcp_ok" in result:
+        # TCP conectó, intentar SMTP
+        import smtplib
+        from email.message import EmailMessage
+        from config import EMAIL_FROM
 
-    # Try port 465 (SSL directo)
-    try:
-        with smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=15) as server:
-            if SMTP_USER:
-                server.login(SMTP_USER, SMTP_PASSWORD)
-            server.send_message(mensaje, to_addrs=destinatarios)
-        return {"email_enviado": True, "destinatario": EMAIL_TO, "smtp_host": SMTP_HOST, "puerto": 465, "smtp_user": SMTP_USER, "dns": str(dns_ok)}
-    except Exception as exc:
-        return {"email_enviado": False, "destinatario": EMAIL_TO, "smtp_host": SMTP_HOST, "smtp_user": SMTP_USER, "dns": str(dns_ok), "error": repr(exc)}
+        mensaje = EmailMessage()
+        mensaje["From"] = EMAIL_FROM or SMTP_USER
+        mensaje["To"] = EMAIL_TO
+        mensaje["Subject"] = "TEST - Mariana's Monitor Judicial"
+        mensaje.set_content("Correo de prueba desde Mariana's.")
+
+        puerto = result["tcp_ok"]
+        try:
+            if puerto == 465:
+                with smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=10) as server:
+                    if SMTP_USER:
+                        server.login(SMTP_USER, SMTP_PASSWORD)
+                    server.send_message(mensaje)
+            else:
+                with smtplib.SMTP(SMTP_HOST, puerto, timeout=10) as server:
+                    server.starttls()
+                    if SMTP_USER:
+                        server.login(SMTP_USER, SMTP_PASSWORD)
+                    server.send_message(mensaje)
+            return {"email_enviado": True, **result}
+        except Exception as e:
+            return {"email_enviado": False, "smtp_error": repr(e), **result}
+
+    return {"email_enviado": False, **result}
 
 app.include_router(auth_router)
 app.include_router(procesos_router)
