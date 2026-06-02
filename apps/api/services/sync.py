@@ -247,16 +247,30 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
         time.sleep(0.5)
         try:
             detalle = buscar_detalle_proceso(resumen.id_proceso)
-            time.sleep(0.5)
-            resultado_actuaciones = buscar_actuaciones(resumen.id_proceso)
         except Exception as exc:
             msg = f"{type(exc).__name__}: {exc}"
             logger.warning("No se pudo traer detalle de Rama para %s: %s", radicado.llave_proceso, msg)
-            errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "detalle_o_actuaciones"})
+            errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "detalle"})
             if "Timeout" in type(exc).__name__:
                 time.sleep(10)
             elif "403" in msg:
                 time.sleep(5)
+            continue
+
+        time.sleep(0.5)
+        resultado_actuaciones = None
+        for act_intento in range(3):
+            try:
+                resultado_actuaciones = buscar_actuaciones(resumen.id_proceso)
+                break
+            except Exception as exc:
+                msg = f"{type(exc).__name__}: {exc}"
+                logger.warning("Intento %d de actuaciones para %s falló: %s", act_intento + 1, radicado.llave_proceso, msg)
+                if act_intento < 2:
+                    pausa = 5 * (2 ** act_intento)
+                    time.sleep(pausa)
+        if resultado_actuaciones is None:
+            errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "actuaciones"})
             continue
 
         previous_latest_id = (
