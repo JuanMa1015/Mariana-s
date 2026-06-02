@@ -65,61 +65,15 @@ def health():
 
 @app.get("/test-email")
 def test_email():
-    import socket
-    from config import EMAIL_TO, SMTP_HOST, SMTP_USER, SMTP_PASSWORD
+    from config import EMAIL_TO, SENDGRID_API_KEY
+    from services.notifications import _enviar_sendgrid
 
-    # Solo DNS + ping básico, nada de SMTP para evitar timeouts
-    result = {"destinatario": EMAIL_TO, "smtp_host": SMTP_HOST, "smtp_user": SMTP_USER}
-
-    try:
-        ips = socket.getaddrinfo(SMTP_HOST, 587)
-        result["dns"] = [f"{info[0]}:{info[4][0]}" for info in ips[:3]]
-    except Exception as e:
-        result["dns"] = f"DNS fail: {e}"
-        return {"email_enviado": False, **result}
-
-    # Intentar conexión TCP rápida
-    for puerto in [587, 465]:
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(5)
-            sock.connect((SMTP_HOST, puerto))
-            sock.close()
-            result["tcp_ok"] = puerto
-            break
-        except Exception as e:
-            result[f"tcp_{puerto}"] = str(e)
-
-    if "tcp_ok" in result:
-        # TCP conectó, intentar SMTP
-        import smtplib
-        from email.message import EmailMessage
-        from config import EMAIL_FROM
-
-        mensaje = EmailMessage()
-        mensaje["From"] = EMAIL_FROM or SMTP_USER
-        mensaje["To"] = EMAIL_TO
-        mensaje["Subject"] = "TEST - Mariana's Monitor Judicial"
-        mensaje.set_content("Correo de prueba desde Mariana's.")
-
-        puerto = result["tcp_ok"]
-        try:
-            if puerto == 465:
-                with smtplib.SMTP_SSL(SMTP_HOST, 465, timeout=10) as server:
-                    if SMTP_USER:
-                        server.login(SMTP_USER, SMTP_PASSWORD)
-                    server.send_message(mensaje)
-            else:
-                with smtplib.SMTP(SMTP_HOST, puerto, timeout=10) as server:
-                    server.starttls()
-                    if SMTP_USER:
-                        server.login(SMTP_USER, SMTP_PASSWORD)
-                    server.send_message(mensaje)
-            return {"email_enviado": True, **result}
-        except Exception as e:
-            return {"email_enviado": False, "smtp_error": repr(e), **result}
-
-    return {"email_enviado": False, **result}
+    ok = _enviar_sendgrid(
+        destinatarios=[c.strip() for c in EMAIL_TO.replace(",", " ").split() if c.strip()],
+        asunto="TEST - Mariana's Monitor Judicial",
+        cuerpo="Correo de prueba desde Mariana's.\n\nSi ves esto, las notificaciones funcionan correctamente.",
+    )
+    return {"email_enviado": ok, "destinatario": EMAIL_TO, "sendgrid_api_key_set": bool(SENDGRID_API_KEY)}
 
 app.include_router(auth_router)
 app.include_router(procesos_router)

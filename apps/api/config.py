@@ -21,3 +21,6 @@ API_TOKEN = os.getenv("API_TOKEN", "")
 
 # URL pública de la aplicación (usada en notificaciones para enlaces)
 APP_URL = os.getenv("APP_URL", "https://marianas.vercel.app")
+
+# SendGrid (alternativa a SMTP directo)
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
