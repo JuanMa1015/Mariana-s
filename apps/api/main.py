@@ -66,14 +66,32 @@ def health():
 @app.get("/test-email")
 def test_email():
     from config import EMAIL_TO, SENDGRID_API_KEY
-    from services.notifications import _enviar_sendgrid
 
-    ok = _enviar_sendgrid(
-        destinatarios=[c.strip() for c in EMAIL_TO.replace(",", " ").split() if c.strip()],
-        asunto="TEST - Mariana's Monitor Judicial",
-        cuerpo="Correo de prueba desde Mariana's.\n\nSi ves esto, las notificaciones funcionan correctamente.",
-    )
-    return {"email_enviado": ok, "destinatario": EMAIL_TO, "sendgrid_api_key_set": bool(SENDGRID_API_KEY)}
+    destinatarios = [c.strip() for c in EMAIL_TO.replace(",", " ").split() if c.strip()]
+    try:
+        from sendgrid import SendGridAPIClient
+        from sendgrid.helpers.mail import Mail, Email, To, Content
+        message = Mail(
+            from_email=Email("gonzalezjuanmanuel645@gmail.com"),
+            to_emails=[To(c) for c in destinatarios],
+            subject="TEST - Mariana's Monitor Judicial",
+            plain_text_content=Content("text/plain", "Correo de prueba desde Mariana's."),
+        )
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        response = sg.send(message)
+        return {
+            "email_enviado": 200 <= response.status_code < 300,
+            "status_code": response.status_code,
+            "destinatario": EMAIL_TO,
+            "sendgrid_api_key_set": bool(SENDGRID_API_KEY),
+        }
+    except Exception as exc:
+        return {
+            "email_enviado": False,
+            "destinatario": EMAIL_TO,
+            "sendgrid_api_key_set": bool(SENDGRID_API_KEY),
+            "error": repr(exc),
+        }
 
 app.include_router(auth_router)
 app.include_router(procesos_router)
