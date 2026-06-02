@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 from datetime import date
 
 from sqlalchemy import func
@@ -216,7 +217,11 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
     ignorados = []
     errores = []
 
-    for radicado in radicados:
+    for idx, radicado in enumerate(radicados):
+        # Pausa entre radicados para evitar rate limiting de Rama Judicial
+        if idx > 0:
+            time.sleep(1.5)
+
         if not re.fullmatch(r"\d{23}", radicado.llave_proceso or ""):
             ignorados.append(radicado.llave_proceso)
             continue
@@ -227,6 +232,8 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
             msg = f"{type(exc).__name__}: {exc}"
             logger.warning("No se pudo consultar radicado %s: %s", radicado.llave_proceso, msg)
             errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "buscar_por_radicado"})
+            if "403" in msg:
+                time.sleep(5)
             continue
 
         if not resultado.procesos:
@@ -241,6 +248,8 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
             msg = f"{type(exc).__name__}: {exc}"
             logger.warning("No se pudo traer detalle de Rama para %s: %s", radicado.llave_proceso, msg)
             errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "detalle_o_actuaciones"})
+            if "403" in msg:
+                time.sleep(5)
             continue
 
         previous_latest_id = (

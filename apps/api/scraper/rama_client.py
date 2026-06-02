@@ -1,13 +1,27 @@
 from __future__ import annotations
 
 import httpx
+import time
 import warnings
 from typing import Optional
 from dataclasses import dataclass, field
 
 warnings.filterwarnings("ignore", message=".*verify.*", category=UserWarning)
 
-TIMEOUT = 10
+TIMEOUT = 15
+MAX_RETRIES = 2
+
+
+def _request_with_retry(client: httpx.Client, method: str, url: str, **kwargs) -> httpx.Response:
+    for attempt in range(1 + MAX_RETRIES):
+        response = client.request(method, url, **kwargs)
+        if response.status_code == 403 and attempt < MAX_RETRIES:
+            wait = 2 ** (attempt + 1)
+            time.sleep(wait)
+            continue
+        response.raise_for_status()
+        return response
+    return response  # Never reached
 
 BASE_URL = "https://consultaprocesos.ramajudicial.gov.co:448/api/v2/Procesos/Consulta"
 BASE_ROOT = BASE_URL.replace("/Procesos/Consulta", "")
@@ -136,13 +150,9 @@ def buscar_por_nombre(
     }
 
     with _cliente() as client:
-        response = client.get(
-            f"{BASE_URL}/NombreRazonSocial",
-            params=params,
-        )
+        response = _request_with_retry(client, "GET", f"{BASE_URL}/NombreRazonSocial", params=params)
         print(f"Status: {response.status_code}")
         print(f"Body: {response.text[:500]}")
-        response.raise_for_status()
         data = response.json()
 
     procesos = [_parsear_proceso(p) for p in data.get("procesos", [])]
@@ -212,16 +222,14 @@ def _parsear_actuacion(raw: dict) -> Actuacion:
 
 def buscar_detalle_proceso(id_proceso: int) -> DetalleProceso:
     with _cliente() as client:
-        response = client.get(f"{BASE_ROOT}/Proceso/Detalle/{id_proceso}")
-        response.raise_for_status()
+        response = _request_with_retry(client, "GET", f"{BASE_ROOT}/Proceso/Detalle/{id_proceso}")
         data = response.json()
     return _parsear_detalle(data)
 
 
 def buscar_actuaciones(id_proceso: int, pagina: int = 1) -> ResultadoActuaciones:
     with _cliente() as client:
-        response = client.get(f"{BASE_ROOT}/Proceso/Actuaciones/{id_proceso}", params={"pagina": pagina})
-        response.raise_for_status()
+        response = _request_with_retry(client, "GET", f"{BASE_ROOT}/Proceso/Actuaciones/{id_proceso}", params={"pagina": pagina})
         data = response.json()
 
     actuaciones = [_parsear_actuacion(a) for a in data.get("actuaciones", [])]
@@ -239,8 +247,7 @@ def buscar_actuaciones(id_proceso: int, pagina: int = 1) -> ResultadoActuaciones
 
 def buscar_documentos_actuacion(id_reg_actuacion: int) -> list[DocumentoActuacion]:
     with _cliente() as client:
-        response = client.get(f"{BASE_ROOT}/Proceso/DocumentosActuacion/{id_reg_actuacion}")
-        response.raise_for_status()
+        response = _request_with_retry(client, "GET", f"{BASE_ROOT}/Proceso/DocumentosActuacion/{id_reg_actuacion}")
         data = response.json()
 
     return [_parsear_documento(d) for d in data]
@@ -254,13 +261,9 @@ def buscar_por_radicado(numero: str, solo_activos: bool = False, pagina: int = 1
     }
 
     with _cliente() as client:
-        response = client.get(
-            f"{BASE_URL}/NumeroRadicacion",
-            params=params,
-        )
+        response = _request_with_retry(client, "GET", f"{BASE_URL}/NumeroRadicacion", params=params)
         print(f"Status: {response.status_code}")
         print(f"Body: {response.text[:500]}")
-        response.raise_for_status()
         data = response.json()
 
     procesos = [_parsear_proceso(p) for p in data.get("procesos", [])]
