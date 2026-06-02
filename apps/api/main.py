@@ -28,6 +28,10 @@ async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"error": str(exc), "type": type(exc).__name__},
+        headers={
+            "Access-Control-Allow-Origin": "https://mariana-app-nu.vercel.app",
+            "Access-Control-Allow-Credentials": "true",
+        },
     )
 
 
@@ -37,6 +41,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def cors_fallback(request: Request, call_next):
+    response = await call_next(request)
+    if "access-control-allow-origin" not in response.headers:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+    if "access-control-allow-headers" not in response.headers:
+        response.headers["Access-Control-Allow-Headers"] = "*"
+    if "access-control-allow-methods" not in response.headers:
+        response.headers["Access-Control-Allow-Methods"] = "*"
+    return response
 
 @app.get("/health")
 def health():
