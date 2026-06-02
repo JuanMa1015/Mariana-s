@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from sqlalchemy.orm import Session
@@ -230,6 +231,10 @@ def obtener_proceso_publico(llave_proceso: str):
 
 
 def _sincronizar_radicado_actuaciones(db, proceso):
+    # Skip if synced within last 30 minutes
+    if proceso.actualizado_en and (datetime.now(timezone.utc) - proceso.actualizado_en).total_seconds() < 1800:
+        return
+
     try:
         resultado = buscar_por_radicado(proceso.llave_proceso, solo_activos=False)
         if resultado.procesos:
@@ -241,7 +246,8 @@ def _sincronizar_radicado_actuaciones(db, proceso):
                     ultima_fecha = a.fecha_actuacion
             if ultima_fecha:
                 proceso.fecha_ultima_actuacion = ultima_fecha
-            db.commit()
+        proceso.actualizado_en = datetime.now(timezone.utc)
+        db.commit()
     except Exception as exc:
         logger.warning("Sync falló para %s: %s", proceso.llave_proceso, exc)
         db.rollback()
