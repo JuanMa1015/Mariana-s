@@ -233,7 +233,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
             logger.warning("No se pudo consultar radicado %s: %s", radicado.llave_proceso, msg)
             errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "buscar_por_radicado"})
             if "403" in msg:
-                time.sleep(5)
+                time.sleep(8)
             continue
 
         if not resultado.procesos:
@@ -241,8 +241,10 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
 
         resumen = _elegir_mejor_proceso(resultado.procesos)
 
+        time.sleep(0.5)
         try:
             detalle = buscar_detalle_proceso(resumen.id_proceso)
+            time.sleep(0.5)
             resultado_actuaciones = buscar_actuaciones(resumen.id_proceso)
         except Exception as exc:
             msg = f"{type(exc).__name__}: {exc}"

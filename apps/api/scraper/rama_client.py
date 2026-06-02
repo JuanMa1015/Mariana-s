@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 warnings.filterwarnings("ignore", message=".*verify.*", category=UserWarning)
 
 TIMEOUT = 30
-MAX_RETRIES = 2
+MAX_RETRIES = 3
 
 
 def _request_with_retry(client: httpx.Client, method: str, url: str, **kwargs) -> httpx.Response:
