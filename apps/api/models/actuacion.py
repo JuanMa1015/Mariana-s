@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import BigInteger, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -11,8 +11,8 @@ class Actuacion(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     proceso_id = Column(Integer, ForeignKey("procesos.id"), nullable=False, index=True)
-    id_reg_actuacion = Column(Integer, nullable=False, index=True)
-    cons_actuacion = Column(Integer, nullable=False)
+    id_reg_actuacion = Column(BigInteger, nullable=False, index=True)
+    cons_actuacion = Column(BigInteger, nullable=False)
     fecha_actuacion = Column(String)
     actuacion = Column(String)
     anotacion = Column(Text)

@@ -146,6 +146,7 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
             db.commit()
     except Exception as exc:
         logger.warning("Sync inicial falló para %s: %s", payload.llave_proceso, exc)
+        db.rollback()
 
     return {"created": True, "llave_proceso": payload.llave_proceso}
 
@@ -243,6 +244,7 @@ def _sincronizar_radicado_actuaciones(db, proceso):
             db.commit()
     except Exception as exc:
         logger.warning("Sync falló para %s: %s", proceso.llave_proceso, exc)
+        db.rollback()
 
 
 def _upsert_actuacion(db, proceso, remota):
