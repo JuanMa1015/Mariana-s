@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 warnings.filterwarnings("ignore", message=".*verify.*", category=UserWarning)
 
-TIMEOUT = 15
+TIMEOUT = 30
 MAX_RETRIES = 2
 
 
