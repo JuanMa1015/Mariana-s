@@ -62,5 +62,23 @@ async def cors_fallback(request: Request, call_next):
 def health():
     return {"status": "ok"}
 
+
+@app.get("/test-email")
+def test_email():
+    from services.notifications import notificar_cambio_radicado
+    from config import EMAIL_TO, SMTP_HOST
+    ok = notificar_cambio_radicado(
+        llave_proceso="TEST-123456789012345678901",
+        despacho="TEST Despacho",
+        departamento="TEST",
+        fecha_ultima_actuacion="2026-06-01",
+        sujetos_procesales="Test de notificación",
+        actuacion="TEST Actuación",
+        anotacion="Mensaje de prueba desde Mariana's",
+        fecha_registro="2026-06-01T12:00:00",
+        con_documentos=False,
+    )
+    return {"email_enviado": ok, "destinatario": EMAIL_TO, "smtp_host": SMTP_HOST}
+
 app.include_router(auth_router)
 app.include_router(procesos_router)

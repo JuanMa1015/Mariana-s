@@ -10,7 +10,7 @@ from services.sync import sincronizar_radicados
 from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones
 from services.auth import get_current_user, oauth2_scheme
 from services.notifications import notificar_cambio_radicado
-from config import API_TOKEN, EMAIL_TO, SMTP_HOST
+from config import API_TOKEN
 from typing import Optional
 from pydantic import BaseModel, constr
 from models.user import User
@@ -257,23 +257,6 @@ def obtener_proceso_publico(llave_proceso: str):
         }
     except Exception as exc:
         return {"error": str(exc)}
-
-
-@router.get("/test-email")
-def test_email():
-    from services.notifications import notificar_cambio_radicado
-    ok = notificar_cambio_radicado(
-        llave_proceso="TEST-123456789012345678901",
-        despacho="TEST Despacho",
-        departamento="TEST",
-        fecha_ultima_actuacion="2026-06-01",
-        sujetos_procesales="Test de notificación",
-        actuacion="TEST Actuación",
-        anotacion="Mensaje de prueba desde Mariana's",
-        fecha_registro="2026-06-01T12:00:00",
-        con_documentos=False,
-    )
-    return {"email_enviado": ok, "destinatario": EMAIL_TO, "smtp_host": SMTP_HOST}
 
 
 def _es_hoy(fecha_str: str | None) -> bool:
