@@ -22,20 +22,7 @@ export default function App() {
 
   const esDetalle = view === "detalle" && Boolean(radicadoDetalle)
 
-  const cargarDatos = async () => {
-    if (esDetalle && radicadoDetalle) {
-      setLoadingDetalle(true)
-      try {
-        const [p, n, d] = await Promise.all([getProcesos(undefined, undefined, 0, 1), getNovedades(), getProceso(radicadoDetalle)])
-        setProcesos(p)
-        setNovedades(n)
-        setDetalle(d)
-      } finally {
-        setLoadingDetalle(false)
-      }
-      return
-    }
-
+  const cargarLista = async () => {
     const skip = (page - 1) * limit
     const [p, n] = await Promise.all([getProcesos(undefined, undefined, skip, limit), getNovedades()])
     setProcesos(p)
@@ -43,8 +30,15 @@ export default function App() {
   }
 
   useEffect(() => {
-    cargarDatos()
-  }, [page, limit, esDetalle, radicadoDetalle])
+    cargarLista()
+  }, [page, limit])
+
+  useEffect(() => {
+    if (!esDetalle || !radicadoDetalle) return
+    setLoadingDetalle(true)
+    setDetalle(null)
+    getProceso(radicadoDetalle).then(setDetalle).finally(() => setLoadingDetalle(false))
+  }, [esDetalle, radicadoDetalle])
 
   const abrirDetalle = (llaveProceso: string) => {
     const url = new URL(window.location.href)
@@ -108,7 +102,7 @@ export default function App() {
                 </div>
               </div>
             ) : detalle ? (
-              <DetalleView detalle={detalle} onVolver={volverLista} onActualizado={cargarDatos} />
+              <DetalleView detalle={detalle} onVolver={volverLista} onActualizado={cargarLista} />
             ) : (
               <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
                 No se encontró el radicado solicitado.
@@ -153,7 +147,7 @@ export default function App() {
                   const res = await postAddRadicado(newRadicado)
                   if (res.created) {
                     setNewRadicado({ llave_proceso: "" })
-                    await cargarDatos()
+                    await cargarLista()
                     toast.success("Radicado agregado exitosamente", { id: loadingToast })
                   } else {
                     toast.error(res.detail || res.message || 'Error al agregar', { id: loadingToast })
@@ -181,7 +175,7 @@ export default function App() {
           </div>
 
           <div className="min-h-0 flex-1 border-t border-violet-50">
-            {procesos && <TablaProcesos procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={async () => await cargarDatos()} />}
+            {procesos && <TablaProcesos procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={cargarLista} />}
           </div>
         </section>
         <div className="flex items-center justify-between px-1 pt-1 text-xs text-slate-500">
