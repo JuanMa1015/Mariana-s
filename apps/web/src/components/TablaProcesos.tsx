@@ -98,7 +98,7 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
         {/* ── Header ── */}
         <thead className="sticky top-0 z-10">
           <tr>
-            {["Radicado", "Despacho", "Departamento", "Sujetos", "Última actuación", "Estado", "Acciones"].map((col) => (
+            {["Radicado", "Despacho", "Departamento", "Categoría", "Sujetos", "Última actuación", "Estado", "Acciones"].map((col) => (
               <th
                 key={col}
                 className="bg-violet-100 px-5 py-3.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-600 first:rounded-tl-2xl last:rounded-tr-2xl"
@@ -152,6 +152,24 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
                     {p.departamento ? (
                       <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
                         {p.departamento}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400 italic">—</span>
+                    )}
+                  </td>
+
+                  {/* Categoría */}
+                  <td className="px-5 py-4 align-middle border-b border-slate-100">
+                    {p.categoria ? (
+                      <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
+                        p.categoria === "Trabajo"
+                          ? "border-sky-200 bg-sky-50 text-sky-700"
+                          : "border-amber-200 bg-amber-50 text-amber-700"
+                      }`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${
+                          p.categoria === "Trabajo" ? "bg-sky-500" : "bg-amber-500"
+                        }`} />
+                        {p.categoria}
                       </span>
                     ) : (
                       <span className="text-xs text-slate-400 italic">—</span>
@@ -240,7 +258,7 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
                 {/* ── Expanded detail row ── */}
                 {isOpen && (
                   <tr>
-                    <td colSpan={7} className="border-b border-violet-50 bg-gradient-to-b from-violet-50/50 to-white px-6 pb-6 pt-0">
+                    <td colSpan={8} className="border-b border-violet-50 bg-gradient-to-b from-violet-50/50 to-white px-6 pb-6 pt-0">
                       <div className="mt-3 rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
                         {/* Header */}
                         <div className="mb-4 flex items-start justify-between gap-3 border-b border-violet-100 pb-4">
@@ -259,6 +277,7 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
                           {[
                             { label: "Tipo de proceso", value: p.tipo_proceso },
                             { label: "Clase", value: p.clase_proceso },
+                            { label: "Categoría", value: p.categoria || "General" },
                             { label: "Privado", value: p.es_privado ? "Sí" : "No" },
                             { label: "Fecha del proceso", value: p.fecha_proceso },
                             { label: "Registrado el", value: p.creado_en ? new Date(p.creado_en).toLocaleString("es-CO") : null },

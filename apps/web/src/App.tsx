@@ -10,7 +10,7 @@ export default function App() {
   const navigate = useNavigate()
   const [procesos, setProcesos] = useState<ListaProcesos | null>(null)
   const [novedades, setNovedades] = useState<ListaNovedades | null>(null)
-  const [newRadicado, setNewRadicado] = useState({ llave_proceso: "" })
+  const [newRadicado, setNewRadicado] = useState({ llave_proceso: "", categoria: "Trabajo" })
   const [detalle, setDetalle] = useState<DetalleProceso | null>(null)
   const [loadingDetalle, setLoadingDetalle] = useState(false)
   const [page, setPage] = useState(1)
@@ -127,15 +127,25 @@ export default function App() {
         </section>
 
         <section className="rounded-3xl border border-violet-100 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <input
-              placeholder="Radicado de 23 dígitos"
-              value={newRadicado.llave_proceso}
-              onChange={(e) => setNewRadicado({ llave_proceso: e.target.value.replace(/\D/g, "") })}
-              className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition placeholder:text-violet-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-              maxLength={23}
-              inputMode="numeric"
-            />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex flex-1 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+              <input
+                placeholder="Radicado de 23 dígitos"
+                value={newRadicado.llave_proceso}
+                onChange={(e) => setNewRadicado({ ...newRadicado, llave_proceso: e.target.value.replace(/\D/g, "") })}
+                className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition placeholder:text-violet-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                maxLength={23}
+                inputMode="numeric"
+              />
+              <select
+                value={newRadicado.categoria}
+                onChange={(e) => setNewRadicado({ ...newRadicado, categoria: e.target.value })}
+                className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 sm:w-44"
+              >
+                <option value="Trabajo">Trabajo</option>
+                <option value="Consultorio">Consultorio</option>
+              </select>
+            </div>
             <button
               onClick={async () => {
                 if (newRadicado.llave_proceso.length !== 23) {
@@ -146,7 +156,7 @@ export default function App() {
                 try {
                   const res = await postAddRadicado(newRadicado)
                   if (res.created) {
-                    setNewRadicado({ llave_proceso: "" })
+                    setNewRadicado({ llave_proceso: "", categoria: "Trabajo" })
                     await cargarLista()
                     toast.success("Radicado agregado exitosamente", { id: loadingToast })
                   } else {

@@ -256,8 +256,21 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
               </h2>
             </div>
           </div>
-          <StatusBadge notificado={detalle.notificado} />
-        </div>
+          <div className="flex items-center gap-2">
+            {detalle.categoria && (
+              <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold ${
+                detalle.categoria === "Trabajo"
+                  ? "border-sky-200 bg-sky-50 text-sky-700"
+                  : "border-amber-200 bg-amber-50 text-amber-700"
+              }`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${
+                  detalle.categoria === "Trabajo" ? "bg-sky-500" : "bg-amber-500"
+                }`} />
+                {detalle.categoria}
+              </span>
+            )}
+            <StatusBadge notificado={detalle.notificado} />
+          </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl bg-white/60 border border-violet-200 px-4 py-3">
@@ -285,6 +298,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <InfoCard label="Despacho" value={detalle.despacho} highlight />
         <InfoCard label="Departamento" value={detalle.departamento} />
+        <InfoCard label="Categoría" value={detalle.categoria || "General"} />
         <InfoCard label="Privado" value={detalle.es_privado ? "Sí" : "No"} />
         <InfoCard label="Fecha del proceso" value={formatearFecha(detalle.fecha_proceso)} />
         <InfoCard label="Registrado en sistema" value={fechaCreado} />
