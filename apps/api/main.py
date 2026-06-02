@@ -63,6 +63,37 @@ def health():
     return {"status": "ok"}
 
 
+@app.get("/test-notificacion")
+def test_notificacion():
+    from models.database import SessionLocal
+    from models.actuacion import Actuacion
+    from models.proceso import Proceso
+    from services.notifications import notificar_cambio_radicado
+    from sqlalchemy import func
+
+    db = SessionLocal()
+    try:
+        proceso = db.query(Proceso).order_by(Proceso.id.desc()).first()
+        if not proceso:
+            return {"error": "No hay procesos en la DB"}
+
+        ultima = db.query(Actuacion).filter(Actuacion.proceso_id == proceso.id).order_by(Actuacion.fecha_actuacion.desc().nullslast(), Actuacion.id_reg_actuacion.desc()).first()
+        ok = notificar_cambio_radicado(
+            llave_proceso=proceso.llave_proceso,
+            despacho=proceso.despacho or "",
+            departamento=proceso.departamento or "",
+            fecha_ultima_actuacion=proceso.fecha_ultima_actuacion,
+            sujetos_procesales=proceso.sujetos_procesales or "",
+            actuacion=ultima.actuacion if ultima else None,
+            anotacion=ultima.anotacion if ultima else None,
+            fecha_registro=ultima.fecha_registro if ultima else None,
+            con_documentos=ultima.con_documentos if ultima else False,
+        )
+        return {"email_enviado": ok, "radicado": proceso.llave_proceso, "actuacion": ultima.actuacion if ultima else "N/A"}
+    finally:
+        db.close()
+
+
 @app.get("/test-email")
 def test_email():
     import json, urllib.request
