@@ -22,10 +22,11 @@ def _request_with_retry(client: httpx.Client, method: str, url: str, **kwargs) -
                 time.sleep(wait)
                 continue
             raise
-        if response.status_code == 403 and attempt < MAX_RETRIES:
-            wait = 2 ** (attempt + 1)
-            time.sleep(wait)
-            continue
+        if response.status_code in (403, 429) or (500 <= response.status_code < 600):
+            if attempt < MAX_RETRIES:
+                wait = 2 ** (attempt + 1)
+                time.sleep(wait)
+                continue
         response.raise_for_status()
         return response
     return response  # Never reached
