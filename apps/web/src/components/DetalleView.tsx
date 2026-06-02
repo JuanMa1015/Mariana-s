@@ -271,6 +271,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
             )}
             <StatusBadge notificado={detalle.notificado} />
           </div>
+        </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl bg-white/60 border border-violet-200 px-4 py-3">
