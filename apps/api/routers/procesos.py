@@ -363,9 +363,11 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
 
 
 class UpdateProceso(BaseModel):
+    llave_proceso: Optional[str] = None
     despacho: Optional[str] = None
     departamento: Optional[str] = None
     sujetos_procesales: Optional[str] = None
+    categoria: Optional[str] = None
     notificado: Optional[bool] = None
     fecha_ultima_actuacion: Optional[str] = None
 
@@ -387,6 +389,12 @@ def update_proceso(llave_proceso: str, payload: UpdateProceso, db: Session = Dep
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
 
     changed = False
+    if payload.llave_proceso is not None and payload.llave_proceso != proceso.llave_proceso:
+        existente = db.query(Proceso).filter(Proceso.llave_proceso == payload.llave_proceso, Proceso.user_id == current_user.id).first()
+        if existente:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ese radicado ya existe")
+        proceso.llave_proceso = payload.llave_proceso
+        changed = True
     if payload.despacho is not None:
         proceso.despacho = payload.despacho
         changed = True
@@ -395,6 +403,9 @@ def update_proceso(llave_proceso: str, payload: UpdateProceso, db: Session = Dep
         changed = True
     if payload.sujetos_procesales is not None:
         proceso.sujetos_procesales = payload.sujetos_procesales
+        changed = True
+    if payload.categoria is not None:
+        proceso.categoria = payload.categoria
         changed = True
     if payload.notificado is not None:
         proceso.notificado = payload.notificado
@@ -407,4 +418,4 @@ def update_proceso(llave_proceso: str, payload: UpdateProceso, db: Session = Dep
         db.add(proceso)
         db.commit()
 
-    return {"updated": changed, "llave_proceso": llave_proceso}
+    return {"updated": changed, "llave_proceso": proceso.llave_proceso}

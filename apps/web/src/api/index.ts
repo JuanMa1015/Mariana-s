@@ -79,7 +79,7 @@ export async function deleteProceso(llaveProceso: string) {
   return res.json()
 }
 
-export async function updateProceso(llaveProceso: string, payload: Partial<{ despacho: string; departamento: string; sujetos_procesales: string; notificado: boolean; fecha_ultima_actuacion: string }>) {
+export async function updateProceso(llaveProceso: string, payload: Partial<{ llave_proceso: string; despacho: string; departamento: string; sujetos_procesales: string; categoria: string; notificado: boolean; fecha_ultima_actuacion: string }>) {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/${llaveProceso}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

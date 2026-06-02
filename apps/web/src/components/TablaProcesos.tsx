@@ -1,7 +1,7 @@
 import { Fragment, useState } from "react"
 import type { Proceso } from "../types"
 import toast from "react-hot-toast"
-import { deleteProceso } from "../api"
+import { deleteProceso, updateProceso } from "../api"
 
 interface Props {
   procesos: Proceso[]
@@ -50,6 +50,9 @@ const IconChevronDown = ({ open }: { open: boolean }) => (
 // ─── Component ───────────────────────────────────────────────────────────────
 export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Props) {
   const [abierto, setAbierto] = useState<string | null>(null)
+  const [editando, setEditando] = useState<string | null>(null)
+  const editProceso = procesos.find(p => p.llave_proceso === editando)
+  const [editForm, setEditForm] = useState({ llave_proceso: "", categoria: "" })
 
   const handleDelete = async (e: React.MouseEvent, llave: string) => {
     e.stopPropagation()
@@ -90,6 +93,30 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
     e.stopPropagation()
     await navigator.clipboard.writeText(llave)
     toast.success("Radicado copiado al portapapeles")
+  }
+
+  const abrirEditor = (llave: string) => {
+    const p = procesos.find(x => x.llave_proceso === llave)
+    if (p) {
+      setEditForm({ llave_proceso: p.llave_proceso, categoria: p.categoria || "Trabajo" })
+      setEditando(llave)
+    }
+  }
+
+  const guardarEdicion = async () => {
+    if (!editando) return
+    const loading = toast.loading("Guardando cambios...")
+    try {
+      await updateProceso(editando, {
+        llave_proceso: editForm.llave_proceso.trim() || undefined,
+        categoria: editForm.categoria,
+      })
+      toast.success("Radicado actualizado", { id: loading })
+      setEditando(null)
+      if (onDelete) onDelete(editando)
+    } catch (err: any) {
+      toast.error(err.message || "Error al actualizar", { id: loading })
+    }
   }
 
   return (
@@ -232,6 +259,19 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
                         <span>Oficial</span>
                       </a>
 
+                      {/* Editar */}
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); abrirEditor(p.llave_proceso) }}
+                        title="Editar radicado"
+                        className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm transition hover:bg-amber-50 hover:text-amber-600 active:scale-95"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                          <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
+                          <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
+                        </svg>
+                      </button>
+
                       {/* Copiar */}
                       <button
                         type="button"
@@ -301,5 +341,55 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
         </tbody>
       </table>
     </div>
+
+      {/* ── Edit modal ── */}
+      {editando && editProceso && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setEditando(null)}>
+          <div className="w-full max-w-md rounded-3xl border border-violet-100 bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-500 mb-1">Editar radicado</p>
+            <h3 className="text-lg font-bold text-slate-800 mb-5">Modificar datos</h3>
+
+            <div className="flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Radicado</label>
+                <input
+                  value={editForm.llave_proceso}
+                  onChange={(e) => setEditForm({ ...editForm, llave_proceso: e.target.value.replace(/\D/g, "") })}
+                  className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                  maxLength={23}
+                  inputMode="numeric"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Categoría</label>
+                <select
+                  value={editForm.categoria}
+                  onChange={(e) => setEditForm({ ...editForm, categoria: e.target.value })}
+                  className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                >
+                  <option value="Trabajo">Trabajo</option>
+                  <option value="Consultorio">Consultorio</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                onClick={() => setEditando(null)}
+                className="rounded-2xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={guardarEdicion}
+                className="rounded-2xl bg-violet-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-violet-600 active:scale-95"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
   )
 }
