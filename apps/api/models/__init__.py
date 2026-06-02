@@ -24,6 +24,15 @@ def init_db():
     except Exception:
         pass
 
+    # Migrate: allow NULL in guid_documento_sxxiw (Rama Judicial sometimes returns null)
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE documentos_actuacion ALTER COLUMN guid_documento_sxxiw DROP NOT NULL"))
+            conn.commit()
+    except Exception:
+        pass
+
     # Migrate: add categoria column if missing
     try:
         from sqlalchemy import text
