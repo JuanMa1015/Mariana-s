@@ -116,13 +116,12 @@ def sync_manual(current_user: Optional[User] = Depends(_auth_for_sync)):
             status_code=status.HTTP_202_ACCEPTED,
             content={"task_id": task_id, "status": "started", "mensaje": "Sincronización iniciada en segundo plano"},
         )
-    else:
-        db = next(get_db())
-        try:
-            resultado = sincronizar_radicados(db, user_id=current_user.id)
-            return resultado
-        finally:
-            db.close()
+    db = next(get_db())
+    try:
+        resultado = sincronizar_radicados(db, user_id=current_user.id)
+        return resultado
+    finally:
+        db.close()
 
 
 @router.get("/sync/{task_id}")
