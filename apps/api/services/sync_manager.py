@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 
 import httpx
+from sqlalchemy.exc import OperationalError
 from config import API_URL
 from models.database import SessionLocal
 from services.sync import sincronizar_radicados
@@ -60,6 +61,27 @@ def iniciar_sync_global() -> str:
                     "finished_at": datetime.utcnow().isoformat(),
                     "result": resultado,
                 })
+        except OperationalError:
+            logger.warning("Error de conexión BD, reintentando una vez...")
+            db.close()
+            time.sleep(5)
+            db = SessionLocal()
+            try:
+                resultado = sincronizar_radicados(db)
+                with _lock:
+                    _tasks[task_id].update({
+                        "status": "completed",
+                        "finished_at": datetime.utcnow().isoformat(),
+                        "result": resultado,
+                    })
+            except Exception as exc:
+                logger.exception("Sync global falló (segundo intento): %s", exc)
+                with _lock:
+                    _tasks[task_id].update({
+                        "status": "failed",
+                        "finished_at": datetime.utcnow().isoformat(),
+                        "error": f"{type(exc).__name__}: {exc}",
+                    })
         except Exception as exc:
             logger.exception("Sync global falló: %s", exc)
             with _lock:
