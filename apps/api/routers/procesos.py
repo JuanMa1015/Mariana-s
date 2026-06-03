@@ -2,6 +2,7 @@ import logging
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from models.database import get_db
 from models.actuacion import Actuacion
