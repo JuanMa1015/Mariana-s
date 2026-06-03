@@ -64,8 +64,10 @@ def notificar_cambio_radicado(
     con_documentos: bool | None = None,
     num_actuaciones: int | None = None,
     total_actualizadas: int | None = None,
+    destinatarios: list[str] | None = None,
 ) -> bool:
-    destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
+    if not destinatarios:
+        destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
 
     if not destinatarios:
         logger.info("Correo no configurado; se omite notificación para %s", llave_proceso)

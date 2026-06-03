@@ -309,6 +309,9 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
             .scalar()
         )
 
+        user_email = radicado.user.email if radicado.user else None
+        user_destinatarios = [user_email] if user_email else None
+
         if is_initial_sync:
             if latest_remote is not None and _es_hoy(latest_remote.fecha_actuacion):
                 radicado.notificado = False
@@ -323,6 +326,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
                     anotacion=latest_remote.anotacion,
                     fecha_registro=latest_remote.fecha_registro,
                     con_documentos=latest_remote.con_documentos,
+                    destinatarios=user_destinatarios,
                 ):
                     emails_enviados.append(radicado.llave_proceso)
             else:
@@ -342,6 +346,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
                 fecha_registro=latest_remote.fecha_registro,
                 con_documentos=latest_remote.con_documentos,
                 total_actualizadas=len(actualizados),
+                destinatarios=user_destinatarios,
             ):
                 emails_enviados.append(radicado.llave_proceso)
 
