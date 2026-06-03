@@ -23,48 +23,37 @@ jobs:
       - name: Wake up server
         run: |
           echo "⏳ Esperando a que el servidor responda..."
-          for i in {1..24}; do
+          for i in {1..12}; do
             if curl -fsS "${{ secrets.API_URL }}/health"; then
               echo "✅ Servidor listo"
               exit 0
             fi
-            echo "  Intento $i/24 — aún no responde, esperando 5s..."
-            sleep 5
+            echo "  Intento $i/12 — aún no responde, esperando 10s..."
+            sleep 10
           done
           echo "❌ El servidor no respondió a tiempo"
           exit 1
 
-      - name: Trigger sync
+      - name: Trigger sync (async)
         id: sync
         run: |
-          echo "🔄 Sincronizando procesos judiciales..."
+          echo "🔄 Disparando sincronización asíncrona..."
           RESULT=$(curl -s -X POST "${{ secrets.API_URL }}/procesos/sync" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.API_TOKEN }}" \
-            --retry 3 \
-            --retry-delay 15)
+            -H "Authorization: Bearer ${{ secrets.API_TOKEN }}")
 
-          echo "Resultado: $RESULT"
+          echo "Respuesta: $RESULT"
           echo "result=$RESULT" >> $GITHUB_OUTPUT
 
-          CONSULTADOS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('total_consultados', 0))" 2>/dev/null || echo "?")
-          NUEVOS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('nuevos', 0))" 2>/dev/null || echo "?")
-          ACTUALIZADOS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('actualizados', 0))" 2>/dev/null || echo "?")
-          EMAILS=$(echo "$RESULT" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('emails_enviados', [])))" 2>/dev/null || echo "?")
-          ERRORES=$(echo "$RESULT" | python3 -c "import sys,json; print(len(json.load(sys.stdin).get('radicados_error_consulta', [])))" 2>/dev/null || echo "?")
+          TASK_ID=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('task_id',''))" 2>/dev/null || echo "")
+          STATUS=$(echo "$RESULT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
 
           echo ""
-          echo "============= RESUMEN DE SINCRONIZACION ============="
-          echo "  Consultados:    $CONSULTADOS"
-          echo "  Nuevos:         $NUEVOS"
-          echo "  Actualizados:   $ACTUALIZADOS"
-          echo "  Notificaciones: $EMAILS"
-          echo "  Errores:        $ERRORES"
+          echo "============= SINCRONIZACION DISPARADA ============="
+          echo "  Task ID:    $TASK_ID"
+          echo "  Status:     $STATUS"
+          echo "  La sincronización continúa en segundo plano."
           echo "====================================================="
-          echo ""
-          if [ "$EMAILS" -gt 0 ] 2>/dev/null; then
-            echo "📧 Se enviaron $EMAILS notificaciones por correo con los detalles de las nuevas actuaciones."
-          fi
 
       - name: Notify on failure
         if: failure()
