@@ -19,6 +19,9 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440
 # Si está vacío, el endpoint mantiene el comportamiento por defecto (desarrollo local).
 API_TOKEN = os.getenv("API_TOKEN", "")
 
+# URL pública de la API (usada para keepalive en sync background)
+API_URL = os.getenv("API_URL", "")
+
 # URL pública de la aplicación (usada en notificaciones para enlaces)
 APP_URL = os.getenv("APP_URL", "https://marianas.vercel.app")
 

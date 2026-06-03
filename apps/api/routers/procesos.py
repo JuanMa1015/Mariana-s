@@ -7,6 +7,7 @@ from models.database import get_db
 from models.actuacion import Actuacion
 from models.proceso import Proceso
 from services.sync import sincronizar_radicados
+from services.sync_manager import iniciar_sync_global, obtener_resultado
 from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones
 from services.auth import get_current_user, oauth2_scheme
 from services.notifications import notificar_cambio_radicado
@@ -108,13 +109,28 @@ def _auth_for_sync(request: Request, token: str = Depends(oauth2_scheme), db: Se
 
 
 @router.post("/sync")
-def sync_manual(db: Session = Depends(get_db), current_user: Optional[User] = Depends(_auth_for_sync)):
-    # Si `current_user` es None significa que la petición vino con `API_TOKEN` válido — sincronizamos globalmente.
+def sync_manual(current_user: Optional[User] = Depends(_auth_for_sync)):
     if current_user is None:
-        resultado = sincronizar_radicados(db)
+        task_id = iniciar_sync_global()
+        return JSONResponse(
+            status_code=status.HTTP_202_ACCEPTED,
+            content={"task_id": task_id, "status": "started", "mensaje": "Sincronización iniciada en segundo plano"},
+        )
     else:
-        resultado = sincronizar_radicados(db, user_id=current_user.id)
-    return resultado
+        db = next(get_db())
+        try:
+            resultado = sincronizar_radicados(db, user_id=current_user.id)
+            return resultado
+        finally:
+            db.close()
+
+
+@router.get("/sync/{task_id}")
+def sync_status(task_id: str):
+    tarea = obtener_resultado(task_id)
+    if tarea is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarea no encontrada")
+    return tarea
 
 
 class AddRadicado(BaseModel):
