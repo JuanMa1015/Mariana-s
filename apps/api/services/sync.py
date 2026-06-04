@@ -4,7 +4,7 @@ import time
 from datetime import date
 
 import httpx
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from models.actuacion import Actuacion
@@ -222,6 +222,12 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
         # Pausa entre radicados para evitar rate limiting de Rama Judicial
         if idx > 0:
             time.sleep(1.5)
+
+        try:
+            db.connection().execute(text("SELECT 1"))
+        except Exception:
+            logger.warning("Conexión BD caída, cerrando y reabriendo sesión...")
+            db.close()
 
         if not re.fullmatch(r"\d{23}", radicado.llave_proceso or ""):
             ignorados.append(radicado.llave_proceso)
