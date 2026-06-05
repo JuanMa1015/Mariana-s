@@ -326,23 +326,23 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
             if latest_remote is not None and _es_hoy(latest_remote.fecha_actuacion):
                 radicado.notificado = False
                 actualizados.append(radicado.llave_proceso)
+                if notificar_cambio_radicado(
+                    llave_proceso=radicado.llave_proceso,
+                    despacho=radicado.despacho or "",
+                    departamento=radicado.departamento or "",
+                    fecha_ultima_actuacion=radicado.fecha_ultima_actuacion,
+                    sujetos_procesales=radicado.sujetos_procesales or "",
+                    actuacion=latest_remote.actuacion,
+                    anotacion=latest_remote.anotacion,
+                    fecha_registro=latest_remote.fecha_registro,
+                    con_documentos=latest_remote.con_documentos,
+                    destinatarios=user_destinatarios,
+                    categoria=radicado.categoria,
+                ):
+                    emails_enviados.append(radicado.llave_proceso)
             else:
-                radicado.notificado = False
+                radicado.notificado = True
                 nuevos.append(radicado.llave_proceso)
-            if notificar_cambio_radicado(
-                llave_proceso=radicado.llave_proceso,
-                despacho=radicado.despacho or "",
-                departamento=radicado.departamento or "",
-                fecha_ultima_actuacion=radicado.fecha_ultima_actuacion,
-                sujetos_procesales=radicado.sujetos_procesales or "",
-                actuacion=latest_remote.actuacion if latest_remote else "",
-                anotacion=latest_remote.anotacion if latest_remote else "",
-                fecha_registro=latest_remote.fecha_registro if latest_remote else "",
-                con_documentos=latest_remote.con_documentos if latest_remote else False,
-                destinatarios=user_destinatarios,
-                categoria=radicado.categoria,
-            ):
-                emails_enviados.append(radicado.llave_proceso)
         elif latest_remote is not None and latest_stored_id != previous_latest_id:
             radicado.notificado = False
             actualizados.append(radicado.llave_proceso)
