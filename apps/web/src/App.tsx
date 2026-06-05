@@ -10,7 +10,7 @@ export default function App() {
   const navigate = useNavigate()
   const [procesos, setProcesos] = useState<ListaProcesos | null>(null)
   const [novedades, setNovedades] = useState<ListaNovedades | null>(null)
-  const [newRadicado, setNewRadicado] = useState({ llave_proceso: "", categoria: "Trabajo" })
+  const [newRadicado, setNewRadicado] = useState({ llave_proceso: "", categoria: "General" })
   const [detalle, setDetalle] = useState<DetalleProceso | null>(null)
   const [loadingDetalle, setLoadingDetalle] = useState(false)
   const [page, setPage] = useState(1)
@@ -153,6 +153,7 @@ export default function App() {
                 onChange={(e) => setNewRadicado({ ...newRadicado, categoria: e.target.value })}
                 className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 sm:w-44"
               >
+                <option value="General">General</option>
                 <option value="Trabajo">Trabajo</option>
                 <option value="Consultorio">Consultorio</option>
               </select>
@@ -197,8 +198,8 @@ export default function App() {
 
           {/* ── Filters ── */}
           <div className="flex flex-col gap-2 border-b border-violet-50 px-4 py-3 sm:flex-row sm:items-center sm:px-5">
-            <div className="flex gap-1">
-              {["", "Trabajo", "Consultorio"].map((cat) => (
+              <div className="flex gap-1">
+                {["", "General", "Trabajo", "Consultorio"].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => { setFiltroCategoria(cat); setPage(1) }}

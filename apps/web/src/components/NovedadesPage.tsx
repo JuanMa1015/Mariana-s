@@ -177,7 +177,7 @@ export default function NovedadesPage() {
 
                       {nov.categoria && (
                         <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                          nov.categoria === "Trabajo" ? "bg-sky-100 text-sky-700" : "bg-amber-100 text-amber-700"
+                          nov.categoria === "Trabajo" ? "bg-sky-100 text-sky-700" : nov.categoria === "Consultorio" ? "bg-amber-100 text-amber-700" : "bg-violet-100 text-violet-700"
                         }`}>
                           {nov.categoria}
                         </span>

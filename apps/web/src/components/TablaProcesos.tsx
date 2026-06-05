@@ -98,7 +98,7 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
   const abrirEditor = (llave: string) => {
     const p = procesos.find(x => x.llave_proceso === llave)
     if (p) {
-      setEditForm({ llave_proceso: p.llave_proceso, categoria: p.categoria || "Trabajo" })
+      setEditForm({ llave_proceso: p.llave_proceso, categoria: p.categoria || "General" })
       setEditando(llave)
     }
   }
@@ -192,10 +192,12 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
                         <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
                           p.categoria === "Trabajo"
                             ? "border-sky-200 bg-sky-50 text-sky-700"
-                            : "border-amber-200 bg-amber-50 text-amber-700"
+                            : p.categoria === "Consultorio"
+                            ? "border-amber-200 bg-amber-50 text-amber-700"
+                            : "border-violet-200 bg-violet-50 text-violet-700"
                         }`}>
                           <span className={`h-1.5 w-1.5 rounded-full ${
-                            p.categoria === "Trabajo" ? "bg-sky-500" : "bg-amber-500"
+                            p.categoria === "Trabajo" ? "bg-sky-500" : p.categoria === "Consultorio" ? "bg-amber-500" : "bg-violet-500"
                           }`} />
                           {p.categoria}
                         </span>
@@ -369,6 +371,7 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
                   onChange={(e) => setEditForm({ ...editForm, categoria: e.target.value })}
                   className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
                 >
+                  <option value="General">General</option>
                   <option value="Trabajo">Trabajo</option>
                   <option value="Consultorio">Consultorio</option>
                 </select>
