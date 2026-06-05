@@ -3,6 +3,11 @@ import { getNovedadesDetalle } from "../api"
 import type { NovedadesDetalle, Actuacion } from "../types"
 import { useNavigate } from "react-router-dom"
 
+function formatearFecha(iso: string | null | undefined): string {
+  if (!iso) return "—"
+  return iso.slice(0, 10)
+}
+
 function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"] }) {
   const [open, setOpen] = useState(false)
   if (!documentos?.length) return <span className="text-slate-300">—</span>
@@ -27,7 +32,7 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
                 <div key={doc.id_reg_documento} className="rounded-lg bg-sky-50 p-2 text-[11px]">
                   <p className="font-medium text-sky-800">{doc.nombre}</p>
                   {doc.descripcion && <p className="mt-0.5 text-slate-500">{doc.descripcion}</p>}
-                  {doc.fecha_carga && <p className="mt-0.5 text-[10px] text-slate-400">{doc.fecha_carga}</p>}
+                  {doc.fecha_carga && <p className="mt-0.5 text-[10px] text-slate-400">{formatearFecha(doc.fecha_carga)}</p>}
                 </div>
               ))}
             </div>
@@ -63,7 +68,7 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
                 {i === 0 && (
                   <span className="mr-1.5 inline-block rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700">Última</span>
                 )}
-                {a.fecha_actuacion || "—"}
+                {formatearFecha(a.fecha_actuacion)}
               </td>
               <td className="px-3 py-2.5 font-medium text-slate-800">{a.actuacion}</td>
               <td className="max-w-xs px-3 py-2.5 text-slate-600">
@@ -71,9 +76,9 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
                   <span className="line-clamp-3" title={a.anotacion}>{a.anotacion}</span>
                 ) : "—"}
               </td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{a.fecha_inicial || "—"}</td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{a.fecha_final || "—"}</td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{a.fecha_registro || "—"}</td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFecha(a.fecha_inicial)}</td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFecha(a.fecha_final)}</td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFecha(a.fecha_registro)}</td>
               <td className="px-3 py-2.5 text-center">
                 <DocumentosPopover documentos={a.documentos} />
               </td>
@@ -188,7 +193,7 @@ export default function NovedadesPage() {
                       </span>
 
                       <span className="ml-auto shrink-0 text-[11px] font-medium text-amber-600">
-                        {nov.fecha_ultima_actuacion || ""}
+                        {formatearFecha(nov.fecha_ultima_actuacion)}
                       </span>
 
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
