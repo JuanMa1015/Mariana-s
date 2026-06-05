@@ -102,6 +102,23 @@ def test_notificacion(llave_proceso: str = ""):
         db.close()
 
 
+@app.get("/marcar-leido")
+def marcar_leido(llave_proceso: str):
+    from models.database import SessionLocal
+    from models.proceso import Proceso
+
+    db = SessionLocal()
+    try:
+        proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
+        if not proceso:
+            return {"ok": False, "error": "No encontrado"}
+        proceso.notificado = True
+        db.commit()
+        return {"ok": True, "llave_proceso": llave_proceso}
+    finally:
+        db.close()
+
+
 @app.get("/test-email")
 def test_email():
     import json, urllib.request
