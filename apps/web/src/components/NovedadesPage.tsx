@@ -13,6 +13,29 @@ function formatearFecha(iso: string | null | undefined): string {
 function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"] }) {
   const [open, setOpen] = useState(false)
   if (!documentos?.length) return <span className="text-slate-300">—</span>
+
+  const descargarDocumento = (id: number, nombre: string) => async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const token = localStorage.getItem("token")
+      const res = await fetch(`${BASE_URL}/procesos/documento/${id}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+      if (!res.ok) throw new Error("Error al descargar")
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = nombre
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      window.alert("No se pudo descargar el documento")
+    }
+  }
+
   return (
     <div className="relative">
       <button
@@ -38,15 +61,12 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
                       {doc.descripcion && <p className="mt-0.5 text-slate-500">{doc.descripcion}</p>}
                       {doc.fecha_carga && <p className="mt-0.5 text-[10px] text-slate-400">{formatearFecha(doc.fecha_carga)}</p>}
                     </div>
-                    <a
-                      href={`${BASE_URL}/procesos/documento/${doc.id_reg_documento}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={descargarDocumento(doc.id_reg_documento, doc.nombre)}
                       className="shrink-0 rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-sky-600 shadow-sm ring-1 ring-sky-200 transition hover:bg-sky-50"
-                      onClick={(e) => e.stopPropagation()}
                     >
                       Descargar
-                    </a>
+                    </button>
                   </div>
                 </div>
               ))}
