@@ -10,7 +10,8 @@ from models.actuacion import Actuacion
 from models.proceso import Proceso
 from services.sync import sincronizar_radicados
 from services.sync_manager import iniciar_sync_global, obtener_resultado
-from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones
+from fastapi.responses import StreamingResponse
+from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones, descargar_documento
 from services.auth import get_current_user, oauth2_scheme
 from config import API_TOKEN
 from typing import Optional
@@ -191,6 +192,17 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
         db.rollback()
 
     return {"created": True, "llave_proceso": payload.llave_proceso}
+
+
+@router.get("/documento/{id_reg_documento}")
+def descargar_documento_endpoint(id_reg_documento: int, current_user: User = Depends(get_current_user)):
+    from scraper.rama_client import descargar_documento as _descargar
+    contenido, filename = _descargar(id_reg_documento)
+    return StreamingResponse(
+        iter([contenido]),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
 
 
 @router.get("/options")
