@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from models.database import get_db
 from models.actuacion import Actuacion
@@ -202,6 +203,61 @@ def opciones_filtros(db: Session = Depends(get_db), current_user: User = Depends
     despachos = [d[0] for d in db.query(Proceso.despacho).filter(Proceso.user_id == current_user.id).distinct().all() if d[0]]
     departamentos = [d[0] for d in db.query(Proceso.departamento).filter(Proceso.user_id == current_user.id).distinct().all() if d[0]]
     return {"despachos": sorted(list(set(despachos))), "departamentos": sorted(list(set(departamentos)))}
+
+
+@router.get("/actuaciones-recientes")
+def actuaciones_recientes(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+):
+    base = (
+        db.query(Actuacion)
+        .join(Proceso, Actuacion.proceso_id == Proceso.id)
+        .filter(Proceso.user_id == current_user.id)
+    )
+    total = base.with_entities(func.count(Actuacion.id)).scalar()
+    actuaciones = (
+        base.order_by(Actuacion.fecha_actuacion.desc().nullslast(), Actuacion.id_reg_actuacion.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    return {
+        "total": total,
+        "actuaciones": [
+            {
+                "id_reg_actuacion": a.id_reg_actuacion,
+                "cons_actuacion": a.cons_actuacion,
+                "fecha_actuacion": a.fecha_actuacion,
+                "actuacion": a.actuacion,
+                "anotacion": a.anotacion,
+                "fecha_inicial": a.fecha_inicial,
+                "fecha_final": a.fecha_final,
+                "fecha_registro": a.fecha_registro,
+                "con_documentos": a.con_documentos,
+                "cant": a.cant,
+                "proceso": {
+                    "llave_proceso": a.proceso.llave_proceso,
+                    "despacho": a.proceso.despacho,
+                    "departamento": a.proceso.departamento,
+                },
+                "documentos": [
+                    {
+                        "id_reg_documento": d.id_reg_documento,
+                        "nombre": d.nombre,
+                        "descripcion": d.descripcion,
+                        "tipo": d.tipo,
+                        "fecha_carga": d.fecha_carga,
+                    }
+                    for d in a.documentos
+                ],
+            }
+            for a in actuaciones
+        ],
+    }
 
 
 @router.get("/rama-health")
