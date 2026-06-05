@@ -180,6 +180,14 @@ export default function NovedadesPage() {
                         {nov.llave_proceso}
                       </span>
 
+                      {nov.tipo_novedad && (
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          nov.tipo_novedad === "nuevo" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                        }`}>
+                          {nov.tipo_novedad === "nuevo" ? "Nuevo" : "Actualización"}
+                        </span>
+                      )}
+
                       {nov.categoria && (
                         <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
                           nov.categoria === "Trabajo" ? "bg-sky-100 text-sky-700" : nov.categoria === "Consultorio" ? "bg-amber-100 text-amber-700" : "bg-violet-100 text-violet-700"

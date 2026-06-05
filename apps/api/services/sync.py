@@ -1,7 +1,7 @@
 import logging
 import re
 import time
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 
 import httpx
 from sqlalchemy import func, text
@@ -20,6 +20,8 @@ from scraper.rama_client import (
 from services.notifications import notificar_cambio_radicado
 
 logger = logging.getLogger(__name__)
+
+_COLOMBIA_TZ = timezone(timedelta(hours=-5))
 
 
 def _normalizar_texto(valor: str | None) -> str:
@@ -53,7 +55,8 @@ def _es_hoy(fecha_str: str | None) -> bool:
         return False
     try:
         fecha = fecha_str[:10]
-        return fecha == date.today().isoformat()
+        hoy_colombia = datetime.now(_COLOMBIA_TZ).date().isoformat()
+        return fecha == hoy_colombia
     except (ValueError, IndexError):
         return False
 
@@ -325,6 +328,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
         if is_initial_sync:
             if latest_remote is not None and _es_hoy(latest_remote.fecha_actuacion):
                 radicado.notificado = False
+                radicado.tipo_novedad = "actualizacion"
                 actualizados.append(radicado.llave_proceso)
                 if notificar_cambio_radicado(
                     llave_proceso=radicado.llave_proceso,
@@ -345,6 +349,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
                 nuevos.append(radicado.llave_proceso)
         elif latest_remote is not None and latest_stored_id != previous_latest_id:
             radicado.notificado = False
+            radicado.tipo_novedad = "actualizacion"
             actualizados.append(radicado.llave_proceso)
             if notificar_cambio_radicado(
                 llave_proceso=radicado.llave_proceso,

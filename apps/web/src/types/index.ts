@@ -52,6 +52,7 @@ export interface Novedad {
   departamento: string
   sujetos_procesales: string
   fecha_ultima_actuacion: string | null
+  tipo_novedad?: string | null
 }
 
 export interface ListaNovedades {
@@ -76,6 +77,7 @@ export interface NovedadDetalle {
   categoria?: string | null
   sujetos_procesales: string
   fecha_ultima_actuacion: string | null
+  tipo_novedad?: string | null
   tipo_proceso?: string | null
   clase_proceso?: string | null
   actuaciones: Actuacion[]
