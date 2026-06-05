@@ -65,7 +65,20 @@ jobs:
               echo ""
               echo "✅ Sincronización completada"
               echo ""
-              echo "$STATUS_RESP" | python3 -c "import sys,json;d=json.load(sys.stdin);r=d.get('result',{});print('============= RESUMEN DE SINCRONIZACION =============');print(f'  Consultados:    {r.get(\"total_consultados\",0)}');print(f'  Nuevos:         {r.get(\"nuevos\",0)}');print(f'  Actualizados:   {r.get(\"actualizados\",0)}');print(f'  Notificaciones: {len(r.get(\"emails_enviados\",[]))}');print(f'  Errores:        {len(r.get(\"radicados_error_consulta\",[]))}');print('=====================================================');" 2>/dev/null || echo "$STATUS_RESP"
+              echo "$STATUS_RESP" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+r=d.get('result',{})
+errs=r.get('radicados_error_consulta',[])
+print('============= RESUMEN DE SINCRONIZACION =============')
+print(f'  Consultados:    {r.get(\"total_consultados\",0)}')
+print(f'  Nuevos:         {r.get(\"nuevos\",0)}')
+print(f'  Actualizados:   {r.get(\"actualizados\",0)}')
+print(f'  Notificaciones: {len(r.get(\"emails_enviados\",[]))}')
+print(f'  Errores:        {len(errs)}')
+for e in errs:
+    print(f'    - {e.get(\"radicado\",\"?\")}: {e.get(\"error\",\"?\")} (paso: {e.get(\"paso\",\"?\")})')
+print('=====================================================')" 2>/dev/null || echo "$STATUS_RESP"
               exit 0
             fi
 
