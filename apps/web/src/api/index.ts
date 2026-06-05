@@ -81,11 +81,8 @@ export async function deleteProceso(llaveProceso: string) {
   return res.json()
 }
 
-export async function getActuacionesRecientes(limit = 50, offset = 0) {
-  const params = new URLSearchParams()
-  params.append("limit", String(limit))
-  params.append("offset", String(offset))
-  const res = await fetchWithAuth(`${BASE_URL}/procesos/actuaciones-recientes?${params}`)
+export async function getNovedadesDetalle() {
+  const res = await fetchWithAuth(`${BASE_URL}/procesos/novedades-detalle`)
   return res.json()
 }
 

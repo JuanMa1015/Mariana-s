@@ -69,17 +69,19 @@ export interface DetalleProceso extends Proceso {
   actuaciones?: Actuacion[]
 }
 
-export interface ResumenProceso {
+export interface NovedadDetalle {
   llave_proceso: string
   despacho: string
   departamento: string
+  categoria?: string | null
+  sujetos_procesales: string
+  fecha_ultima_actuacion: string | null
+  tipo_proceso?: string | null
+  clase_proceso?: string | null
+  actuaciones: Actuacion[]
 }
 
-export interface ActuacionConProceso extends Actuacion {
-  proceso: ResumenProceso
-}
-
-export interface ActuacionesRecientes {
+export interface NovedadesDetalle {
   total: number
-  actuaciones: ActuacionConProceso[]
+  novedades: NovedadDetalle[]
 }
