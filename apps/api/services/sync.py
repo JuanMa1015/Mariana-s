@@ -1,7 +1,7 @@
 import logging
 import re
 import time
-from datetime import date, datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta
 
 import httpx
 from sqlalchemy import func, text
@@ -50,13 +50,13 @@ def _serializar_texto(valor: str | None) -> str | None:
     return valor_normalizado or None
 
 
-def _es_hoy(fecha_str: str | None) -> bool:
+def _es_reciente(fecha_str: str | None, dias: int = 5) -> bool:
     if not fecha_str:
         return False
     try:
-        fecha = fecha_str[:10]
-        hoy_colombia = datetime.now(_COLOMBIA_TZ).date().isoformat()
-        return fecha == hoy_colombia
+        fecha = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
+        hoy_colombia = datetime.now(_COLOMBIA_TZ).date()
+        return 0 <= (hoy_colombia - fecha).days <= dias
     except (ValueError, IndexError):
         return False
 
@@ -326,7 +326,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
         )
 
         if is_initial_sync:
-            if latest_remote is not None and _es_hoy(latest_remote.fecha_actuacion):
+            if latest_remote is not None and _es_reciente(latest_remote.fecha_actuacion):
                 radicado.notificado = False
                 radicado.tipo_novedad = "actualizacion"
                 actualizados.append(radicado.llave_proceso)
