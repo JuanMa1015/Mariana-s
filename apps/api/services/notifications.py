@@ -97,8 +97,25 @@ def notificar_cambio_radicado(
     if total_actualizadas is not None:
         asunto = f"[{total_actualizadas} novedades] {asunto}"
 
-    # Intentar SendGrid primero, luego SMTP
-    if SENDGRID_API_KEY:
-        return _enviar_sendgrid(destinatarios, asunto, cuerpo)
+    # Determine default EMAIL_TO recipients for fallback
+    default_destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
+    using_defaults = set(destinatarios) == set(default_destinatarios)
 
-    return _enviar_smtp(destinatarios, asunto, cuerpo)
+    # Intentar SendGrid primero, luego SMTP
+    exito = False
+    if SENDGRID_API_KEY:
+        exito = _enviar_sendgrid(destinatarios, asunto, cuerpo)
+    else:
+        exito = _enviar_smtp(destinatarios, asunto, cuerpo)
+
+    if not exito and not using_defaults and default_destinatarios:
+        logger.warning(
+            "Fallo envío a %s, reintentando con destinatarios por defecto: %s",
+            destinatarios, default_destinatarios,
+        )
+        if SENDGRID_API_KEY:
+            exito = _enviar_sendgrid(default_destinatarios, asunto, cuerpo)
+        else:
+            exito = _enviar_smtp(default_destinatarios, asunto, cuerpo)
+
+    return exito

@@ -315,8 +315,12 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
             .scalar()
         )
 
-        user_email = radicado.user.email if radicado.user else None
+        user_email = radicado.user.email.strip() if radicado.user and radicado.user.email else None
         user_destinatarios = [user_email] if user_email else None
+        logger.info(
+            "Notificando %s -> destinatarios=%s, categoria=%s",
+            radicado.llave_proceso, user_destinatarios, radicado.categoria,
+        )
 
         if is_initial_sync:
             if latest_remote is not None and _es_hoy(latest_remote.fecha_actuacion):
