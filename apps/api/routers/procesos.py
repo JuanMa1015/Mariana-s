@@ -1,5 +1,5 @@
 import logging
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from fastapi.responses import JSONResponse
@@ -84,6 +84,7 @@ def listar_novedades(db: Session = Depends(get_db), current_user: User = Depends
                 "departamento": p.departamento,
                 "sujetos_procesales": p.sujetos_procesales,
                 "fecha_ultima_actuacion": p.fecha_ultima_actuacion,
+                "tipo_novedad": p.tipo_novedad or "nuevo",
             }
             for p in procesos
         ],
@@ -155,6 +156,7 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
         sujetos_procesales=payload.sujetos_procesales or "",
         categoria=payload.categoria or "General",
         notificado=False,
+        tipo_novedad="nuevo",
         user_id=current_user.id,
     )
     db.add(nuevo)
@@ -200,20 +202,24 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
         logger.warning("Sync inicial falló para %s: %s", payload.llave_proceso, exc)
         db.rollback()
 
-    # Notify only if the latest actuación is from today
-    if last_remote is not None and _es_hoy(last_remote.fecha_actuacion):
-        notificar_cambio_radicado(
-            llave_proceso=nuevo.llave_proceso,
-            despacho=nuevo.despacho or "",
-            departamento=nuevo.departamento or "",
-            fecha_ultima_actuacion=nuevo.fecha_ultima_actuacion,
-            sujetos_procesales=nuevo.sujetos_procesales or "",
-            actuacion=last_remote.actuacion,
-            anotacion=last_remote.anotacion,
-            fecha_registro=last_remote.fecha_registro,
-            con_documentos=last_remote.con_documentos,
-        )
-    else:
+    ok = notificar_cambio_radicado(
+        llave_proceso=nuevo.llave_proceso,
+        despacho=nuevo.despacho or "",
+        departamento=nuevo.departamento or "",
+        fecha_ultima_actuacion=nuevo.fecha_ultima_actuacion,
+        sujetos_procesales=nuevo.sujetos_procesales or "",
+        actuacion=last_remote.actuacion if last_remote else "",
+        anotacion=last_remote.anotacion if last_remote else "",
+        fecha_registro=last_remote.fecha_registro if last_remote else "",
+        con_documentos=last_remote.con_documentos if last_remote else False,
+        destinatarios=[current_user.email] if current_user.email else None,
+        categoria=nuevo.categoria,
+    )
+    logger.info(
+        "Notificación al agregar %s -> destinatarios=[%s], categoria=%s, resultado=%s",
+        payload.llave_proceso, current_user.email, nuevo.categoria, ok,
+    )
+    if not ok:
         nuevo.notificado = True
         db.commit()
 
@@ -305,6 +311,7 @@ def novedades_detalle(
                 "categoria": p.categoria,
                 "sujetos_procesales": p.sujetos_procesales,
                 "fecha_ultima_actuacion": p.fecha_ultima_actuacion,
+                "tipo_novedad": p.tipo_novedad or "nuevo",
                 "tipo_proceso": p.tipo_proceso,
                 "clase_proceso": p.clase_proceso,
                 "actuaciones": [
@@ -415,11 +422,15 @@ def obtener_proceso_publico(llave_proceso: str):
         return {"error": str(exc)}
 
 
+_COLOMBIA_TZ = timezone(timedelta(hours=-5))
+
+
 def _es_hoy(fecha_str: str | None) -> bool:
     if not fecha_str:
         return False
     try:
-        return fecha_str[:10] == date.today().isoformat()
+        hoy_colombia = datetime.now(_COLOMBIA_TZ).date().isoformat()
+        return fecha_str[:10] == hoy_colombia
     except (ValueError, IndexError):
         return False
 
