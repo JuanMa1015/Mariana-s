@@ -164,7 +164,29 @@ def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_us
     try:
         resultado = buscar_por_radicado(payload.llave_proceso, solo_activos=False)
         if resultado.procesos:
-            acts = buscar_actuaciones(resultado.procesos[0].id_proceso)
+            resumen = max(resultado.procesos, key=lambda p: sum(1 for c in [p.despacho, p.departamento, p.sujetos_procesales, p.tipo_proceso, p.clase_proceso, p.fecha_proceso] if (c or "").strip()))
+            nuevo.despacho = _serializar_texto(resumen.despacho) or nuevo.despacho
+            nuevo.departamento = _serializar_texto(resumen.departamento) or nuevo.departamento
+            nuevo.sujetos_procesales = _serializar_texto(resumen.sujetos_procesales) or nuevo.sujetos_procesales
+            nuevo.tipo_proceso = _serializar_texto(resumen.tipo_proceso)
+            nuevo.clase_proceso = _serializar_texto(resumen.clase_proceso)
+            nuevo.fecha_proceso = _serializar_texto(resumen.fecha_proceso)
+            es_privado = resumen.es_privado
+            if isinstance(es_privado, str):
+                es_privado = es_privado.strip().lower() in {"true", "1", "si", "sí"}
+            nuevo.es_privado = es_privado
+
+            try:
+                detalle = buscar_detalle_proceso(resumen.id_proceso)
+                nuevo.despacho = _serializar_texto(detalle.despacho) or nuevo.despacho
+                nuevo.tipo_proceso = _serializar_texto(detalle.tipo_proceso) or nuevo.tipo_proceso
+                nuevo.clase_proceso = _serializar_texto(detalle.clase_proceso) or nuevo.clase_proceso
+                nuevo.fecha_proceso = _serializar_texto(detalle.fecha_proceso) or nuevo.fecha_proceso
+                nuevo.es_privado = detalle.es_privado
+            except Exception:
+                pass
+
+            acts = buscar_actuaciones(resumen.id_proceso)
             ultima_fecha = None
             for a in acts.actuaciones:
                 _upsert_actuacion(db, nuevo, a)
@@ -423,6 +445,11 @@ def _sincronizar_radicado_actuaciones(db, proceso):
     except Exception as exc:
         logger.warning("Sync falló para %s: %s", proceso.llave_proceso, exc)
         db.rollback()
+
+
+def _serializar_texto(valor: str | None) -> str | None:
+    valor_normalizado = (valor or "").strip()
+    return valor_normalizado or None
 
 
 def _upsert_actuacion(db, proceso, remota):
