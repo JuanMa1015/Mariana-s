@@ -81,6 +81,14 @@ export async function deleteProceso(llaveProceso: string) {
   return res.json()
 }
 
+export async function getActuacionesRecientes(limit = 50, offset = 0) {
+  const params = new URLSearchParams()
+  params.append("limit", String(limit))
+  params.append("offset", String(offset))
+  const res = await fetchWithAuth(`${BASE_URL}/procesos/actuaciones-recientes?${params}`)
+  return res.json()
+}
+
 export async function updateProceso(llaveProceso: string, payload: Partial<{ llave_proceso: string; despacho: string; departamento: string; sujetos_procesales: string; categoria: string; notificado: boolean; fecha_ultima_actuacion: string }>) {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/${llaveProceso}`, {
     method: "PATCH",

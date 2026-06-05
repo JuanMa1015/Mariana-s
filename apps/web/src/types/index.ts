@@ -68,3 +68,18 @@ export interface ResultadoSync {
 export interface DetalleProceso extends Proceso {
   actuaciones?: Actuacion[]
 }
+
+export interface ResumenProceso {
+  llave_proceso: string
+  despacho: string
+  departamento: string
+}
+
+export interface ActuacionConProceso extends Actuacion {
+  proceso: ResumenProceso
+}
+
+export interface ActuacionesRecientes {
+  total: number
+  actuaciones: ActuacionConProceso[]
+}
