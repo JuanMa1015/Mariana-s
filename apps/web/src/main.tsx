@@ -7,7 +7,7 @@ import './index.css'
 import App from './App.tsx'
 import Login from './components/Login.tsx'
 import Register from './components/Register.tsx'
-import ActuacionesPage from './components/ActuacionesPage.tsx'
+import NovedadesPage from './components/NovedadesPage.tsx'
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const token = localStorage.getItem("token")
@@ -24,9 +24,9 @@ createRoot(document.getElementById('root')!).render(
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/actuaciones" element={
+        <Route path="/novedades" element={
           <ProtectedRoute>
-            <ActuacionesPage />
+            <NovedadesPage />
           </ProtectedRoute>
         } />
         <Route path="/*" element={

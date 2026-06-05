@@ -260,6 +260,68 @@ def actuaciones_recientes(
     }
 
 
+@router.get("/novedades-detalle")
+def novedades_detalle(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    limit_actuaciones: int = Query(50, ge=1, le=200),
+):
+    procesos = (
+        db.query(Proceso)
+        .filter(Proceso.notificado == False, Proceso.user_id == current_user.id)
+        .order_by(Proceso.fecha_ultima_actuacion.desc().nullslast(), Proceso.id.desc())
+        .all()
+    )
+
+    return {
+        "total": len(procesos),
+        "novedades": [
+            {
+                "llave_proceso": p.llave_proceso,
+                "despacho": p.despacho,
+                "departamento": p.departamento,
+                "categoria": p.categoria,
+                "sujetos_procesales": p.sujetos_procesales,
+                "fecha_ultima_actuacion": p.fecha_ultima_actuacion,
+                "tipo_proceso": p.tipo_proceso,
+                "clase_proceso": p.clase_proceso,
+                "actuaciones": [
+                    {
+                        "id_reg_actuacion": a.id_reg_actuacion,
+                        "cons_actuacion": a.cons_actuacion,
+                        "fecha_actuacion": a.fecha_actuacion,
+                        "actuacion": a.actuacion,
+                        "anotacion": a.anotacion,
+                        "fecha_inicial": a.fecha_inicial,
+                        "fecha_final": a.fecha_final,
+                        "fecha_registro": a.fecha_registro,
+                        "con_documentos": a.con_documentos,
+                        "cant": a.cant,
+                        "documentos": [
+                            {
+                                "id_reg_documento": d.id_reg_documento,
+                                "nombre": d.nombre,
+                                "descripcion": d.descripcion,
+                                "tipo": d.tipo,
+                                "fecha_carga": d.fecha_carga,
+                            }
+                            for d in a.documentos
+                        ],
+                    }
+                    for a in (
+                        db.query(Actuacion)
+                        .filter(Actuacion.proceso_id == p.id)
+                        .order_by(Actuacion.fecha_actuacion.desc().nullslast(), Actuacion.id_reg_actuacion.desc())
+                        .limit(limit_actuaciones)
+                        .all()
+                    )
+                ],
+            }
+            for p in procesos
+        ],
+    }
+
+
 @router.get("/rama-health")
 def rama_health():
     import httpx
