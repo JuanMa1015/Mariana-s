@@ -261,6 +261,19 @@ def buscar_documentos_actuacion(id_reg_actuacion: int) -> list[DocumentoActuacio
     return [_parsear_documento(d) for d in data]
 
 
+def descargar_documento(id_reg_documento: int) -> tuple[bytes, str]:
+    """Descarga el archivo PDF de un documento. Retorna (contenido, nombre_archivo)."""
+    with _cliente() as client:
+        response = _request_with_retry(
+            client, "GET", f"{BASE_ROOT}/Descarga/Documento/{id_reg_documento}"
+        )
+        filename = "documento.pdf"
+        cd = response.headers.get("content-disposition", "")
+        if "filename=" in cd:
+            filename = cd.split("filename=")[-1].strip('" ')
+    return response.content, filename
+
+
 def buscar_por_radicado(numero: str, solo_activos: bool = False, pagina: int = 1) -> ResultadoBusqueda:
     params = {
         "numero": numero,

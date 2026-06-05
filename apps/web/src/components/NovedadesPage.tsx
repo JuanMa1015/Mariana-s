@@ -3,6 +3,8 @@ import { getNovedadesDetalle } from "../api"
 import type { NovedadesDetalle, Actuacion } from "../types"
 import { useNavigate } from "react-router-dom"
 
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+
 function formatearFecha(iso: string | null | undefined): string {
   if (!iso) return "—"
   return iso.slice(0, 10)
@@ -25,14 +27,27 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-72 rounded-xl border border-sky-100 bg-white p-3 shadow-lg">
+          <div className="absolute right-0 top-full z-20 mt-1 w-96 rounded-xl border border-sky-100 bg-white p-3 shadow-lg">
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-sky-600">Documentos</p>
             <div className="space-y-2">
               {documentos.map((doc) => (
                 <div key={doc.id_reg_documento} className="rounded-lg bg-sky-50 p-2 text-[11px]">
-                  <p className="font-medium text-sky-800">{doc.nombre}</p>
-                  {doc.descripcion && <p className="mt-0.5 text-slate-500">{doc.descripcion}</p>}
-                  {doc.fecha_carga && <p className="mt-0.5 text-[10px] text-slate-400">{formatearFecha(doc.fecha_carga)}</p>}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sky-800 truncate">{doc.nombre}</p>
+                      {doc.descripcion && <p className="mt-0.5 text-slate-500">{doc.descripcion}</p>}
+                      {doc.fecha_carga && <p className="mt-0.5 text-[10px] text-slate-400">{formatearFecha(doc.fecha_carga)}</p>}
+                    </div>
+                    <a
+                      href={`${BASE_URL}/procesos/documento/${doc.id_reg_documento}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-sky-600 shadow-sm ring-1 ring-sky-200 transition hover:bg-sky-50"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      Descargar
+                    </a>
+                  </div>
                 </div>
               ))}
             </div>
