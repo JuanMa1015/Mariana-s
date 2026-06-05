@@ -333,6 +333,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
                     fecha_registro=latest_remote.fecha_registro,
                     con_documentos=latest_remote.con_documentos,
                     destinatarios=user_destinatarios,
+                    categoria=radicado.categoria,
                 ):
                     emails_enviados.append(radicado.llave_proceso)
             else:
@@ -353,6 +354,7 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
                 con_documentos=latest_remote.con_documentos,
                 total_actualizadas=len(actualizados),
                 destinatarios=user_destinatarios,
+                categoria=radicado.categoria,
             ):
                 emails_enviados.append(radicado.llave_proceso)
 

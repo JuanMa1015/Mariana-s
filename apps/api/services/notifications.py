@@ -65,6 +65,7 @@ def notificar_cambio_radicado(
     num_actuaciones: int | None = None,
     total_actualizadas: int | None = None,
     destinatarios: list[str] | None = None,
+    categoria: str | None = None,
 ) -> bool:
     if not destinatarios:
         destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
@@ -75,28 +76,23 @@ def notificar_cambio_radicado(
 
     asunto = f"Novedad judicial: {llave_proceso}"
     cuerpo = (
-        f"╔══════════════════════════════════════════╗\n"
-        f"║  MARIANA'S — MONITOR JUDICIAL            ║\n"
-        f"╚══════════════════════════════════════════╝\n\n"
+        f"MARIANA'S — Monitor Judicial\n\n"
         f"Se detectó una nueva actuación en el proceso:\n\n"
         f"  Radicado:     {llave_proceso}\n"
+        f"  Categoría:    {categoria or 'General'}\n"
         f"  Despacho:     {despacho}\n"
         f"  Departamento: {departamento}\n"
         f"  Última act.:  {fecha_ultima_actuacion or 'N/D'}\n\n"
-        f"── Nueva actuación ──\n"
+        f"Nueva actuación:\n"
         f"  Actuación:    {actuacion or 'N/D'}\n"
         f"  Anotación:    {anotacion or 'N/D'}\n"
         f"  Fecha registro: {fecha_registro or 'N/D'}\n"
         f"  Documentos:   {'Sí' if con_documentos else 'No'}\n\n"
-        f"  Sujetos procesales:\n"
+        f"Sujetos procesales:\n"
         f"  {sujetos_procesales}\n"
         f"\n"
-        f"──────────\n"
-        f"  Ver en Rama Judicial:\n"
-        f"  https://consultaprocesos.ramajudicial.gov.co/procesos/bienvenida\n"
-        f"\n"
-        f"  Ver en Mariana's:\n"
-        f"  {APP_URL}\n"
+        f"---\n"
+        f"Ver en Mariana's: {APP_URL}\n"
     )
     if total_actualizadas is not None:
         asunto = f"[{total_actualizadas} novedades] {asunto}"
