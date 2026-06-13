@@ -119,6 +119,32 @@ def marcar_leido(llave_proceso: str):
         db.close()
 
 
+@app.get("/resetear-radicado")
+def resetear_radicado(llave_proceso: str):
+    from models.database import SessionLocal
+    from models.actuacion import Actuacion
+    from models.documento_actuacion import DocumentoActuacion
+    from models.proceso import Proceso
+
+    db = SessionLocal()
+    try:
+        proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
+        if not proceso:
+            return {"ok": False, "error": "No encontrado"}
+        docs = db.query(DocumentoActuacion).join(Actuacion).filter(Actuacion.proceso_id == proceso.id).all()
+        for d in docs:
+            db.delete(d)
+        acts = db.query(Actuacion).filter(Actuacion.proceso_id == proceso.id).all()
+        for a in acts:
+            db.delete(a)
+        proceso.notificado = True
+        proceso.fecha_ultima_actuacion = None
+        db.commit()
+        return {"ok": True, "llave_proceso": llave_proceso, "actuaciones_borradas": len(acts), "documentos_borrados": len(docs)}
+    finally:
+        db.close()
+
+
 @app.get("/test-email")
 def test_email():
     import json, urllib.request
