@@ -475,11 +475,23 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
 
 
 def sincronizar_radicados_lote(db: Session, lote: int = 25, user_id: int | None = None) -> dict:
+    from sqlalchemy import case, desc, nullsfirst, nullslast
+
     query = db.query(Proceso)
     if user_id is not None:
         query = query.filter(Proceso.user_id == user_id)
     radicados = (
-        query.order_by(Proceso.ultima_sincronizacion.asc().nullsfirst(), Proceso.id.asc())
+        query.order_by(
+            # Priority 1: nunca sincronizados
+            Proceso.ultima_sincronizacion.is_(None).desc(),
+            # Priority 2: con novedades sin revisar
+            Proceso.notificado.asc(),
+            # Priority 3: actuación reciente más probable
+            Proceso.fecha_ultima_actuacion.desc().nullslast(),
+            # Priority 4: los que llevan más tiempo sin sincronizar
+            Proceso.ultima_sincronizacion.asc().nullsfirst(),
+            Proceso.id.asc(),
+        )
         .limit(lote)
         .all()
     )
