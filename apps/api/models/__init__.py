@@ -41,3 +41,30 @@ def init_db():
             conn.commit()
     except Exception:
         pass  # Column already exists or not supported
+
+    # Migrate: add ultima_sincronizacion column if missing
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE procesos ADD COLUMN ultima_sincronizacion TIMESTAMP"))
+            conn.commit()
+    except Exception:
+        pass
+
+    # Migrate: add dias_sin_cambios column if missing
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE procesos ADD COLUMN dias_sin_cambios INTEGER DEFAULT 0"))
+            conn.commit()
+    except Exception:
+        pass
+
+    # Migrate: add fallos_consecutivos column if missing
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE procesos ADD COLUMN fallos_consecutivos INTEGER DEFAULT 0"))
+            conn.commit()
+    except Exception:
+        pass
