@@ -331,6 +331,7 @@ def _procesar_radicado(
                 categoria=radicado.categoria,
             ):
                 emails_enviados.append(radicado.llave_proceso)
+                time.sleep(0.5)
         else:
             radicado.notificado = True
             nuevos.append(radicado.llave_proceso)
@@ -353,6 +354,7 @@ def _procesar_radicado(
             categoria=radicado.categoria,
         ):
             emails_enviados.append(radicado.llave_proceso)
+            time.sleep(0.5)
 
     if datos_cambiaron or latest_remote is not None or is_initial_sync:
         db.commit()

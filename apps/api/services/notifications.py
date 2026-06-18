@@ -13,16 +13,23 @@ def _enviar_sendgrid(destinatarios: list[str], asunto: str, cuerpo: str) -> bool
         from sendgrid import SendGridAPIClient
         from sendgrid.helpers.mail import Mail, Email, To, Content
 
-        message = Mail(
-            from_email=Email(EMAIL_FROM or SMTP_USER or "noreply@mariana.app"),
-            to_emails=[To(c) for c in destinatarios],
-            subject=asunto,
-            plain_text_content=Content("text/plain", cuerpo),
-        )
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        response = sg.send(message)
-        logger.info("SendGrid response status: %s", response.status_code)
-        return 200 <= response.status_code < 300
+        for dest in destinatarios:
+            message = Mail(
+                from_email=Email(EMAIL_FROM or SMTP_USER or "noreply@mariana.app"),
+                to_emails=To(dest),
+                subject=asunto,
+                plain_text_content=Content("text/plain", cuerpo),
+            )
+            sg = SendGridAPIClient(SENDGRID_API_KEY)
+            response = sg.send(message)
+            ok = 200 <= response.status_code < 300
+            logger.info(
+                "SendGrid -> %s | status=%s | ok=%s",
+                dest, response.status_code, ok,
+            )
+            if not ok:
+                return False
+        return True
     except Exception as exc:
         logger.error("SendGrid falló: %s", exc)
         return False
@@ -94,18 +101,18 @@ def notificar_cambio_radicado(
         f"---\n"
         f"Ver en Mariana's: {APP_URL}\n"
     )
-    if total_actualizadas is not None:
+    if total_actualizadas is not None and total_actualizadas > 0:
         asunto = f"[{total_actualizadas} novedades] {asunto}"
 
-    # Determine default EMAIL_TO recipients for fallback
     default_destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
     using_defaults = set(destinatarios) == set(default_destinatarios)
 
-    # Intentar SendGrid primero, luego SMTP
     exito = False
     if SENDGRID_API_KEY:
         exito = _enviar_sendgrid(destinatarios, asunto, cuerpo)
-    else:
+
+    if not exito and SMTP_HOST:
+        logger.warning("SendGrid falló, reintentando con SMTP para %s", destinatarios)
         exito = _enviar_smtp(destinatarios, asunto, cuerpo)
 
     if not exito and not using_defaults and default_destinatarios:
@@ -115,7 +122,7 @@ def notificar_cambio_radicado(
         )
         if SENDGRID_API_KEY:
             exito = _enviar_sendgrid(default_destinatarios, asunto, cuerpo)
-        else:
+        if not exito and SMTP_HOST:
             exito = _enviar_smtp(default_destinatarios, asunto, cuerpo)
 
     return exito

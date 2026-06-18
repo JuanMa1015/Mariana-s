@@ -182,55 +182,35 @@ def resetear_todos():
 
 @app.get("/test-email")
 def test_email():
-    import json, urllib.request
-    from config import EMAIL_TO, SENDGRID_API_KEY
+    from config import EMAIL_TO as CFG_EMAIL_TO, SENDGRID_API_KEY, SMTP_HOST
+    from services.notifications import _enviar_smtp, _enviar_sendgrid
 
-    destinatarios = [c.strip() for c in EMAIL_TO.replace(",", " ").split() if c.strip()]
+    destinatarios = [c.strip() for c in CFG_EMAIL_TO.replace(",", " ").split() if c.strip()]
     if not destinatarios:
         return {"email_enviado": False, "error": "Sin destinatarios"}
 
-    data = json.dumps({
-        "personalizations": [{"to": [{"email": d} for d in destinatarios]}],
-        "from": {"email": "gonzalezjuanmanuel645@gmail.com"},
-        "subject": "TEST - Mariana's",
-        "content": [{"type": "text/plain", "value": "Correo de prueba desde Mariana's."}],
-    }).encode()
+    asunto = "TEST - Mariana's"
+    cuerpo = "Correo de prueba desde Mariana's."
+    resultados = {}
 
-    req = urllib.request.Request(
-        "https://api.sendgrid.com/v3/mail/send",
-        data=data,
-        headers={
-            "Authorization": f"Bearer {SENDGRID_API_KEY}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
-    )
+    if SENDGRID_API_KEY:
+        sg_ok = _enviar_sendgrid(destinatarios, asunto, cuerpo)
+        resultados["sendgrid"] = {"ok": sg_ok, "api_key_set": True}
+    else:
+        resultados["sendgrid"] = {"ok": False, "api_key_set": False}
 
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            body = resp.read().decode()
-            return {
-                "email_enviado": True,
-                "status": resp.status,
-                "body": body[:200],
-                "destinatario": EMAIL_TO,
-                "sendgrid_api_key_set": bool(SENDGRID_API_KEY),
-            }
-    except urllib.error.HTTPError as e:
-        return {
-            "email_enviado": False,
-            "status": e.code,
-            "body": e.read().decode()[:500],
-            "destinatario": EMAIL_TO,
-            "sendgrid_api_key_set": bool(SENDGRID_API_KEY),
-        }
-    except Exception as exc:
-        return {
-            "email_enviado": False,
-            "error": repr(exc),
-            "destinatario": EMAIL_TO,
-            "sendgrid_api_key_set": bool(SENDGRID_API_KEY),
-        }
+    if SMTP_HOST:
+        smtp_ok = _enviar_smtp(destinatarios, asunto, cuerpo)
+        resultados["smtp"] = {"ok": smtp_ok}
+    else:
+        resultados["smtp"] = {"ok": False, "smtp_host_set": False}
+
+    primary_ok = resultados.get("sendgrid", {}).get("ok", False) or resultados.get("smtp", {}).get("ok", False)
+    return {
+        "resultados": resultados,
+        "email_enviado": primary_ok,
+        "destinatarios": destinatarios,
+    }
 
 app.include_router(auth_router)
 app.include_router(procesos_router)
