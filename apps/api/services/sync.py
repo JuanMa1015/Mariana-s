@@ -58,7 +58,8 @@ def _es_reciente(fecha_str: str | None, dias: int = 5) -> bool:
     try:
         fecha = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
         hoy_colombia = datetime.now(_COLOMBIA_TZ).date()
-        return 0 <= (hoy_colombia - fecha).days <= dias
+        diff = abs((hoy_colombia - fecha).days)
+        return diff <= dias
     except (ValueError, IndexError):
         return False
 
