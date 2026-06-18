@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    scheduler = iniciar_scheduler(intervalo_horas=6)
+    scheduler = iniciar_scheduler(intervalo_horas=1)
     yield
     scheduler.shutdown()
 

@@ -12,6 +12,9 @@ export interface Proceso {
   notificado: boolean
   creado_en: string
   actualizado_en?: string | null
+  ultima_sincronizacion?: string | null
+  dias_sin_cambios?: number | null
+  fallos_consecutivos?: number | null
 }
 
 export interface DocumentoActuacion {

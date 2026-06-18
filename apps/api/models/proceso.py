@@ -23,6 +23,9 @@ class Proceso(Base):
     categoria = Column(String, default="General")
     creado_en = Column(DateTime, server_default=func.now())
     actualizado_en = Column(DateTime, onupdate=func.now())
+    ultima_sincronizacion = Column(DateTime, nullable=True)
+    dias_sin_cambios = Column(Integer, default=0)
+    fallos_consecutivos = Column(Integer, default=0)
 
     user = relationship("User", back_populates="procesos")
     actuaciones = relationship("Actuacion", back_populates="proceso", cascade="all, delete-orphan")

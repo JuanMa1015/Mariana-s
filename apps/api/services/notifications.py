@@ -73,6 +73,8 @@ def notificar_cambio_radicado(
     total_actualizadas: int | None = None,
     destinatarios: list[str] | None = None,
     categoria: str | None = None,
+    custom_asunto: str | None = None,
+    custom_cuerpo: str | None = None,
 ) -> bool:
     if not destinatarios:
         destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
@@ -81,28 +83,32 @@ def notificar_cambio_radicado(
         logger.info("Correo no configurado; se omite notificación para %s", llave_proceso)
         return False
 
-    asunto = f"Novedad judicial: {llave_proceso}"
-    cuerpo = (
-        f"MARIANA'S — Monitor Judicial\n\n"
-        f"Se detectó una nueva actuación en el proceso:\n\n"
-        f"  Radicado:     {llave_proceso}\n"
-        f"  Categoría:    {categoria or 'General'}\n"
-        f"  Despacho:     {despacho}\n"
-        f"  Departamento: {departamento}\n"
-        f"  Última act.:  {fecha_ultima_actuacion or 'N/D'}\n\n"
-        f"Nueva actuación:\n"
-        f"  Actuación:    {actuacion or 'N/D'}\n"
-        f"  Anotación:    {anotacion or 'N/D'}\n"
-        f"  Fecha registro: {fecha_registro or 'N/D'}\n"
-        f"  Documentos:   {'Sí' if con_documentos else 'No'}\n\n"
-        f"Sujetos procesales:\n"
-        f"  {sujetos_procesales}\n"
-        f"\n"
-        f"---\n"
-        f"Ver en Mariana's: {APP_URL}\n"
-    )
-    if total_actualizadas is not None and total_actualizadas > 0:
-        asunto = f"[{total_actualizadas} novedades] {asunto}"
+    if custom_asunto and custom_cuerpo:
+        asunto = custom_asunto
+        cuerpo = custom_cuerpo
+    else:
+        asunto = f"Novedad judicial: {llave_proceso}"
+        cuerpo = (
+            f"MARIANA'S — Monitor Judicial\n\n"
+            f"Se detectó una nueva actuación en el proceso:\n\n"
+            f"  Radicado:     {llave_proceso}\n"
+            f"  Categoría:    {categoria or 'General'}\n"
+            f"  Despacho:     {despacho}\n"
+            f"  Departamento: {departamento}\n"
+            f"  Última act.:  {fecha_ultima_actuacion or 'N/D'}\n\n"
+            f"Nueva actuación:\n"
+            f"  Actuación:    {actuacion or 'N/D'}\n"
+            f"  Anotación:    {anotacion or 'N/D'}\n"
+            f"  Fecha registro: {fecha_registro or 'N/D'}\n"
+            f"  Documentos:   {'Sí' if con_documentos else 'No'}\n\n"
+            f"Sujetos procesales:\n"
+            f"  {sujetos_procesales}\n"
+            f"\n"
+            f"---\n"
+            f"Ver en Mariana's: {APP_URL}\n"
+        )
+        if total_actualizadas is not None and total_actualizadas > 0:
+            asunto = f"[{total_actualizadas} novedades] {asunto}"
 
     default_destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
     using_defaults = set(destinatarios) == set(default_destinatarios)
