@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { getProceso, getProcesos, getNovedades, postAddRadicado } from "./api"
 import toast from "react-hot-toast"
 import type { DetalleProceso, ListaProcesos, ListaNovedades } from "./types"
@@ -6,8 +6,28 @@ import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
 import { useNavigate } from "react-router-dom"
 
+const FRASES: string[] = [
+  "La justicia es la constante y perpetua voluntad de dar a cada uno su derecho. — Ulpiano",
+  "El derecho es el conjunto de condiciones que permiten a la libertad de cada uno acomodarse a la libertad de todos. — Kant",
+  "Donde hay justicia no hay pobreza. — Séneca",
+  "El abogado no es dueño de la verdad, es dueño de la argumentación. — Anónimo",
+  "La ley es razón libre de pasión. — Aristóteles",
+  "Un buen abogado conoce el derecho; un gran abogado conoce al juez. — Anónimo",
+  "La justicia tarda, pero llega. — Refrán popular",
+  "El estudio del derecho no solo te enseña leyes, te enseña a pensar. — Anónimo",
+  "La libertad sin ley es anarquía; la ley sin libertad es tiranía. — Simón Bolívar",
+  "La perseverancia es la madre de la justicia. — Anónimo",
+  "No hay causa perdida, solo abogados que se rinden. — Anónimo",
+  "De la UdeA para el mundo: orgullo, compromiso y excelencia. — Anónimo",
+  "El derecho es la arquitectura de la convivencia social. — Anónimo",
+  "Lo importante no es ganar el caso, es hacer justicia. — Anónimo",
+  "Estudiar derecho es aprender a construir un mundo más justo. — Anónimo",
+]
+
 export default function App() {
   const navigate = useNavigate()
+  const username = localStorage.getItem("username") || localStorage.getItem("email")?.split("@")[0] || "Mariana"
+  const frase = useMemo(() => FRASES[Math.floor(Math.random() * FRASES.length)], [])
   const [procesos, setProcesos] = useState<ListaProcesos | null>(null)
   const [novedades, setNovedades] = useState<ListaNovedades | null>(null)
   const [newRadicado, setNewRadicado] = useState({ llave_proceso: "", categoria: "General" })
@@ -59,6 +79,7 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("email")
+    localStorage.removeItem("username")
     navigate("/login", { replace: true })
   }
 
@@ -68,7 +89,7 @@ export default function App() {
         <div className="mx-auto flex w-full max-w-none items-center justify-between px-4 py-3 sm:px-5">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-400">Mariana's</p>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">Seguimiento por radicado</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">Hola, {username}</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
@@ -122,7 +143,7 @@ export default function App() {
           </section>
         ) : (
           <>
-        <section className="grid gap-3 md:grid-cols-3">
+        <section className="grid gap-3 md:grid-cols-4">
           <div className="rounded-3xl border border-violet-200 bg-violet-50 px-5 py-4 text-slate-900 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-500">Total procesos guardados</p>
             <p className="mt-1 text-3xl font-black tracking-tight text-violet-900">{procesos?.total ?? 0}</p>
@@ -134,6 +155,10 @@ export default function App() {
           <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-slate-900 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-600">Procesos al día</p>
             <p className="mt-1 text-3xl font-black tracking-tight text-emerald-900">{Math.max((procesos?.total ?? 0) - (novedades?.total ?? 0), 0)}</p>
+          </div>
+          <div className="rounded-3xl border border-indigo-200 bg-indigo-50 px-5 py-4 text-slate-900 shadow-sm">
+            <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-indigo-500">⚖️ Frase del día</p>
+            <p className="mt-1 text-sm leading-snug text-indigo-700">{frase}</p>
           </div>
         </section>
 

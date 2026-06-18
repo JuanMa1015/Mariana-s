@@ -17,7 +17,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
   return res
 }
 
-export async function loginUser(payload: any) {
+export async function loginUser(payload: { credential: string; password: string }) {
   const res = await fetch(`${BASE_URL}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -27,7 +27,7 @@ export async function loginUser(payload: any) {
   return res.json()
 }
 
-export async function registerUser(payload: any) {
+export async function registerUser(payload: { email: string; password: string; username?: string }) {
   const res = await fetch(`${BASE_URL}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

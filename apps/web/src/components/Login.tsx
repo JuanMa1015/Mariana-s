@@ -4,7 +4,7 @@ import { Link, useNavigate } from "react-router-dom"
 import toast from "react-hot-toast"
 
 export default function Login() {
-  const [email, setEmail] = useState("")
+  const [credential, setCredential] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
@@ -13,7 +13,7 @@ export default function Login() {
   useEffect(() => {
     const remembered = localStorage.getItem("rememberedEmail")
     if (remembered) {
-      setEmail(remembered)
+      setCredential(remembered)
       setRememberMe(true)
     }
   }, [])
@@ -22,11 +22,12 @@ export default function Login() {
     e.preventDefault()
     const loadingToast = toast.loading("Iniciando sesión...")
     try {
-      const data = await loginUser({ email, password })
+      const data = await loginUser({ credential, password })
       localStorage.setItem("token", data.access_token)
       localStorage.setItem("email", data.email)
+      if (data.username) localStorage.setItem("username", data.username)
       if (rememberMe) {
-        localStorage.setItem("rememberedEmail", email)
+        localStorage.setItem("rememberedEmail", credential)
       } else {
         localStorage.removeItem("rememberedEmail")
       }
@@ -47,13 +48,14 @@ export default function Login() {
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Correo Electrónico</label>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Correo o Usuario</label>
             <input
-              type="email"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={credential}
+              onChange={(e) => setCredential(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+              placeholder="ej: paulacorreaq"
             />
           </div>
           <div>
