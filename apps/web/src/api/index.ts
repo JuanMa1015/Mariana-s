@@ -1,6 +1,10 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
-async function fetchWithAuth(url: string, options: RequestInit = {}) {
+function _esperar(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos = 3) {
   const token = localStorage.getItem("token")
   const headers = new Headers(options.headers || {})
   
@@ -8,13 +12,37 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
     headers.set("Authorization", `Bearer ${token}`)
   }
 
-  const res = await fetch(url, { ...options, headers })
-  if (res.status === 401) {
-    localStorage.removeItem("token")
-    window.location.href = "/login"
-    throw new Error("Unauthorized")
+  for (let intento = 0; intento < reintentos; intento++) {
+    let res: Response
+    try {
+      res = await fetch(url, { ...options, headers })
+    } catch (err) {
+      if (intento < reintentos - 1) {
+        const espera = 1000 * 2 ** intento
+        console.warn(`fetch falló (red), reintento ${intento + 1}/${reintentos} en ${espera}ms:`, err)
+        await _esperar(espera)
+        continue
+      }
+      throw err
+    }
+
+    if (res.status === 401) {
+      localStorage.removeItem("token")
+      window.location.href = "/login"
+      throw new Error("Unauthorized")
+    }
+
+    if (res.status >= 500 && res.status < 600 && intento < reintentos - 1) {
+      const espera = 1000 * 2 ** intento
+      console.warn(`API respondió ${res.status}, reintento ${intento + 1}/${reintentos} en ${espera}ms`)
+      await _esperar(espera)
+      continue
+    }
+
+    return res
   }
-  return res
+
+  throw new Error(`Error de conexión después de ${reintentos} intentos`)
 }
 
 export async function loginUser(payload: { credential: string; password: string }) {
