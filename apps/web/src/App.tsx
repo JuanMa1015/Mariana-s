@@ -41,7 +41,7 @@ export default function App() {
   const [detalle, setDetalle] = useState<DetalleProceso | null>(null)
   const [loadingDetalle, setLoadingDetalle] = useState(false)
   const [page, setPage] = useState(1)
-  const [limit] = useState(10)
+  const [limit] = useState(500)
   const [filtroCategoria, setFiltroCategoria] = useState("")
   const [busqueda, setBusqueda] = useState("")
 

@@ -20,6 +20,7 @@ from scraper.rama_client import (
     buscar_por_radicado,
 )
 from services.notifications import notificar_cambio_radicado
+from config import APP_URL
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,51 @@ def _es_reciente(fecha_str: str | None, dias: int = 5) -> bool:
         return diff <= dias
     except (ValueError, IndexError):
         return False
+
+
+def _calcular_dias_sin_cambios(fecha_str: str | None) -> int:
+    if not fecha_str:
+        return 999
+    try:
+        fecha = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
+        hoy_colombia = datetime.now(_COLOMBIA_TZ).date()
+        diff = (hoy_colombia - fecha).days
+        return max(0, diff)
+    except (ValueError, IndexError):
+        return 999
+
+
+def _backoff_dias(proceso: Proceso) -> int:
+    fallos = proceso.fallos_consecutivos or 0
+    if fallos == 0:
+        return 0
+    if fallos == 1:
+        return 1
+    if fallos == 2:
+        return 3
+    if fallos == 3:
+        return 7
+    return 15
+
+
+def _debe_sincronizar(proceso: Proceso) -> bool:
+    if proceso.ultima_sincronizacion is None:
+        return True
+    dias_desde_sync = (datetime.now(_COLOMBIA_TZ) - proceso.ultima_sincronizacion).days
+    dias_sin_cambios = proceso.dias_sin_cambios or 0
+    backoff = _backoff_dias(proceso)
+
+    if backoff > 0:
+        return dias_desde_sync >= backoff
+
+    if dias_sin_cambios < 7:
+        return dias_desde_sync >= 1
+    elif dias_sin_cambios < 30:
+        return dias_desde_sync >= 3
+    elif dias_sin_cambios < 90:
+        return dias_desde_sync >= 7
+    else:
+        return dias_desde_sync >= 15
 
 
 def _actualizar_campos_proceso(proceso: Proceso, resumen, detalle) -> bool:
@@ -202,6 +248,10 @@ def sincronizar_radicado(db: Session, radicado: Proceso) -> bool:
             for documento_remoto in documentos:
                 _upsert_documento(db, actuacion_db, documento_remoto)
 
+    radicado.ultima_sincronizacion = datetime.now(_COLOMBIA_TZ)
+    radicado.dias_sin_cambios = _calcular_dias_sin_cambios(radicado.fecha_ultima_actuacion)
+    radicado.fallos_consecutivos = 0
+
     logger.info(
         "Radicado %s sincronizado: %d actuaciones, última: %s",
         radicado.llave_proceso,
@@ -219,6 +269,7 @@ def _procesar_radicado(
     actualizados: list,
     emails_enviados: list,
     errores: list,
+    acumuladas: dict,
 ):
     if not re.fullmatch(r"\d{23}", radicado.llave_proceso or ""):
         return
@@ -229,6 +280,7 @@ def _procesar_radicado(
         msg = f"{type(exc).__name__}: {exc}"
         logger.warning("No se pudo consultar radicado %s: %s", radicado.llave_proceso, msg)
         errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "buscar_por_radicado"})
+        radicado.fallos_consecutivos = (radicado.fallos_consecutivos or 0) + 1
         if "Timeout" in type(exc).__name__:
             time.sleep(10)
         elif "403" in msg:
@@ -247,6 +299,7 @@ def _procesar_radicado(
         msg = f"{type(exc).__name__}: {exc}"
         logger.warning("No se pudo traer detalle de Rama para %s: %s", radicado.llave_proceso, msg)
         errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "detalle"})
+        radicado.fallos_consecutivos = (radicado.fallos_consecutivos or 0) + 1
         if "Timeout" in type(exc).__name__:
             time.sleep(10)
         elif "403" in msg:
@@ -267,6 +320,7 @@ def _procesar_radicado(
                 time.sleep(pausa)
     if resultado_actuaciones is None:
         errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "actuaciones"})
+        radicado.fallos_consecutivos = (radicado.fallos_consecutivos or 0) + 1
         return
 
     previous_latest_id = (
@@ -306,10 +360,9 @@ def _procesar_radicado(
     )
 
     user_email = radicado.user.email.strip() if radicado.user and radicado.user.email else None
-    user_destinatarios = [user_email] if user_email else None
     logger.info(
-        "Notificando %s -> destinatarios=%s, categoria=%s",
-        radicado.llave_proceso, user_destinatarios, radicado.categoria,
+        "Notificando %s -> email=%s, categoria=%s",
+        radicado.llave_proceso, user_email, radicado.categoria,
     )
 
     if is_initial_sync:
@@ -317,21 +370,19 @@ def _procesar_radicado(
             radicado.notificado = False
             radicado.tipo_novedad = "actualizacion"
             actualizados.append(radicado.llave_proceso)
-            if notificar_cambio_radicado(
-                llave_proceso=radicado.llave_proceso,
-                despacho=radicado.despacho or "",
-                departamento=radicado.departamento or "",
-                fecha_ultima_actuacion=radicado.fecha_ultima_actuacion,
-                sujetos_procesales=radicado.sujetos_procesales or "",
-                actuacion=latest_remote.actuacion,
-                anotacion=latest_remote.anotacion,
-                fecha_registro=latest_remote.fecha_registro,
-                con_documentos=latest_remote.con_documentos,
-                destinatarios=user_destinatarios,
-                categoria=radicado.categoria,
-            ):
-                emails_enviados.append(radicado.llave_proceso)
-                time.sleep(0.5)
+            if user_email:
+                acumuladas.setdefault(user_email, []).append({
+                    "llave_proceso": radicado.llave_proceso,
+                    "despacho": radicado.despacho or "",
+                    "departamento": radicado.departamento or "",
+                    "fecha_ultima_actuacion": radicado.fecha_ultima_actuacion,
+                    "sujetos_procesales": radicado.sujetos_procesales or "",
+                    "actuacion": latest_remote.actuacion,
+                    "anotacion": latest_remote.anotacion,
+                    "fecha_registro": latest_remote.fecha_registro,
+                    "con_documentos": latest_remote.con_documentos,
+                    "categoria": radicado.categoria,
+                })
         else:
             radicado.notificado = True
             nuevos.append(radicado.llave_proceso)
@@ -339,25 +390,100 @@ def _procesar_radicado(
         radicado.notificado = False
         radicado.tipo_novedad = "actualizacion"
         actualizados.append(radicado.llave_proceso)
-        if notificar_cambio_radicado(
-            llave_proceso=radicado.llave_proceso,
-            despacho=radicado.despacho or "",
-            departamento=radicado.departamento or "",
-            fecha_ultima_actuacion=radicado.fecha_ultima_actuacion,
-            sujetos_procesales=radicado.sujetos_procesales or "",
-            actuacion=latest_remote.actuacion,
-            anotacion=latest_remote.anotacion,
-            fecha_registro=latest_remote.fecha_registro,
-            con_documentos=latest_remote.con_documentos,
-            total_actualizadas=len(actualizados),
-            destinatarios=user_destinatarios,
-            categoria=radicado.categoria,
-        ):
-            emails_enviados.append(radicado.llave_proceso)
-            time.sleep(0.5)
+        if user_email:
+            acumuladas.setdefault(user_email, []).append({
+                "llave_proceso": radicado.llave_proceso,
+                "despacho": radicado.despacho or "",
+                "departamento": radicado.departamento or "",
+                "fecha_ultima_actuacion": radicado.fecha_ultima_actuacion,
+                "sujetos_procesales": radicado.sujetos_procesales or "",
+                "actuacion": latest_remote.actuacion,
+                "anotacion": latest_remote.anotacion,
+                "fecha_registro": latest_remote.fecha_registro,
+                "con_documentos": latest_remote.con_documentos,
+                "categoria": radicado.categoria,
+            })
+
+    radicado.ultima_sincronizacion = datetime.now(_COLOMBIA_TZ)
+    radicado.dias_sin_cambios = _calcular_dias_sin_cambios(radicado.fecha_ultima_actuacion)
+    radicado.fallos_consecutivos = 0
 
     if datos_cambiaron or latest_remote is not None or is_initial_sync:
         db.commit()
+
+
+def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list):
+    for email, notifs in acumuladas.items():
+        destinatarios = [email]
+        if len(notifs) > 3:
+            lines = []
+            for n in notifs:
+                lines.append(
+                    f"  Radicado:     {n['llave_proceso']}\n"
+                    f"  Categoría:    {n['categoria'] or 'General'}\n"
+                    f"  Despacho:     {n['despacho']}\n"
+                    f"  Departamento: {n['departamento']}\n"
+                    f"  Última act.:  {n['fecha_ultima_actuacion'] or 'N/D'}\n"
+                    f"  Actuación:    {n['actuacion'] or 'N/D'}\n"
+                    f"  Anotación:    {n['anotacion'] or 'N/D'}\n"
+                    f"  Fecha registro: {n['fecha_registro'] or 'N/D'}\n"
+                    f"  Documentos:   {'Sí' if n['con_documentos'] else 'No'}\n"
+                    f"  {'─' * 40}\n"
+                )
+            cuerpo = (
+                f"MARIANA'S — Monitor Judicial\n\n"
+                f"Resumen de {len(notifs)} novedades detectadas:\n\n"
+                + "\n".join(lines) +
+                f"\nVer en Mariana's: {APP_URL}\n"
+            )
+            asunto = f"[{len(notifs)} novedades] Resumen de actualizaciones judiciales"
+            ok = notificar_cambio_radicado(
+                llave_proceso="resumen",
+                despacho="",
+                departamento="",
+                fecha_ultima_actuacion=None,
+                sujetos_procesales="",
+                actuacion=None,
+                anotacion=None,
+                fecha_registro=None,
+                con_documentos=None,
+                destinatarios=destinatarios,
+                custom_asunto=asunto,
+                custom_cuerpo=cuerpo,
+            )
+            if ok:
+                emails_enviados.append(f"resumen_{email}")
+            time.sleep(0.5)
+        else:
+            for n in notifs:
+                ok = notificar_cambio_radicado(
+                    llave_proceso=n["llave_proceso"],
+                    despacho=n["despacho"],
+                    departamento=n["departamento"],
+                    fecha_ultima_actuacion=n["fecha_ultima_actuacion"],
+                    sujetos_procesales=n["sujetos_procesales"],
+                    actuacion=n["actuacion"],
+                    anotacion=n["anotacion"],
+                    fecha_registro=n["fecha_registro"],
+                    con_documentos=n["con_documentos"],
+                    destinatarios=destinatarios,
+                    categoria=n["categoria"],
+                )
+                if ok:
+                    emails_enviados.append(n["llave_proceso"])
+                time.sleep(0.5)
+
+
+def sincronizar_radicados_lote(db: Session, lote: int = 25, user_id: int | None = None) -> dict:
+    query = db.query(Proceso)
+    if user_id is not None:
+        query = query.filter(Proceso.user_id == user_id)
+    radicados = (
+        query.order_by(Proceso.ultima_sincronizacion.asc().nullsfirst(), Proceso.id.asc())
+        .limit(lote)
+        .all()
+    )
+    return _sincronizar_lista(db, radicados)
 
 
 def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
@@ -365,12 +491,18 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
     if user_id is not None:
         query = query.filter(Proceso.user_id == user_id)
     radicados = query.order_by(Proceso.id.asc()).all()
+    return _sincronizar_lista(db, radicados)
+
+
+def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
 
     nuevos = []
     actualizados = []
     emails_enviados = []
     ignorados = []
     errores = []
+    saltados = []
+    acumuladas: dict[str, list[dict]] = {}
 
     for idx, radicado in enumerate(radicados):
         # Pausa entre radicados para evitar rate limiting de Rama Judicial
@@ -381,19 +513,25 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
             ignorados.append(radicado.llave_proceso)
             continue
 
+        if not _debe_sincronizar(radicado):
+            saltados.append(radicado.llave_proceso)
+            continue
+
         try:
-            _procesar_radicado(db, radicado, nuevos, actualizados, emails_enviados, errores)
+            _procesar_radicado(db, radicado, nuevos, actualizados, emails_enviados, errores, acumuladas)
         except OperationalError as exc:
             logger.warning("Error BD en radicado %s: %s. Reintentando una vez...", radicado.llave_proceso, exc)
             db.rollback()
             try:
-                _procesar_radicado(db, radicado, nuevos, actualizados, emails_enviados, errores)
+                _procesar_radicado(db, radicado, nuevos, actualizados, emails_enviados, errores, acumuladas)
             except OperationalError as exc2:
                 logger.warning("Error BD persistente en radicado %s: %s. Cerrando sesión y creando una nueva.", radicado.llave_proceso, exc2)
                 db.rollback()
                 db.close()
                 db = SessionLocal()
                 errores.append({"radicado": radicado.llave_proceso, "error": str(exc2), "paso": "base_de_datos"})
+
+    _enviar_notificaciones_acumuladas(acumuladas, emails_enviados)
 
     return {
         "total_consultados": len(radicados),
@@ -403,5 +541,6 @@ def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
         "actualizados_radicados": actualizados,
         "emails_enviados": emails_enviados,
         "radicados_ignorados": ignorados,
+        "radicados_saltados_frecuencia": saltados,
         "radicados_error_consulta": errores,
     }

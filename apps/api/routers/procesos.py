@@ -67,6 +67,9 @@ def listar_procesos(
                 "notificado": p.notificado,
                 "creado_en": p.creado_en,
                 "actualizado_en": p.actualizado_en,
+                "ultima_sincronizacion": p.ultima_sincronizacion,
+                "dias_sin_cambios": p.dias_sin_cambios,
+                "fallos_consecutivos": p.fallos_consecutivos,
             }
             for p in procesos
         ],
@@ -403,7 +406,7 @@ def obtener_proceso_publico(llave_proceso: str):
 
 def _sincronizar_radicado_actuaciones(db, proceso):
     # Skip if synced within last 30 minutes
-    if proceso.actualizado_en and (datetime.utcnow() - proceso.actualizado_en).total_seconds() < 1800:
+    if proceso.ultima_sincronizacion and (datetime.utcnow() - proceso.ultima_sincronizacion).total_seconds() < 1800:
         return
 
     try:
@@ -417,7 +420,9 @@ def _sincronizar_radicado_actuaciones(db, proceso):
                     ultima_fecha = a.fecha_actuacion
             if ultima_fecha:
                 proceso.fecha_ultima_actuacion = ultima_fecha
-        proceso.actualizado_en = datetime.utcnow()
+                dias_sin = (datetime.utcnow().date() - datetime.strptime(ultima_fecha[:10], "%Y-%m-%d").date()).days
+                proceso.dias_sin_cambios = max(0, dias_sin)
+        proceso.ultima_sincronizacion = datetime.utcnow()
         db.commit()
     except Exception as exc:
         logger.warning("Sync falló para %s: %s", proceso.llave_proceso, exc)
@@ -476,6 +481,9 @@ def obtener_proceso(llave_proceso: str, db: Session = Depends(get_db), current_u
         "notificado": proceso.notificado,
         "creado_en": proceso.creado_en,
         "actualizado_en": proceso.actualizado_en,
+        "ultima_sincronizacion": proceso.ultima_sincronizacion,
+        "dias_sin_cambios": proceso.dias_sin_cambios,
+        "fallos_consecutivos": proceso.fallos_consecutivos,
         "actuaciones": [
             {
                 "id_reg_actuacion": a.id_reg_actuacion,

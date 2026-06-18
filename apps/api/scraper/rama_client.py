@@ -274,6 +274,20 @@ def descargar_documento(id_reg_documento: int) -> tuple[bytes, str]:
     return response.content, filename
 
 
+def rama_health_check() -> bool:
+    """Verifica rápidamente que Rama Judicial responde. Retorna True si está operativo."""
+    try:
+        with _cliente() as client:
+            response = client.get(
+                f"{BASE_URL}/NumeroRadicacion",
+                params={"numero": "05001310301720240048000", "soloActivos": "false", "pagina": 1},
+                timeout=httpx.Timeout(15.0, connect=10.0),
+            )
+            return response.status_code < 500
+    except Exception:
+        return False
+
+
 def buscar_por_radicado(numero: str, solo_activos: bool = False, pagina: int = 1) -> ResultadoBusqueda:
     params = {
         "numero": numero,
