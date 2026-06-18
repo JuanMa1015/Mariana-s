@@ -5,6 +5,7 @@ import toast from "react-hot-toast"
 
 export default function Register() {
   const [email, setEmail] = useState("")
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const navigate = useNavigate()
@@ -13,9 +14,10 @@ export default function Register() {
     e.preventDefault()
     const loadingToast = toast.loading("Creando cuenta...")
     try {
-      const data = await registerUser({ email, password })
+      const data = await registerUser({ email, username: username || undefined, password })
       localStorage.setItem("token", data.access_token)
       localStorage.setItem("email", data.email)
+      if (data.username) localStorage.setItem("username", data.username)
       toast.success("¡Cuenta creada con éxito!", { id: loadingToast })
       navigate("/")
     } catch (err: any) {
@@ -40,6 +42,16 @@ export default function Register() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+            />
+          </div>
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Nombre de Usuario</label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
+              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+              placeholder="Opcional — se auto-genera si lo dejas vacío"
             />
           </div>
           <div>
