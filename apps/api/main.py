@@ -6,9 +6,11 @@ from fastapi.responses import JSONResponse
 from models import init_db
 from services.scheduler import iniciar_scheduler, obtener_estado_scheduler
 from services.keepalive import Keepalive
+from services.logging_config import configurar_logging, set_request_id, get_request_id
 from routers.procesos import router as procesos_router
 from routers.auth import router as auth_router
 
+configurar_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -49,6 +51,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    rid = request.headers.get("X-Request-Id", "")
+    set_request_id(rid)
+    logger.info("→ %s %s", request.method, request.url.path)
+    response = await call_next(request)
+    response.headers["X-Request-Id"] = get_request_id()
+    return response
 
 
 @app.middleware("http")
