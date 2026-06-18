@@ -28,6 +28,13 @@ export default function App() {
   const navigate = useNavigate()
   const username = localStorage.getItem("username") || localStorage.getItem("email")?.split("@")[0] || "Mariana"
   const frase = useMemo(() => FRASES[Math.floor(Math.random() * FRASES.length)], [])
+
+  const saludo = useMemo(() => {
+    const h = new Date().getHours()
+    if (h < 12) return "Buenos días"
+    if (h < 18) return "Buenas tardes"
+    return "Buenas noches"
+  }, [])
   const [procesos, setProcesos] = useState<ListaProcesos | null>(null)
   const [novedades, setNovedades] = useState<ListaNovedades | null>(null)
   const [newRadicado, setNewRadicado] = useState({ llave_proceso: "", categoria: "General" })
@@ -89,7 +96,7 @@ export default function App() {
         <div className="mx-auto flex w-full max-w-none items-center justify-between px-4 py-3 sm:px-5">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-400">Mariana's</p>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">Hola, {username}</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">{saludo}, {username}</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
