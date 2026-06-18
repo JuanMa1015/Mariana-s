@@ -4,7 +4,8 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from models import init_db
-from services.scheduler import iniciar_scheduler
+from services.scheduler import iniciar_scheduler, obtener_estado_scheduler
+from services.keepalive import Keepalive
 from routers.procesos import router as procesos_router
 from routers.auth import router as auth_router
 
@@ -16,7 +17,10 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     init_db()
     scheduler = iniciar_scheduler(intervalo_horas=1)
+    keepalive = Keepalive()
+    keepalive.iniciar()
     yield
+    keepalive.detener()
     scheduler.shutdown()
 
 app = FastAPI(title="Mariana's - Monitor Judicial", lifespan=lifespan)
@@ -60,7 +64,29 @@ async def cors_fallback(request: Request, call_next):
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    from models.database import SessionLocal
+    from sqlalchemy import text
+    from scraper.rama_client import rama_health_check
+
+    db_ok = False
+    db_error = None
+    try:
+        db = SessionLocal()
+        db.execute(text("SELECT 1"))
+        db_ok = True
+        db.close()
+    except Exception as exc:
+        db_error = f"{type(exc).__name__}: {exc}"
+
+    rama_ok = rama_health_check()
+    scheduler = obtener_estado_scheduler()
+
+    return {
+        "status": "ok" if db_ok else "degradado",
+        "base_de_datos": {"ok": db_ok, "error": db_error},
+        "rama_judicial": {"ok": rama_ok},
+        "scheduler": scheduler,
+    }
 
 
 @app.get("/test-notificacion")
