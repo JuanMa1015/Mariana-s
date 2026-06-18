@@ -145,6 +145,41 @@ def resetear_radicado(llave_proceso: str):
         db.close()
 
 
+@app.post("/resetear-todos")
+def resetear_todos():
+    from models.database import SessionLocal
+    from models.actuacion import Actuacion
+    from models.documento_actuacion import DocumentoActuacion
+    from models.proceso import Proceso
+
+    db = SessionLocal()
+    try:
+        procesos = db.query(Proceso).all()
+        total_acts = 0
+        total_docs = 0
+        for proceso in procesos:
+            docs = db.query(DocumentoActuacion).join(Actuacion).filter(Actuacion.proceso_id == proceso.id).all()
+            for d in docs:
+                db.delete(d)
+            total_docs += len(docs)
+            acts = db.query(Actuacion).filter(Actuacion.proceso_id == proceso.id).all()
+            for a in acts:
+                db.delete(a)
+            total_acts += len(acts)
+            proceso.notificado = True
+            proceso.tipo_novedad = "nuevo"
+            proceso.fecha_ultima_actuacion = None
+        db.commit()
+        return {
+            "ok": True,
+            "total_radicados": len(procesos),
+            "actuaciones_borradas": total_acts,
+            "documentos_borrados": total_docs,
+        }
+    finally:
+        db.close()
+
+
 @app.get("/test-email")
 def test_email():
     import json, urllib.request
