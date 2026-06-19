@@ -302,6 +302,10 @@ def _fetch_radicado_remoto(radicado: Proceso) -> dict:
 
     try:
         detalle = cached_call(buscar_detalle_proceso, 300, resumen.id_proceso)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 404:
+            return {"status": "no_data", "llave_proceso": radicado.llave_proceso}
+        return {"status": "error", "llave_proceso": radicado.llave_proceso, "error": f"HTTP {exc.response.status_code}", "paso": "detalle"}
     except Exception as exc:
         return {"status": "error", "llave_proceso": radicado.llave_proceso, "error": f"{type(exc).__name__}: {exc}", "paso": "detalle"}
 
