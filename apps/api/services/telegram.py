@@ -17,17 +17,26 @@ def _mensaje_texto(
     actuacion: str | None = None,
     anotacion: str | None = None,
     categoria: str | None = None,
+    sujetos_procesales: str = "",
+    fecha_registro: str | None = None,
+    con_documentos: bool | None = None,
 ) -> str:
+    docs = "Si" if con_documentos else "No"
+    partes = [p.strip() for p in (sujetos_procesales or "").split("|") if p.strip()]
+    sujetos = "\n".join(f"> `{p}`" for p in partes) if partes else "> Sin informacion"
     return (
         f"*Novedad judicial - {categoria or 'General'}*\n"
         f"\n"
-        f"Radicado: `{llave_proceso}`\n"
-        f"Despacho: {despacho or '-'}\n"
-        f"Departamento: {departamento or '-'}\n"
+        f"`{llave_proceso}`\n"
+        f"{despacho or '-'} | {departamento or '-'}\n"
         f"Ultima actuacion: {fecha_ultima_actuacion or 'N/D'}\n"
         f"\n"
         f"*Actuacion:* {actuacion or 'N/D'}\n"
-        f"*Anotacion:* {anotacion or 'N/D'}"
+        f"*Anotacion:* {anotacion or 'N/D'}\n"
+        f"*Fecha registro:* {fecha_registro or 'N/D'}\n"
+        f"*Documentos:* {docs}\n"
+        f"\n"
+        f"{sujetos}"
     )
 
 
@@ -58,6 +67,9 @@ def notificar_telegram(
         actuacion=actuacion,
         anotacion=anotacion,
         categoria=categoria,
+        sujetos_procesales=sujetos_procesales,
+        fecha_registro=fecha_registro,
+        con_documentos=con_documentos,
     )
 
     url = f"{API_BASE}{TELEGRAM_BOT_TOKEN}/sendMessage"
