@@ -13,6 +13,7 @@ from models.actuacion import Actuacion
 from models.database import SessionLocal
 from models.documento_actuacion import DocumentoActuacion
 from models.proceso import Proceso
+from scraper.cache import cached_call
 from scraper.rama_client import (
     ResultadoBusqueda,
     buscar_actuaciones,
@@ -213,7 +214,7 @@ def sincronizar_radicado(db: Session, radicado: Proceso) -> bool:
         return False
 
     try:
-        resultado: ResultadoBusqueda = buscar_por_radicado(radicado.llave_proceso, solo_activos=False)
+        resultado: ResultadoBusqueda = cached_call(buscar_por_radicado, 300, radicado.llave_proceso, solo_activos=False)
     except Exception as exc:
         logger.warning("No se pudo consultar radicado %s: %s", radicado.llave_proceso, exc)
         return False
@@ -224,8 +225,8 @@ def sincronizar_radicado(db: Session, radicado: Proceso) -> bool:
     resumen = _elegir_mejor_proceso(resultado.procesos)
 
     try:
-        detalle = buscar_detalle_proceso(resumen.id_proceso)
-        resultado_actuaciones = buscar_actuaciones(resumen.id_proceso)
+        detalle = cached_call(buscar_detalle_proceso, 300, resumen.id_proceso)
+        resultado_actuaciones = cached_call(buscar_actuaciones, 300, resumen.id_proceso)
     except Exception as exc:
         logger.warning("No se pudo traer detalle de Rama para %s: %s", radicado.llave_proceso, exc)
         return False
@@ -240,7 +241,7 @@ def sincronizar_radicado(db: Session, radicado: Proceso) -> bool:
         actuacion_db = _upsert_actuacion(db, radicado, actuacion_remota)
         if actuacion_remota.con_documentos:
             try:
-                documentos = buscar_documentos_actuacion(actuacion_remota.id_reg_actuacion)
+                documentos = cached_call(buscar_documentos_actuacion, 300, actuacion_remota.id_reg_actuacion)
             except Exception as exc:
                 logger.warning(
                     "No se pudieron traer documentos de la actuación %s: %s",
@@ -381,7 +382,7 @@ def _fetch_radicado_remoto(radicado: Proceso) -> dict:
         return {"status": "ignored", "llave_proceso": radicado.llave_proceso}
 
     try:
-        resultado = buscar_por_radicado(radicado.llave_proceso, solo_activos=False)
+        resultado = cached_call(buscar_por_radicado, 300, radicado.llave_proceso, solo_activos=False)
     except Exception as exc:
         return {"status": "error", "llave_proceso": radicado.llave_proceso, "error": f"{type(exc).__name__}: {exc}", "paso": "buscar_por_radicado"}
 
@@ -391,14 +392,14 @@ def _fetch_radicado_remoto(radicado: Proceso) -> dict:
     resumen = _elegir_mejor_proceso(resultado.procesos)
 
     try:
-        detalle = buscar_detalle_proceso(resumen.id_proceso)
+        detalle = cached_call(buscar_detalle_proceso, 300, resumen.id_proceso)
     except Exception as exc:
         return {"status": "error", "llave_proceso": radicado.llave_proceso, "error": f"{type(exc).__name__}: {exc}", "paso": "detalle"}
 
     resultado_actuaciones = None
     for act_intento in range(3):
         try:
-            resultado_actuaciones = buscar_actuaciones(resumen.id_proceso)
+            resultado_actuaciones = cached_call(buscar_actuaciones, 300, resumen.id_proceso)
             break
         except Exception as exc:
             if act_intento < 2:
@@ -410,7 +411,7 @@ def _fetch_radicado_remoto(radicado: Proceso) -> dict:
     for act in resultado_actuaciones.actuaciones:
         if act.con_documentos:
             try:
-                documentos_por_actuacion[act.id_reg_actuacion] = buscar_documentos_actuacion(act.id_reg_actuacion)
+                documentos_por_actuacion[act.id_reg_actuacion] = cached_call(buscar_documentos_actuacion, 300, act.id_reg_actuacion)
             except Exception:
                 documentos_por_actuacion[act.id_reg_actuacion] = []
 

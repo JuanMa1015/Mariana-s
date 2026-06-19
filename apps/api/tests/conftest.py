@@ -38,6 +38,8 @@ TEST_SESSION_LOCAL = sessionmaker(bind=TEST_ENGINE)
 
 @pytest.fixture(autouse=True)
 def setup_db():
+    from scraper.cache import clear_cache
+    clear_cache()
     Base.metadata.create_all(bind=TEST_ENGINE)
     yield
     Base.metadata.drop_all(bind=TEST_ENGINE)
