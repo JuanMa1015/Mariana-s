@@ -44,7 +44,7 @@ export default function App() {
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<ResultadoSync | null>(null)
   const [page, setPage] = useState(1)
-  const [limit] = useState(500)
+  const [limit, setLimit] = useState(25)
   const [filtroCategoria, setFiltroCategoria] = useState("")
   const [busqueda, setBusqueda] = useState("")
 
@@ -321,8 +321,19 @@ export default function App() {
           >
             Anterior
           </button>
-          <div className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1.5 font-semibold text-violet-600">
-            Página {page} de {procesos?.total_paginas ?? 1}
+          <div className="flex items-center gap-3">
+            <div className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1.5 font-semibold text-violet-600">
+              Página {page} de {procesos?.total_paginas ?? 1}
+            </div>
+            <select
+              value={limit}
+              onChange={(e) => { setLimit(Number(e.target.value)); setPage(1) }}
+              className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-600 outline-none transition hover:bg-violet-50"
+            >
+              <option value={25}>25/pág</option>
+              <option value={50}>50/pág</option>
+              <option value={100}>100/pág</option>
+            </select>
           </div>
           <button
             type="button"

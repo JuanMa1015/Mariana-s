@@ -1,11 +1,16 @@
-from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, String, Boolean, DateTime, Integer, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from models.database import Base
 
 class Proceso(Base):
     __tablename__ = "procesos"
-    __table_args__ = (UniqueConstraint('user_id', 'llave_proceso', name='uix_user_radicado'),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "llave_proceso", name="uix_user_radicado"),
+        Index("ix_procesos_user_id", "user_id"),
+        Index("ix_procesos_user_id_notificado", "user_id", "notificado"),
+        Index("ix_procesos_user_id_categoria", "user_id", "categoria"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
