@@ -1,4 +1,5 @@
 APP_URL = "https://mariana-app-nu.vercel.app"
+RAMA_JUDICIAL_URL = "https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion"
 
 
 def _color_categoria(categoria: str | None) -> str:
@@ -23,6 +24,12 @@ def template_novedad(
 ) -> str:
     color = _color_categoria(categoria)
     docs = "Sí" if con_documentos else "No"
+    partes_sujetos = [p.strip() for p in (sujetos_procesales or "").split("|") if p.strip()]
+    sujetos_html = "".join(
+        f'<div style="padding:4px 0;font-size:13px;color:#475569;line-height:1.5">{p}</div>'
+        for p in partes_sujetos
+    ) or '<div style="padding:4px 0;font-size:13px;color:#94a3b8">Sin informacion</div>'
+    link_rama = f'{RAMA_JUDICIAL_URL}?numero={llave_proceso}'
     return f"""<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
@@ -66,13 +73,13 @@ def template_novedad(
 </td></tr>
 <tr><td style="padding:0 32px 24px">
 <h2 style="margin:0 0 12px;font-size:14px;font-weight:700;color:#1e293b">Sujetos procesales</h2>
-<p style="margin:0;font-size:13px;color:#475569;line-height:1.5">{sujetos_procesales or "—"}</p>
+{sujetos_html}
 </td></tr>
 <tr><td style="padding:24px 32px;background:#f8fafc;border-top:1px solid #e2e8f0">
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr>
 <td><span style="font-size:12px;color:#94a3b8">Mariana's — Monitor Judicial</span></td>
-<td align="right"><a href="{APP_URL}" style="display:inline-block;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;color:#ffffff;background:#7c3aed;text-decoration:none">Ver en Mariana's</a></td>
+<td align="right"><a href="{link_rama}" style="font-size:12px;color:#6366f1;text-decoration:underline;margin-right:16px">Consultar en Rama Judicial</a><a href="{APP_URL}" style="display:inline-block;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;color:#ffffff;background:#7c3aed;text-decoration:none">Ver en Mariana's</a></td>
 </tr>
 </table>
 </td></tr>
@@ -122,7 +129,7 @@ def template_resumen(novedades: list[dict]) -> tuple[str, str]:
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr>
 <td><span style="font-size:12px;color:#94a3b8">Mariana's — Monitor Judicial</span></td>
-<td align="right"><a href="{APP_URL}" style="display:inline-block;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;color:#ffffff;background:#7c3aed;text-decoration:none">Ver en Mariana's</a></td>
+<td align="right"><a href="{RAMA_JUDICIAL_URL}" style="font-size:12px;color:#6366f1;text-decoration:underline;margin-right:16px">Consultar en Rama Judicial</a><a href="{APP_URL}" style="display:inline-block;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;color:#ffffff;background:#7c3aed;text-decoration:none">Ver en Mariana's</a></td>
 </tr>
 </table>
 </td></tr>

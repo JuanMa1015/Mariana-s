@@ -109,6 +109,9 @@ def notificar_cambio_radicado(
             con_documentos=con_documentos,
             categoria=categoria,
         )
+        partes_sujetos = [p.strip() for p in (sujetos_procesales or "").split("|") if p.strip()]
+        sujetos_texto = "\n".join(f"  {p}" for p in partes_sujetos) or "  Sin informacion"
+        link_rama = f"https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion?numero={llave_proceso}"
         cuerpo_texto = (
             f"MARIANA'S — Monitor Judicial\n\n"
             f"Se detectó una nueva actuación en el proceso:\n\n"
@@ -123,9 +126,10 @@ def notificar_cambio_radicado(
             f"  Fecha registro: {fecha_registro or 'N/D'}\n"
             f"  Documentos:   {'Sí' if con_documentos else 'No'}\n\n"
             f"Sujetos procesales:\n"
-            f"  {sujetos_procesales}\n"
+            f"{sujetos_texto}\n"
             f"\n"
             f"---\n"
+            f"Consultar en Rama Judicial: {link_rama}\n"
             f"Ver en Mariana's: {APP_URL}\n"
         )
 
