@@ -38,3 +38,4 @@ tzlocal==5.3.1
 uvicorn==0.48.0
 wheel==0.47.0
 sendgrid==6.12.5
+sentry-sdk>=2.0.0

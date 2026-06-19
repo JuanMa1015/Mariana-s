@@ -9,6 +9,14 @@ from services.keepalive import Keepalive
 from services.logging_config import configurar_logging, set_request_id, get_request_id
 from routers.procesos import router as procesos_router
 from routers.auth import router as auth_router
+from config import SENTRY_DSN
+
+if SENTRY_DSN:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        traces_sample_rate=0.1,
+    )
 
 configurar_logging()
 logger = logging.getLogger(__name__)
