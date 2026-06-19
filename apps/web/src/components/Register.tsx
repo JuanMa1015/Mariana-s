@@ -21,7 +21,7 @@ export default function Register() {
       toast.success("¡Cuenta creada con éxito!", { id: loadingToast })
       navigate("/")
     } catch (err: any) {
-      toast.error(err.message, { id: loadingToast })
+      toast.error(err.message || "Error al registrarse", { id: loadingToast })
     }
   }
 

@@ -39,13 +39,15 @@ app = FastAPI(title="Mariana's - Monitor Judicial", lifespan=lifespan)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.exception("Error no manejado en %s: %s", request.url, exc)
+    if isinstance(exc, HTTPException):
+        detail = exc.detail
+        status_code = exc.status_code
+    else:
+        detail = "Error interno del servidor"
+        status_code = 500
     return JSONResponse(
-        status_code=500,
-        content={
-            "detail": f"{type(exc).__name__}: {exc}",
-            "error": str(exc),
-            "type": type(exc).__name__,
-        },
+        status_code=status_code,
+        content={"detail": detail},
         headers={
             "Access-Control-Allow-Origin": "https://mariana-app-nu.vercel.app",
             "Access-Control-Allow-Credentials": "true",

@@ -23,7 +23,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos 
         await _esperar(espera)
         continue
       }
-      throw err
+      throw new Error("Error de conexión. Revisa tu internet.")
     }
 
     if (res.status === 401) {
@@ -46,21 +46,31 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos 
 }
 
 export async function loginUser(payload: { credential: string; password: string }) {
-  const res = await fetch(`${BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  })
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+  } catch {
+    throw new Error("Error de conexión. Revisa tu internet.")
+  }
   if (!res.ok) throw new Error((await res.json()).detail || "Error en login")
   return res.json()
 }
 
 export async function registerUser(payload: { email: string; password: string; username?: string }) {
-  const res = await fetch(`${BASE_URL}/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  })
+  let res: Response
+  try {
+    res = await fetch(`${BASE_URL}/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    })
+  } catch {
+    throw new Error("Error de conexión. Revisa tu internet.")
+  }
   if (!res.ok) throw new Error((await res.json()).detail || "Error en registro")
   return res.json()
 }

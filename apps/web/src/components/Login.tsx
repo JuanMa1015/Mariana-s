@@ -34,7 +34,7 @@ export default function Login() {
       toast.success("¡Bienvenido!", { id: loadingToast })
       navigate("/")
     } catch (err: any) {
-      toast.error(err.message, { id: loadingToast })
+      toast.error(err.message || "Error al iniciar sesión", { id: loadingToast })
     }
   }
 
