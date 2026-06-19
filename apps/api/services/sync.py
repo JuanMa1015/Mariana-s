@@ -96,7 +96,7 @@ def _backoff_dias(proceso: Proceso) -> int:
 def _debe_sincronizar(proceso: Proceso) -> bool:
     if proceso.ultima_sincronizacion is None:
         return True
-    dias_desde_sync = (datetime.utcnow() - proceso.ultima_sincronizacion).days
+    dias_desde_sync = (datetime.now(timezone.utc).replace(tzinfo=None) - proceso.ultima_sincronizacion).days
     dias_sin_cambios = proceso.dias_sin_cambios or 0
     backoff = _backoff_dias(proceso)
 
@@ -205,98 +205,6 @@ def _latest_actuacion(actuaciones: list[object]):
     )
 
 
-def sincronizar_radicado(db: Session, radicado: Proceso) -> bool:
-    """Sincroniza un solo radicado contra Rama Judicial en vivo.
-    Busca datos del proceso, actuaciones y documentos, y los persiste en DB.
-    Retorna True si se pudo sincronizar, False si falló.
-    """
-    if not re.fullmatch(r"\d{23}", radicado.llave_proceso or ""):
-        return False
-
-    try:
-        resultado: ResultadoBusqueda = cached_call(buscar_por_radicado, 300, radicado.llave_proceso, solo_activos=False)
-    except Exception as exc:
-        logger.warning("No se pudo consultar radicado %s: %s", radicado.llave_proceso, exc)
-        return False
-
-    if not resultado.procesos:
-        return False
-
-    resumen = _elegir_mejor_proceso(resultado.procesos)
-
-    try:
-        detalle = cached_call(buscar_detalle_proceso, 300, resumen.id_proceso)
-        resultado_actuaciones = cached_call(buscar_actuaciones, 300, resumen.id_proceso)
-    except Exception as exc:
-        logger.warning("No se pudo traer detalle de Rama para %s: %s", radicado.llave_proceso, exc)
-        return False
-
-    _actualizar_campos_proceso(radicado, resumen, detalle)
-
-    latest_remote = _latest_actuacion(resultado_actuaciones.actuaciones)
-    if latest_remote is not None:
-        radicado.fecha_ultima_actuacion = _serializar_texto(latest_remote.fecha_actuacion)
-
-    for actuacion_remota in resultado_actuaciones.actuaciones:
-        actuacion_db = _upsert_actuacion(db, radicado, actuacion_remota)
-        if actuacion_remota.con_documentos:
-            try:
-                documentos = cached_call(buscar_documentos_actuacion, 300, actuacion_remota.id_reg_actuacion)
-            except Exception as exc:
-                logger.warning(
-                    "No se pudieron traer documentos de la actuación %s: %s",
-                    actuacion_remota.id_reg_actuacion, exc,
-                )
-                documentos = []
-            for documento_remoto in documentos:
-                _upsert_documento(db, actuacion_db, documento_remoto)
-
-    radicado.ultima_sincronizacion = datetime.utcnow()
-    radicado.dias_sin_cambios = _calcular_dias_sin_cambios(radicado.fecha_ultima_actuacion)
-    radicado.fallos_consecutivos = 0
-
-    logger.info(
-        "Radicado %s sincronizado: %d actuaciones, última: %s",
-        radicado.llave_proceso,
-        len(resultado_actuaciones.actuaciones),
-        latest_remote.fecha_actuacion if latest_remote else "N/A",
-    )
-    db.commit()
-    return True
-
-
-def _procesar_radicado(
-    db: Session,
-    radicado: Proceso,
-    nuevos: list,
-    actualizados: list,
-    emails_enviados: list,
-    errores: list,
-    acumuladas: dict,
-):
-    datos = _fetch_radicado_remoto(radicado)
-
-    if datos["status"] == "ignored":
-        return
-    if datos["status"] == "no_data":
-        return
-    if datos["status"] == "error":
-        errores.append({
-            "radicado": radicado.llave_proceso,
-            "error": datos["error"],
-            "paso": datos.get("paso", "remoto"),
-        })
-        radicado.fallos_consecutivos = (radicado.fallos_consecutivos or 0) + 1
-        error_msg = datos.get("error", "")
-        if "Timeout" in error_msg:
-            time.sleep(10)
-        elif "403" in error_msg:
-            sleep_time = 8 if datos.get("paso") == "buscar_por_radicado" else 5
-            time.sleep(sleep_time)
-        return
-
-    _aplicar_datos_remotos(db, radicado, datos, nuevos, actualizados, emails_enviados, errores, acumuladas)
-
 
 def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list):
     for email, notifs in acumuladas.items():
@@ -343,16 +251,6 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                     emails_enviados.append(n["llave_proceso"])
                 time.sleep(0.5)
 
-
-def _elegir_usuario_para_sync(db: Session) -> int | None:
-    user_id = (
-        db.query(Proceso.user_id)
-        .group_by(Proceso.user_id)
-        .order_by(func.min(Proceso.ultima_sincronizacion).asc().nullsfirst())
-        .limit(1)
-        .scalar()
-    )
-    return user_id
 
 
 def sincronizar_radicados_lote(db: Session, lote: int = 25, user_id: int | None = None) -> dict:
@@ -517,7 +415,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
                 "telegram_chat_id": telegram_chat_id,
             })
 
-    radicado.ultima_sincronizacion = datetime.utcnow()
+    radicado.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None)
     radicado.dias_sin_cambios = _calcular_dias_sin_cambios(radicado.fecha_ultima_actuacion)
     radicado.fallos_consecutivos = 0
 

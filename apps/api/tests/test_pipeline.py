@@ -45,248 +45,6 @@ def _make_paginacion(cantidad=1):
                       cantidad_paginas=1, pagina=1)
 
 
-# ─── _procesar_radicado tests ────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_procesar_initial_sync_recente(test_user, db):
-    from services.sync import _procesar_radicado
-    from models.proceso import Proceso
-
-    p = Proceso(llave_proceso=RADICADO, user_id=test_user.id)
-    db.add(p)
-    db.commit()
-
-    mock_proc = _make_proceso_remoto()
-    mock_det = _make_detalle()
-    mock_act = _make_actuacion()
-    from scraper.rama_client import ResultadoBusqueda, ResultadoActuaciones
-
-    pag = _make_paginacion()
-
-    nuevos, actualizados, emails_enviados, errores, acumuladas = [], [], [], [], {}
-
-    with (
-        patch("services.sync.buscar_por_radicado") as m_br,
-        patch("services.sync.buscar_detalle_proceso") as m_bd,
-        patch("services.sync.buscar_actuaciones") as m_ba,
-        patch("services.sync.buscar_documentos_actuacion", return_value=[]),
-        patch("services.sync.time.sleep"),
-        patch("services.sync._es_reciente", return_value=True),
-    ):
-        m_br.return_value = ResultadoBusqueda(procesos=[mock_proc], paginacion=pag)
-        m_bd.return_value = mock_det
-        m_ba.return_value = ResultadoActuaciones(actuaciones=[mock_act], paginacion=pag)
-
-        _procesar_radicado(db, p, nuevos, actualizados, emails_enviados, errores, acumuladas)
-
-        db.refresh(p)
-        assert p.notificado is False
-        assert p.tipo_novedad == "actualizacion"
-        assert p.ultima_sincronizacion is not None
-        assert p.fallos_consecutivos == 0
-        assert len(actualizados) == 1
-        assert RADICADO in actualizados
-        assert len(errores) == 0
-        assert test_user.email in acumuladas
-        assert len(acumuladas[test_user.email]) == 1
-
-
-@pytest.mark.asyncio
-async def test_procesar_initial_sync_antiguo(test_user, db):
-    from services.sync import _procesar_radicado
-    from models.proceso import Proceso
-
-    p = Proceso(llave_proceso=RADICADO, user_id=test_user.id)
-    db.add(p)
-    db.commit()
-
-    mock_proc = _make_proceso_remoto()
-    mock_det = _make_detalle()
-    from scraper.rama_client import ResultadoBusqueda, ResultadoActuaciones
-    pag = _make_paginacion()
-
-    nuevos, actualizados, emails_enviados, errores, acumuladas = [], [], [], [], {}
-
-    with (
-        patch("services.sync.buscar_por_radicado") as m_br,
-        patch("services.sync.buscar_detalle_proceso") as m_bd,
-        patch("services.sync.buscar_actuaciones") as m_ba,
-        patch("services.sync.buscar_documentos_actuacion", return_value=[]),
-        patch("services.sync.time.sleep"),
-        patch("services.sync._es_reciente", return_value=False),
-    ):
-        m_br.return_value = ResultadoBusqueda(procesos=[mock_proc], paginacion=pag)
-        m_bd.return_value = mock_det
-        m_ba.return_value = ResultadoActuaciones(actuaciones=[], paginacion=pag)
-
-        _procesar_radicado(db, p, nuevos, actualizados, emails_enviados, errores, acumuladas)
-
-        db.refresh(p)
-        assert p.notificado is True
-        assert len(nuevos) == 1
-        assert RADICADO in nuevos
-        assert len(acumuladas) == 0
-
-
-@pytest.mark.asyncio
-async def test_procesar_update_sync_con_novedad(test_user, db):
-    from services.sync import _procesar_radicado
-    from models.proceso import Proceso
-    from models.actuacion import Actuacion
-
-    p = Proceso(llave_proceso=RADICADO, user_id=test_user.id)
-    db.add(p)
-    db.commit()
-    existing = Actuacion(proceso_id=p.id, id_reg_actuacion=1, cons_actuacion=1, actuacion="Vieja")
-    db.add(existing)
-    db.commit()
-
-    mock_proc = _make_proceso_remoto()
-    mock_det = _make_detalle()
-    mock_act_old = _make_actuacion(id_reg_actuacion=1, cons_actuacion=1, actuacion="Vieja")
-    mock_act_new = _make_actuacion(id_reg_actuacion=2, actuacion="Nueva actuacion")
-    from scraper.rama_client import ResultadoBusqueda, ResultadoActuaciones
-    pag = _make_paginacion()
-
-    nuevos, actualizados, emails_enviados, errores, acumuladas = [], [], [], [], {}
-
-    with (
-        patch("services.sync.buscar_por_radicado") as m_br,
-        patch("services.sync.buscar_detalle_proceso") as m_bd,
-        patch("services.sync.buscar_actuaciones") as m_ba,
-        patch("services.sync.buscar_documentos_actuacion", return_value=[]),
-        patch("services.sync.time.sleep"),
-    ):
-        m_br.return_value = ResultadoBusqueda(procesos=[mock_proc], paginacion=pag)
-        m_bd.return_value = mock_det
-        m_ba.return_value = ResultadoActuaciones(actuaciones=[mock_act_old, mock_act_new], paginacion=pag)
-
-        _procesar_radicado(db, p, nuevos, actualizados, emails_enviados, errores, acumuladas)
-
-        db.refresh(p)
-        assert p.notificado is False
-        assert p.tipo_novedad == "actualizacion"
-        assert len(actualizados) == 1
-        assert len(errores) == 0
-        assert test_user.email in acumuladas
-
-
-@pytest.mark.asyncio
-async def test_procesar_update_sync_sin_cambios(test_user, db):
-    from services.sync import _procesar_radicado
-    from models.proceso import Proceso
-    from models.actuacion import Actuacion
-
-    p = Proceso(llave_proceso=RADICADO, user_id=test_user.id)
-    db.add(p)
-    db.commit()
-    existing = Actuacion(proceso_id=p.id, id_reg_actuacion=1, cons_actuacion=1, actuacion="Existente")
-    db.add(existing)
-    db.commit()
-
-    mock_proc = _make_proceso_remoto()
-    mock_det = _make_detalle()
-    mock_act = _make_actuacion(id_reg_actuacion=1, cons_actuacion=1, actuacion="Existente")
-    from scraper.rama_client import ResultadoBusqueda, ResultadoActuaciones
-    pag = _make_paginacion()
-
-    nuevos, actualizados, emails_enviados, errores, acumuladas = [], [], [], [], {}
-
-    with (
-        patch("services.sync.buscar_por_radicado") as m_br,
-        patch("services.sync.buscar_detalle_proceso") as m_bd,
-        patch("services.sync.buscar_actuaciones") as m_ba,
-        patch("services.sync.buscar_documentos_actuacion", return_value=[]),
-        patch("services.sync.time.sleep"),
-    ):
-        m_br.return_value = ResultadoBusqueda(procesos=[mock_proc], paginacion=pag)
-        m_bd.return_value = mock_det
-        m_ba.return_value = ResultadoActuaciones(actuaciones=[mock_act], paginacion=pag)
-
-        _procesar_radicado(db, p, nuevos, actualizados, emails_enviados, errores, acumuladas)
-
-        assert len(actualizados) == 0
-        assert len(acumuladas) == 0
-
-
-@pytest.mark.asyncio
-async def test_procesar_error_buscar_por_radicado(test_user, db):
-    from services.sync import _procesar_radicado
-    from models.proceso import Proceso
-
-    p = Proceso(llave_proceso=RADICADO, user_id=test_user.id, fallos_consecutivos=0)
-    db.add(p)
-    db.commit()
-
-    nuevos, actualizados, emails_enviados, errores, acumuladas = [], [], [], [], {}
-
-    with patch("services.sync.buscar_por_radicado", side_effect=Exception("Timeout")):
-        _procesar_radicado(db, p, nuevos, actualizados, emails_enviados, errores, acumuladas)
-
-        assert p.fallos_consecutivos == 1
-        assert len(errores) == 1
-        assert errores[0]["paso"] == "buscar_por_radicado"
-
-
-@pytest.mark.asyncio
-async def test_procesar_error_detalle(test_user, db):
-    from services.sync import _procesar_radicado
-    from models.proceso import Proceso
-    from scraper.rama_client import ResultadoBusqueda
-
-    p = Proceso(llave_proceso=RADICADO, user_id=test_user.id, fallos_consecutivos=0)
-    db.add(p)
-    db.commit()
-
-    mock_proc = _make_proceso_remoto()
-    pag = _make_paginacion()
-
-    nuevos, actualizados, emails_enviados, errores, acumuladas = [], [], [], [], {}
-
-    with (
-        patch("services.sync.buscar_por_radicado") as m_br,
-        patch("services.sync.buscar_detalle_proceso", side_effect=Exception("403 Forbidden")),
-        patch("services.sync.time.sleep"),
-    ):
-        m_br.return_value = ResultadoBusqueda(procesos=[mock_proc], paginacion=pag)
-        _procesar_radicado(db, p, nuevos, actualizados, emails_enviados, errores, acumuladas)
-
-        assert p.fallos_consecutivos == 1
-        assert len(errores) == 1
-        assert errores[0]["paso"] == "detalle"
-
-
-@pytest.mark.asyncio
-async def test_procesar_error_actuaciones(test_user, db):
-    from services.sync import _procesar_radicado
-    from models.proceso import Proceso
-    from scraper.rama_client import ResultadoBusqueda
-
-    p = Proceso(llave_proceso=RADICADO, user_id=test_user.id, fallos_consecutivos=0)
-    db.add(p)
-    db.commit()
-
-    mock_proc = _make_proceso_remoto()
-    mock_det = _make_detalle()
-    pag = _make_paginacion()
-
-    nuevos, actualizados, emails_enviados, errores, acumuladas = [], [], [], [], {}
-
-    with (
-        patch("services.sync.buscar_por_radicado") as m_br,
-        patch("services.sync.buscar_detalle_proceso") as m_bd,
-        patch("services.sync.buscar_actuaciones", side_effect=Exception("Error")),
-        patch("services.sync.time.sleep"),
-    ):
-        m_br.return_value = ResultadoBusqueda(procesos=[mock_proc], paginacion=pag)
-        m_bd.return_value = mock_det
-        _procesar_radicado(db, p, nuevos, actualizados, emails_enviados, errores, acumuladas)
-
-        assert p.fallos_consecutivos == 1
-        assert len(errores) == 1
-        assert errores[0]["paso"] == "actuaciones"
-
-
 # ─── _enviar_notificaciones_acumuladas tests ─────────────────────────────────
 
 @pytest.mark.asyncio
@@ -438,16 +196,16 @@ async def test_debe_sincronizar_nunca_sincronizado(db):
 async def test_debe_sincronizar_con_backoff(db):
     from services.sync import _debe_sincronizar
     from models.proceso import Proceso
-    from datetime import datetime, timedelta
+    from datetime import datetime, timezone, timedelta
 
     p = Proceso(
-        ultima_sincronizacion=datetime.utcnow() - timedelta(days=1),
+        ultima_sincronizacion=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1),
         fallos_consecutivos=1,
         dias_sin_cambios=0,
     )
     assert _debe_sincronizar(p) is True
 
-    p.ultima_sincronizacion = datetime.utcnow() - timedelta(hours=1)
+    p.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
     assert _debe_sincronizar(p) is False
 
 
@@ -455,14 +213,14 @@ async def test_debe_sincronizar_con_backoff(db):
 async def test_debe_sincronizar_sin_cambios_recientes(db):
     from services.sync import _debe_sincronizar
     from models.proceso import Proceso
-    from datetime import datetime, timedelta
+    from datetime import datetime, timezone, timedelta
 
     p = Proceso(
-        ultima_sincronizacion=datetime.utcnow() - timedelta(days=2),
+        ultima_sincronizacion=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=2),
         fallos_consecutivos=0,
         dias_sin_cambios=3,
     )
     assert _debe_sincronizar(p) is True
 
-    p.ultima_sincronizacion = datetime.utcnow() - timedelta(hours=12)
+    p.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=12)
     assert _debe_sincronizar(p) is False

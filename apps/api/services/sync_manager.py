@@ -3,7 +3,7 @@ import threading
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
-from datetime import datetime
+from datetime import datetime, timezone
 
 import httpx
 from sqlalchemy.exc import OperationalError
@@ -40,7 +40,7 @@ def iniciar_sync_global() -> str:
         _tasks[task_id] = {
             "task_id": task_id,
             "status": "running",
-            "started_at": datetime.utcnow().isoformat(),
+            "started_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             "finished_at": None,
             "result": None,
             "error": None,
@@ -52,7 +52,7 @@ def iniciar_sync_global() -> str:
             with _lock:
                 _tasks[task_id].update({
                     "status": "failed",
-                    "finished_at": datetime.utcnow().isoformat(),
+                    "finished_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                     "error": "Rama Judicial no responde",
                 })
             return
@@ -75,7 +75,7 @@ def iniciar_sync_global() -> str:
                     with _lock:
                         _tasks[task_id].update({
                             "status": "completed",
-                            "finished_at": datetime.utcnow().isoformat(),
+                            "finished_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                             "result": resultado,
                         })
                 except TimeoutError:
@@ -83,7 +83,7 @@ def iniciar_sync_global() -> str:
                     with _lock:
                         _tasks[task_id].update({
                             "status": "failed",
-                            "finished_at": datetime.utcnow().isoformat(),
+                            "finished_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                             "error": f"TimeoutError: Sync excedió {SYNC_TIMEOUT_MINUTES} minutos",
                         })
         except OperationalError:
@@ -98,7 +98,7 @@ def iniciar_sync_global() -> str:
                     with _lock:
                         _tasks[task_id].update({
                             "status": "completed",
-                            "finished_at": datetime.utcnow().isoformat(),
+                            "finished_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                             "result": resultado,
                         })
             except TimeoutError:
@@ -106,7 +106,7 @@ def iniciar_sync_global() -> str:
                 with _lock:
                     _tasks[task_id].update({
                         "status": "failed",
-                        "finished_at": datetime.utcnow().isoformat(),
+                        "finished_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                         "error": f"TimeoutError: Sync excedió {SYNC_TIMEOUT_MINUTES} minutos (reintento)",
                     })
             except Exception as exc:
@@ -114,7 +114,7 @@ def iniciar_sync_global() -> str:
                 with _lock:
                     _tasks[task_id].update({
                         "status": "failed",
-                        "finished_at": datetime.utcnow().isoformat(),
+                        "finished_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                         "error": f"{type(exc).__name__}: {exc}",
                     })
         except Exception as exc:
@@ -122,7 +122,7 @@ def iniciar_sync_global() -> str:
             with _lock:
                 _tasks[task_id].update({
                     "status": "failed",
-                    "finished_at": datetime.utcnow().isoformat(),
+                    "finished_at": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                     "error": f"{type(exc).__name__}: {exc}",
                 })
         finally:
