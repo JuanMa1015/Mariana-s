@@ -1,4 +1,5 @@
 import logging
+import time as _time
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
@@ -573,7 +574,6 @@ def update_proceso(llave_proceso: str, payload: UpdateProceso, db: Session = Dep
     return {"updated": changed, "llave_proceso": proceso.llave_proceso}
 
 
-import time as _time
 from services.telegram import notificar_telegram
 
 _rama_fallos = 0
