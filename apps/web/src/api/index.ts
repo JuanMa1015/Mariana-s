@@ -119,8 +119,8 @@ export async function deleteProceso(llaveProceso: string) {
   return res.json()
 }
 
-export async function getNovedadesDetalle() {
-  const res = await fetchWithAuth(`${BASE_URL}/procesos/novedades-detalle`)
+export async function getNovedadesDetalle(skip = 0, limit = 50) {
+  const res = await fetchWithAuth(`${BASE_URL}/procesos/novedades-detalle?skip=${skip}&limit=${limit}`)
   return res.json()
 }
 

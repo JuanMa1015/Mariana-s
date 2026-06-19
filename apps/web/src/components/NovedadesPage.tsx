@@ -130,13 +130,19 @@ export default function NovedadesPage() {
   const [data, setData] = useState<NovedadesDetalle | null>(null)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [skip, setSkip] = useState(0)
+
+  const limit = 25
 
   useEffect(() => {
     setLoading(true)
-    getNovedadesDetalle()
+    getNovedadesDetalle(skip, limit)
       .then(setData)
       .finally(() => setLoading(false))
-  }, [])
+  }, [skip])
+
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / limit)) : 1
+  const currentPage = Math.floor(skip / limit) + 1
 
   const toggleExpand = (llave: string) => {
     setExpanded((prev) => {
@@ -188,6 +194,25 @@ export default function NovedadesPage() {
               <p className="text-sm font-semibold text-slate-600">
                 {data.total} proceso{data.total > 1 ? "s" : ""} con novedades
               </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSkip((s) => Math.max(0, s - limit))}
+                  disabled={skip === 0}
+                  className="rounded-lg border border-violet-200 px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ← Anterior
+                </button>
+                <span className="text-xs text-slate-500">
+                  Pág. {currentPage} de {totalPages}
+                </span>
+                <button
+                  onClick={() => setSkip((s) => s + limit)}
+                  disabled={!data || skip + limit >= data.total}
+                  className="rounded-lg border border-violet-200 px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Siguiente →
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-col gap-3">
