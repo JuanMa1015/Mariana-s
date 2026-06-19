@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, type CSSProperties } from "react"
-import { FixedSizeList } from "react-window"
+import { VariableSizeList } from "react-window"
 import type { Proceso } from "../types"
 import toast from "react-hot-toast"
 import { deleteProceso, updateProceso } from "../api"
@@ -271,7 +271,7 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
   const editProceso = procesos.find(p => p.llave_proceso === editando)
   const [editForm, setEditForm] = useState({ llave_proceso: "", categoria: "" })
   const containerRef = useRef<HTMLDivElement>(null)
-  const listRef = useRef<FixedSizeList>(null)
+  const listRef = useRef<VariableSizeList>(null)
   const listHeight = useContainerHeight(containerRef)
 
   const toggleExpand = useCallback((llave: string) => {
@@ -366,7 +366,7 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
           </thead>
         </table>
         <div ref={containerRef} className="flex-1 min-h-0">
-          <FixedSizeList
+          <VariableSizeList
             ref={listRef}
             height={listHeight}
             itemCount={procesos.length}
@@ -377,7 +377,7 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
             style={{ minWidth: "960px" }}
           >
             {Row}
-          </FixedSizeList>
+          </VariableSizeList>
         </div>
       </div>
 
