@@ -5,7 +5,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from models.database import get_db
 from models.user import User
-from services.auth import verify_password, get_password_hash, create_access_token
+from services.auth import verify_password, get_password_hash, create_access_token, get_current_user
 from config import ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -18,6 +18,9 @@ class UserCreate(BaseModel):
 class UserLogin(BaseModel):
     credential: str
     password: str
+
+class TelegramChatIdUpdate(BaseModel):
+    telegram_chat_id: str | None = None
 
 
 def _generar_username(base: str, db: Session) -> str:
@@ -56,6 +59,7 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "email": new_user.email,
         "username": new_user.username,
+        "telegram_chat_id": None,
     }
 
 
@@ -84,4 +88,17 @@ def login_user(user: UserLogin, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "email": db_user.email,
         "username": db_user.username,
+        "telegram_chat_id": db_user.telegram_chat_id,
     }
+
+
+@router.patch("/telegram")
+def actualizar_telegram_chat_id(
+    data: TelegramChatIdUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    db_user = db.query(User).filter(User.id == current_user.id).first()
+    db_user.telegram_chat_id = data.telegram_chat_id
+    db.commit()
+    return {"telegram_chat_id": db_user.telegram_chat_id}

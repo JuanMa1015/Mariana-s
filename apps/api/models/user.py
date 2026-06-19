@@ -11,5 +11,6 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=True)
     password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
+    telegram_chat_id = Column(String, nullable=True)
 
     procesos = relationship("Proceso", back_populates="user", cascade="all, delete")

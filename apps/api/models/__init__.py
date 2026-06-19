@@ -42,6 +42,15 @@ def init_db():
     except Exception:
         pass  # Column already exists or not supported
 
+    # Migrate: add telegram_chat_id column to users if missing
+    try:
+        from sqlalchemy import text
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN telegram_chat_id VARCHAR"))
+            conn.commit()
+    except Exception:
+        pass
+
     # Migrate: add ultima_sincronizacion column if missing
     try:
         from sqlalchemy import text
