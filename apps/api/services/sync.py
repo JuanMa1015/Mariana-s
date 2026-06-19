@@ -435,7 +435,6 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
     errores: list = []
     saltados: list = []
     privados: list = []
-    usuarios_afectados: set = set()
     acumuladas: dict[str, list[dict]] = {}
 
     for radicado in radicados:
@@ -447,6 +446,7 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
             saltados.append(radicado.llave_proceso)
             continue
 
+    usuarios_afectados = len({r.user_id for r in radicados if re.fullmatch(r"\d{23}", r.llave_proceso or "")})
     pendientes = [r for r in radicados if r.llave_proceso not in ignorados and r.llave_proceso not in saltados]
 
     datos_remotos: list[dict] = []
@@ -461,8 +461,6 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
 
     for datos in datos_remotos:
         radicado = next((r for r in pendientes if r.llave_proceso == datos["llave_proceso"]), None)
-        if radicado is not None:
-            usuarios_afectados.add(radicado.user_id)
         if datos["status"] == "ok":
             if radicado is not None:
                 try:
@@ -498,5 +496,5 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
         "radicados_saltados_frecuencia": saltados,
         "radicados_privados": privados,
         "radicados_error_consulta": errores,
-        "usuarios_afectados": len(usuarios_afectados),
+        "usuarios_afectados": usuarios_afectados,
     }
