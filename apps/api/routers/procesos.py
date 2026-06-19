@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from models.database import get_db
 from models.actuacion import Actuacion
 from models.proceso import Proceso
-from services.sync import sincronizar_radicados
+from services.sync import sincronizar_radicados, sincronizar_radicados_lote, _elegir_usuario_para_sync
 from services.sync_manager import iniciar_sync_global, obtener_resultado
 from fastapi.responses import StreamingResponse
 from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones, descargar_documento
@@ -136,6 +136,18 @@ def sync_status(task_id: str):
     if tarea is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tarea no encontrada")
     return tarea
+
+
+@router.post("/sync-lote")
+def sync_lote(current_user: Optional[User] = Depends(_auth_for_sync), db: Session = Depends(get_db)):
+    if not API_TOKEN:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="API_TOKEN no configurado")
+    user_id = _elegir_usuario_para_sync(db)
+    if user_id is None:
+        return {"mensaje": "No hay usuarios con radicados", "total_consultados": 0}
+    resultado = sincronizar_radicados_lote(db, lote=25, user_id=user_id)
+    resultado["usuario_sincronizado"] = user_id
+    return resultado
 
 
 class AddRadicado(BaseModel):
