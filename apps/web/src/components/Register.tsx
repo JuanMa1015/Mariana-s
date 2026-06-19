@@ -35,8 +35,9 @@ export default function Register() {
 
         <form onSubmit={handleRegister} className="flex flex-col gap-4">
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Correo Electrónico</label>
+            <label htmlFor="reg-email" className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Correo Electrónico</label>
             <input
+              id="reg-email"
               type="email"
               required
               value={email}
@@ -45,8 +46,9 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Nombre de Usuario</label>
+            <label htmlFor="reg-username" className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Nombre de Usuario</label>
             <input
+              id="reg-username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
@@ -55,9 +57,10 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Contraseña</label>
+            <label htmlFor="reg-password" className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Contraseña</label>
             <div className="relative">
               <input
+                id="reg-password"
                 type={showPassword ? "text" : "password"}
                 required
                 value={password}
