@@ -1,8 +1,8 @@
-name: Sync Procesos Judiciales
+name: Sync Procesos Judiciales (Lote)
 
 on:
   schedule:
-    - cron: '0 11,17,23,5 * * *'
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
@@ -22,70 +22,51 @@ jobs:
 
       - name: Wake up server
         run: |
-          echo "⏳ Esperando a que el servidor responda..."
-          for i in {1..12}; do
-            if curl -fsS "${{ secrets.API_URL }}/health"; then
-              echo "✅ Servidor listo"
+          echo "Esperando a que el servidor responda..."
+          for i in $(seq 1 12); do
+            if curl -fsS "${{ secrets.API_URL }}/health" > /dev/null 2>&1; then
+              echo "Servidor listo"
               exit 0
             fi
-            echo "  Intento $i/12 — aún no responde, esperando 10s..."
+            echo "  Intento $i/12 — aun no responde, esperando 10s..."
             sleep 10
           done
-          echo "❌ El servidor no respondió a tiempo"
+          echo "El servidor no respondio a tiempo"
           exit 1
 
-      - name: Trigger sync async and wait for result
-        id: sync
+      - name: Sync lote
         env:
           API_URL: ${{ secrets.API_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
-          echo "🔄 Disparando sincronización asíncrona..."
-          RESULT=$(curl -s -X POST "${API_URL}/procesos/sync" \
+          echo "Sincronizando lote de 25 radicados..."
+          RESULT=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/procesos/sync-lote" \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${API_TOKEN}")
+            -H "Authorization: Bearer ${API_TOKEN}" \
+            --max-time 600)
 
-          TASK_ID=$(echo "$RESULT" | python3 -c "import sys,json;print(json.load(sys.stdin).get('task_id',''))" 2>/dev/null || echo "")
-          if [ -z "$TASK_ID" ]; then
-            echo "❌ Error al disparar sync: $RESULT"
+          HTTP_CODE=$(echo "$RESULT" | tail -1)
+          BODY=$(echo "$RESULT" | sed '$d')
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Error HTTP $HTTP_CODE: $BODY"
             exit 1
           fi
-          echo "✅ Tarea disparada — ID: $TASK_ID"
 
           echo ""
-          echo "⏳ Esperando resultado..."
-          INTERVALO=15
-          MAX_INTENTOS=$(( 60 * 60 / INTERVALO ))
-          for i in $(seq 1 $MAX_INTENTOS); do
-            sleep $INTERVALO
-            STATUS_RESP=$(curl -s "${API_URL}/procesos/sync/${TASK_ID}")
-            STATUS=$(echo "$STATUS_RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")
-
-            if [ "$STATUS" = "completed" ]; then
-              echo ""
-              echo "✅ Sincronización completada"
-              echo ""
-              echo "$STATUS_RESP" | python3 -c "import sys,json;d=json.load(sys.stdin);r=d.get('result',{});errs=r.get('radicados_error_consulta',[]);print('============= RESUMEN DE SINCRONIZACION =============');print(f'  Consultados:    {r.get(\"total_consultados\",0)}');print(f'  Nuevos:         {r.get(\"nuevos\",0)}');print(f'  Actualizados:   {r.get(\"actualizados\",0)}');print(f'  Notificaciones: {len(r.get(\"emails_enviados\",[]))}');print(f'  Errores:        {len(errs)}');[print(f'    - {e.get(\"radicado\",\"?\")}: {e.get(\"error\",\"?\")} (paso: {e.get(\"paso\",\"?\")})') for e in errs];print('=====================================================')" 2>/dev/null || echo "$STATUS_RESP"
-              exit 0
-            fi
-
-            if [ "$STATUS" = "failed" ]; then
-              echo ""
-              echo "❌ Sincronización falló"
-              echo "$STATUS_RESP" | python3 -c "import sys,json;d=json.load(sys.stdin);print(f'Error: {d.get(\"error\",\"desconocido\")}')" 2>/dev/null
-              exit 1
-            fi
-
-            if [ $((i % 4)) -eq 0 ]; then
-              echo "  ...esperando, minuto $(( i * INTERVALO / 60 ))"
-            fi
-          done
-
-          echo "❌ Timeout: la sincronización no terminó en 60 minutos"
-          exit 1
-
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "❌ La sincronización falló."
-          echo "Revisa los logs del workflow para más detalles."
+          echo "$BODY" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+u=d.get('usuario_sincronizado','?')
+t=d.get('total_consultados',0)
+n=d.get('nuevos',0)
+a=d.get('actualizados',0)
+e=len(d.get('emails_enviados',[]))
+err=d.get('radicados_error_consulta',[])
+print(f'Usuario: {u}')
+print(f'Consultados: {t}  |  Nuevos: {n}  |  Actualizados: {a}  |  Notificaciones: {e}  |  Errores: {len(err)}')
+for er in err:
+    print(f'  - {er.get(\"radicado\",\"?\")}: {er.get(\"error\",\"?\")}')
+"
+          echo ""
+          echo "Sync lote completado"

@@ -344,6 +344,17 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                 time.sleep(0.5)
 
 
+def _elegir_usuario_para_sync(db: Session) -> int | None:
+    user_id = (
+        db.query(Proceso.user_id)
+        .group_by(Proceso.user_id)
+        .order_by(func.min(Proceso.ultima_sincronizacion).asc().nullsfirst())
+        .limit(1)
+        .scalar()
+    )
+    return user_id
+
+
 def sincronizar_radicados_lote(db: Session, lote: int = 25, user_id: int | None = None) -> dict:
     from sqlalchemy import case, desc, nullsfirst, nullslast
 
