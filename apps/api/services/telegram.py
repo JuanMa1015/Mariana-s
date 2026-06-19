@@ -19,17 +19,15 @@ def _mensaje_texto(
     categoria: str | None = None,
 ) -> str:
     return (
-        f"📋 *Novedad judicial*\n"
-        f"┌─────────────────────\n"
-        f"│ Radicado: `{llave_proceso}`\n"
-        f"│ Categoría: {categoria or 'General'}\n"
-        f"│ Despacho: {despacho or '—'}\n"
-        f"│ Departamento: {departamento or '—'}\n"
-        f"│ Última act.: {fecha_ultima_actuacion or 'N/D'}\n"
-        f"│\n"
-        f"│ *Actuación:* {actuacion or 'N/D'}\n"
-        f"│ *Anotación:* {anotacion or 'N/D'}\n"
-        f"└─────────────────────"
+        f"*Novedad judicial - {categoria or 'General'}*\n"
+        f"\n"
+        f"Radicado: `{llave_proceso}`\n"
+        f"Despacho: {despacho or '-'}\n"
+        f"Departamento: {departamento or '-'}\n"
+        f"Ultima actuacion: {fecha_ultima_actuacion or 'N/D'}\n"
+        f"\n"
+        f"*Actuacion:* {actuacion or 'N/D'}\n"
+        f"*Anotacion:* {anotacion or 'N/D'}"
     )
 
 
