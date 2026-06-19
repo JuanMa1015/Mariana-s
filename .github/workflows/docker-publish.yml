@@ -15,7 +15,27 @@ env:
   WEB_IMAGE: ghcr.io/${{ github.repository }}/mariana-web
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: apps/api/requirements.txt
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx pytest-cov
+      - name: Run tests
+        run: pytest -v --no-header --tb=short --cov=. --cov-report=term-missing
+
   api:
+    needs: [test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
