@@ -93,7 +93,7 @@ def _backoff_dias(proceso: Proceso) -> int:
 def _debe_sincronizar(proceso: Proceso) -> bool:
     if proceso.ultima_sincronizacion is None:
         return True
-    dias_desde_sync = (datetime.now(_COLOMBIA_TZ) - proceso.ultima_sincronizacion).days
+    dias_desde_sync = (datetime.utcnow() - proceso.ultima_sincronizacion).days
     dias_sin_cambios = proceso.dias_sin_cambios or 0
     backoff = _backoff_dias(proceso)
 
@@ -248,7 +248,7 @@ def sincronizar_radicado(db: Session, radicado: Proceso) -> bool:
             for documento_remoto in documentos:
                 _upsert_documento(db, actuacion_db, documento_remoto)
 
-    radicado.ultima_sincronizacion = datetime.now(_COLOMBIA_TZ)
+    radicado.ultima_sincronizacion = datetime.utcnow()
     radicado.dias_sin_cambios = _calcular_dias_sin_cambios(radicado.fecha_ultima_actuacion)
     radicado.fallos_consecutivos = 0
 
@@ -407,7 +407,7 @@ def _procesar_radicado(
                 "telegram_chat_id": telegram_chat_id,
             })
 
-    radicado.ultima_sincronizacion = datetime.now(_COLOMBIA_TZ)
+    radicado.ultima_sincronizacion = datetime.utcnow()
     radicado.dias_sin_cambios = _calcular_dias_sin_cambios(radicado.fecha_ultima_actuacion)
     radicado.fallos_consecutivos = 0
 
