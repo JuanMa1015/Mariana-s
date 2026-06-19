@@ -54,19 +54,15 @@ jobs:
           fi
 
           echo ""
-          echo "$BODY" | python3 << 'PYEOF'
-          import sys, json
-          d = json.load(sys.stdin)
-          u = d.get('usuario_sincronizado', '?')
-          t = d.get('total_consultados', 0)
-          n = d.get('nuevos', 0)
-          a = d.get('actualizados', 0)
-          e = len(d.get('emails_enviados', []))
-          err = d.get('radicados_error_consulta', [])
-          print(f'Usuario: {u}')
-          print(f'Consultados: {t} | Nuevos: {n} | Actualizados: {a} | Notificaciones: {e} | Errores: {len(err)}')
-          for er in err:
-              print(f'  - {er.get("radicado", "?")}: {er.get("error", "?")}')
-          PYEOF
+          echo "Usuario:     $(echo "$BODY" | jq -r '.usuario_sincronizado // "?"')"
+          echo "Consultados: $(echo "$BODY" | jq -r '.total_consultados // 0')"
+          echo "Nuevos:      $(echo "$BODY" | jq -r '.nuevos // 0')"
+          echo "Actualizados:$(echo "$BODY" | jq -r '.actualizados // 0')"
+          echo "Notificaciones: $(echo "$BODY" | jq -r '.emails_enviados | length')"
+          echo "Errores:     $(echo "$BODY" | jq -r '.radicados_error_consulta | length')"
+          ERRORS=$(echo "$BODY" | jq -r '.radicados_error_consulta[] | "  - \(.radicado // "?"): \(.error // "?")"')
+          if [ -n "$ERRORS" ]; then
+            echo "$ERRORS"
+          fi
           echo ""
           echo "Sync lote completado"
