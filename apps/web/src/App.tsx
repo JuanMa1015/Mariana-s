@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, useCallback } from "react"
+import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync } from "./api"
+import { getCache, setCache, removeCache } from "./api/cache"
 import toast from "react-hot-toast"
 import type { DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync } from "./types"
 import TablaProcesos from "./components/TablaProcesos"
@@ -53,19 +54,50 @@ export default function App() {
   const radicadoDetalle = searchParams.get("radicado")
 
   const esDetalle = view === "detalle" && Boolean(radicadoDetalle)
+  const fetchingRef = useRef(false)
 
-  const cargarLista = async () => {
-    setLoadingLista(true)
+  const cacheKey = `lista:${page}:${limit}:${filtroCategoria || ""}:${busqueda || ""}`
+
+  const cargarLista = useCallback(async (forceFresh = false) => {
+    if (fetchingRef.current && !forceFresh) return
+    fetchingRef.current = true
+
+    if (!forceFresh) {
+      const cachedP = getCache<ListaProcesos>(cacheKey)
+      const cachedN = getCache<ListaNovedades>("novedades")
+      if (cachedP && cachedN) {
+        setProcesos(cachedP)
+        setNovedades(cachedN)
+      }
+    }
+
+    if (!forceFresh && getCache<ListaProcesos>(cacheKey)) {
+      setLoadingLista(false)
+    } else {
+      setLoadingLista(true)
+    }
+
     const skip = (page - 1) * limit
-    const [p, n] = await Promise.all([getProcesos(undefined, undefined, skip, limit, filtroCategoria || undefined, busqueda || undefined), getNovedades()])
-    setProcesos(p)
-    setNovedades(n)
-    setLoadingLista(false)
-  }
+    try {
+      const [p, n] = await Promise.all([
+        getProcesos(undefined, undefined, skip, limit, filtroCategoria || undefined, busqueda || undefined),
+        getNovedades(),
+      ])
+      setProcesos(p)
+      setNovedades(n)
+      setCache(cacheKey, p)
+      setCache("novedades", n)
+    } catch {
+      /* keep showing cached data on error */
+    } finally {
+      setLoadingLista(false)
+      fetchingRef.current = false
+    }
+  }, [page, limit, filtroCategoria, busqueda, cacheKey])
 
   useEffect(() => {
     cargarLista()
-  }, [page, limit, filtroCategoria, busqueda])
+  }, [cargarLista])
 
   useEffect(() => {
     if (!esDetalle || !radicadoDetalle) return
@@ -100,13 +132,15 @@ export default function App() {
         `Sincronización completa: ${result.nuevos} nuevos, ${result.actualizados} actualizados, ${result.total_consultados} consultados`,
         { id: loadingToast, duration: 5000 },
       )
-      await cargarLista()
+      removeCache(cacheKey)
+      removeCache("novedades")
+      await cargarLista(true)
     } catch (err: any) {
       toast.error(err.message || "Error al sincronizar", { id: loadingToast })
     } finally {
       setSyncing(false)
     }
-  }, [syncing])
+  }, [syncing, cacheKey, cargarLista])
 
   const handleLogout = () => {
     localStorage.removeItem("token")
@@ -176,7 +210,7 @@ export default function App() {
                 </div>
               </div>
             ) : detalle ? (
-              <DetalleView detalle={detalle} onVolver={volverLista} onActualizado={cargarLista} />
+              <DetalleView detalle={detalle} onVolver={volverLista} onActualizado={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista(true) }} />
             ) : (
               <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
                 No se encontró el radicado solicitado.
@@ -244,7 +278,9 @@ export default function App() {
                   const res = await postAddRadicado(newRadicado)
                   if (res.created) {
                     setNewRadicado({ llave_proceso: "", categoria: "Trabajo" })
-                    await cargarLista()
+                    removeCache(cacheKey)
+                    removeCache("novedades")
+                    await cargarLista(true)
                     toast.success("Radicado agregado exitosamente", { id: loadingToast })
                   } else {
                     toast.error(res.detail || res.message || 'Error al agregar', { id: loadingToast })
@@ -308,7 +344,7 @@ export default function App() {
                 </div>
               </div>
             ) : procesos ? (
-              <TablaProcesos procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={cargarLista} />
+              <TablaProcesos procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista(true) }} />
             ) : null}
           </div>
         </section>
