@@ -360,6 +360,7 @@ def _procesar_radicado(
     )
 
     user_email = radicado.user.email.strip() if radicado.user and radicado.user.email else None
+    telegram_chat_id = radicado.user.telegram_chat_id if radicado.user else None
     logger.info(
         "Notificando %s -> email=%s, categoria=%s",
         radicado.llave_proceso, user_email, radicado.categoria,
@@ -382,6 +383,7 @@ def _procesar_radicado(
                     "fecha_registro": latest_remote.fecha_registro,
                     "con_documentos": latest_remote.con_documentos,
                     "categoria": radicado.categoria,
+                    "telegram_chat_id": telegram_chat_id,
                 })
         else:
             radicado.notificado = True
@@ -402,6 +404,7 @@ def _procesar_radicado(
                 "fecha_registro": latest_remote.fecha_registro,
                 "con_documentos": latest_remote.con_documentos,
                 "categoria": radicado.categoria,
+                "telegram_chat_id": telegram_chat_id,
             })
 
     radicado.ultima_sincronizacion = datetime.now(_COLOMBIA_TZ)
@@ -415,6 +418,7 @@ def _procesar_radicado(
 def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list):
     for email, notifs in acumuladas.items():
         destinatarios = [email]
+        chat_id = notifs[0].get("telegram_chat_id") if notifs else None
         if len(notifs) > 3:
             from services.email_templates import template_resumen
             asunto, cuerpo_html = template_resumen(notifs)
@@ -431,6 +435,7 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                 destinatarios=destinatarios,
                 custom_asunto=asunto,
                 custom_cuerpo=cuerpo_html,
+                telegram_chat_id=chat_id,
             )
             if ok:
                 emails_enviados.append(f"resumen_{email}")
@@ -449,6 +454,7 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                     con_documentos=n["con_documentos"],
                     destinatarios=destinatarios,
                     categoria=n["categoria"],
+                    telegram_chat_id=n.get("telegram_chat_id"),
                 )
                 if ok:
                     emails_enviados.append(n["llave_proceso"])

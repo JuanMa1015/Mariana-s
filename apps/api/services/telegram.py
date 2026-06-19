@@ -45,9 +45,11 @@ def notificar_telegram(
     con_documentos: bool | None = None,
     categoria: str | None = None,
     custom_mensaje: str | None = None,
+    chat_id: str | None = None,
 ) -> bool:
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        logger.info("Telegram no configurado (falta TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID)")
+    chat_id = chat_id or TELEGRAM_CHAT_ID
+    if not TELEGRAM_BOT_TOKEN or not chat_id:
+        logger.info("Telegram no configurado (falta TELEGRAM_BOT_TOKEN o chat_id)")
         return False
 
     texto = custom_mensaje or _mensaje_texto(
@@ -62,7 +64,7 @@ def notificar_telegram(
 
     url = f"{API_BASE}{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": texto,
         "parse_mode": "Markdown",
         "disable_web_page_preview": True,
@@ -73,7 +75,7 @@ def notificar_telegram(
             response = client.post(url, json=payload)
             ok = response.status_code == 200
             if ok:
-                logger.info("Telegram -> chat %s | ok", TELEGRAM_CHAT_ID)
+                logger.info("Telegram -> chat %s | ok", chat_id)
             else:
                 logger.warning("Telegram falló: %s | %s", response.status_code, response.text[:200])
             return ok

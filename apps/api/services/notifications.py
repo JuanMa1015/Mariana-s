@@ -73,12 +73,11 @@ def notificar_cambio_radicado(
     anotacion: str | None = None,
     fecha_registro: str | None = None,
     con_documentos: bool | None = None,
-    num_actuaciones: int | None = None,
-    total_actualizadas: int | None = None,
-    destinatarios: list[str] | None = None,
     categoria: str | None = None,
+    destinatarios: list[str] | None = None,
     custom_asunto: str | None = None,
     custom_cuerpo: str | None = None,
+    telegram_chat_id: str | None = None,
 ) -> bool:
     if not destinatarios:
         destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
@@ -166,6 +165,7 @@ def notificar_cambio_radicado(
             actuacion=actuacion,
             anotacion=anotacion,
             categoria=categoria,
+            chat_id=telegram_chat_id,
         )
     except Exception as exc:
         logger.error("Telegram falló en notificar_cambio_radicado: %s", exc)
