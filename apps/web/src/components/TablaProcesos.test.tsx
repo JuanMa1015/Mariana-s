@@ -1,14 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
-import type { ReactNode } from "react"
 
 vi.mock("../api", () => ({ deleteProceso: vi.fn(), updateProceso: vi.fn() }))
 
-let toastRenderContent: ((t: any) => ReactNode) | null = null
-const toastFn = vi.fn((content: any) => {
-  toastRenderContent = content
-  return "toast-id"
-}) as any
+const toastFn = vi.fn(() => "toast-id") as any
 toastFn.loading = vi.fn(() => "tid")
 toastFn.success = vi.fn()
 toastFn.error = vi.fn()
@@ -53,7 +48,6 @@ const onDelete = vi.fn()
 
 beforeEach(async () => {
   vi.clearAllMocks()
-  toastRenderContent = null
 })
 
 describe("TablaProcesos", () => {

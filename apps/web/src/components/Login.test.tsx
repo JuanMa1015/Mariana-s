@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
@@ -13,9 +13,13 @@ vi.mock('react-router-dom', async () => {
 const mockLoginUser = vi.fn()
 vi.mock('../api', () => ({ loginUser: (...args: any[]) => mockLoginUser(...args) }))
 
-const mockToast = { loading: vi.fn(() => 'toast-id'), success: vi.fn(), error: vi.fn() }
+const mockToast = { loading: vi.fn((..._: any[]) => 'toast-id'), success: vi.fn((..._: any[]) => {}), error: vi.fn((..._: any[]) => {}) }
 vi.mock('react-hot-toast', () => ({
-  default: { loading: (...args: any[]) => mockToast.loading(...args), success: (...args: any[]) => mockToast.success(...args), error: (...args: any[]) => mockToast.error(...args) },
+  default: {
+    loading: (...a: any[]) => mockToast.loading(...a),
+    success: (...a: any[]) => mockToast.success(...a),
+    error: (...a: any[]) => mockToast.error(...a),
+  },
 }))
 
 function renderLogin() {
