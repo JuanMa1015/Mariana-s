@@ -1,11 +1,12 @@
 import re
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from models.database import get_db
 from models.user import User
 from services.auth import verify_password, get_password_hash, create_access_token, get_current_user
+from services.limiter import limiter
 from config import ACCESS_TOKEN_EXPIRE_MINUTES
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -36,7 +37,8 @@ def _generar_username(base: str, db: Session) -> str:
 
 
 @router.post("/register")
-def register_user(user: UserCreate, db: Session = Depends(get_db)):
+@limiter.limit("3/minute")
+def register_user(user: UserCreate, request: Request, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
@@ -64,7 +66,8 @@ def register_user(user: UserCreate, db: Session = Depends(get_db)):
 
 
 @router.post("/login")
-def login_user(user: UserLogin, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login_user(user: UserLogin, request: Request, db: Session = Depends(get_db)):
     credential = user.credential.strip()
 
     if "@" in credential:

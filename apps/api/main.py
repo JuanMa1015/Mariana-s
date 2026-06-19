@@ -3,6 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from slowapi.middleware import SlowAPIMiddleware
+from services.limiter import limiter
+from slowapi.errors import RateLimitExceeded
 from models import init_db
 from services.scheduler import iniciar_scheduler, obtener_estado_scheduler
 from services.keepalive import Keepalive
@@ -34,6 +37,19 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 app = FastAPI(title="Mariana's - Monitor Judicial", lifespan=lifespan)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Demasiadas solicitudes. Intenta de nuevo en un minuto."},
+        headers={
+            "Access-Control-Allow-Origin": "https://mariana-app-nu.vercel.app",
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
 
 
 @app.exception_handler(Exception)
@@ -61,6 +77,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SlowAPIMiddleware)
 
 
 @app.middleware("http")

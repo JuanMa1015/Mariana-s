@@ -33,7 +33,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             <p className="mt-2 text-sm text-rose-600 leading-relaxed">
               Ocurrió un error inesperado. Por favor intenta recargar la página.
             </p>
-            <p className="mt-1 text-xs text-rose-400 font-mono">{this.state.error.message}</p>
+            <p className="mt-1 text-xs text-rose-400 font-mono">&nbsp;</p>
             <button
               onClick={() => window.location.reload()}
               className="mt-5 rounded-2xl bg-rose-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-600 active:scale-95"

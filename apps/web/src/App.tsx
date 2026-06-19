@@ -48,6 +48,18 @@ export default function App() {
   const [limit, setLimit] = useState(25)
   const [filtroCategoria, setFiltroCategoria] = useState("")
   const [busqueda, setBusqueda] = useState("")
+  const [apiOffline, setApiOffline] = useState(false)
+
+  useEffect(() => {
+    const check = () => {
+      fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/health`, { signal: AbortSignal.timeout(5000) })
+        .then((r) => setApiOffline(!r.ok))
+        .catch(() => setApiOffline(true))
+    }
+    check()
+    const id = setInterval(check, 30000)
+    return () => clearInterval(id)
+  }, [])
 
   const searchParams = new URLSearchParams(window.location.search)
   const view = searchParams.get("view")
@@ -136,7 +148,7 @@ export default function App() {
       removeCache("novedades")
       await cargarLista(true)
     } catch (err: any) {
-      toast.error(err.message || "Error al sincronizar", { id: loadingToast })
+      toast.error("Error al sincronizar. Intenta de nuevo.", { id: loadingToast })
     } finally {
       setSyncing(false)
     }
@@ -197,6 +209,11 @@ export default function App() {
       </header>
 
       <main className="mx-auto flex w-full max-w-none flex-1 min-h-0 flex-col gap-3 px-4 py-4 sm:px-5 sm:py-5">
+        {apiOffline && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
+            <span className="font-semibold">API no disponible:</span> los datos pueden estar desactualizados. Intenta recargar la pagina.
+          </div>
+        )}
         {esDetalle ? (
           <section className="flex min-h-0 flex-1 flex-col overflow-auto p-0">
             {loadingDetalle ? (
