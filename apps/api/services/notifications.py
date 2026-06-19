@@ -94,8 +94,6 @@ def notificar_cambio_radicado(
         cuerpo_texto = re.sub(r"<[^>]+>", "", custom_cuerpo).strip()
     else:
         asunto = f"Novedad judicial: {llave_proceso}"
-        if total_actualizadas is not None and total_actualizadas > 0:
-            asunto = f"[{total_actualizadas} novedades] {asunto}"
         cuerpo_html = template_novedad(
             llave_proceso=llave_proceso,
             despacho=despacho,
