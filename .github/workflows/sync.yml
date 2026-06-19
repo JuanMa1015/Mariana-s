@@ -55,18 +55,18 @@ jobs:
 
           echo ""
           echo "$BODY" | python3 << 'PYEOF'
-import sys, json
-d = json.load(sys.stdin)
-u = d.get('usuario_sincronizado', '?')
-t = d.get('total_consultados', 0)
-n = d.get('nuevos', 0)
-a = d.get('actualizados', 0)
-e = len(d.get('emails_enviados', []))
-err = d.get('radicados_error_consulta', [])
-print(f'Usuario: {u}')
-print(f'Consultados: {t} | Nuevos: {n} | Actualizados: {a} | Notificaciones: {e} | Errores: {len(err)}')
-for er in err:
-    print(f'  - {er.get("radicado", "?")}: {er.get("error", "?")}')
-PYEOF
+          import sys, json
+          d = json.load(sys.stdin)
+          u = d.get('usuario_sincronizado', '?')
+          t = d.get('total_consultados', 0)
+          n = d.get('nuevos', 0)
+          a = d.get('actualizados', 0)
+          e = len(d.get('emails_enviados', []))
+          err = d.get('radicados_error_consulta', [])
+          print(f'Usuario: {u}')
+          print(f'Consultados: {t} | Nuevos: {n} | Actualizados: {a} | Notificaciones: {e} | Errores: {len(err)}')
+          for er in err:
+              print(f'  - {er.get("radicado", "?")}: {er.get("error", "?")}')
+          PYEOF
           echo ""
           echo "Sync lote completado"
