@@ -304,7 +304,7 @@ def _fetch_radicado_remoto(radicado: Proceso) -> dict:
         detalle = cached_call(buscar_detalle_proceso, 300, resumen.id_proceso)
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 404:
-            return {"status": "no_data", "llave_proceso": radicado.llave_proceso}
+            return {"status": "private", "llave_proceso": radicado.llave_proceso}
         return {"status": "error", "llave_proceso": radicado.llave_proceso, "error": f"HTTP {exc.response.status_code}", "paso": "detalle"}
     except Exception as exc:
         return {"status": "error", "llave_proceso": radicado.llave_proceso, "error": f"{type(exc).__name__}: {exc}", "paso": "detalle"}
@@ -434,6 +434,7 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
     ignorados: list = []
     errores: list = []
     saltados: list = []
+    privados: list = []
     acumuladas: dict[str, list[dict]] = {}
 
     for radicado in radicados:
@@ -474,6 +475,13 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
                         errores.append({"radicado": radicado.llave_proceso, "error": str(exc2), "paso": "base_de_datos"})
         elif datos["status"] == "error":
             errores.append({"radicado": datos["llave_proceso"], "error": datos.get("error", "unknown"), "paso": datos.get("paso", "remoto")})
+        elif datos["status"] == "private":
+            privados.append(datos["llave_proceso"])
+            radicado = next((r for r in pendientes if r.llave_proceso == datos["llave_proceso"]), None)
+            if radicado is not None:
+                radicado.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None)
+                radicado.fallos_consecutivos = 0
+                db.commit()
 
     _enviar_notificaciones_acumuladas(acumuladas, emails_enviados)
 
@@ -486,5 +494,6 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
         "emails_enviados": emails_enviados,
         "radicados_ignorados": ignorados,
         "radicados_saltados_frecuencia": saltados,
+        "radicados_privados": privados,
         "radicados_error_consulta": errores,
     }
