@@ -438,18 +438,16 @@ async def test_debe_sincronizar_nunca_sincronizado(db):
 async def test_debe_sincronizar_con_backoff(db):
     from services.sync import _debe_sincronizar
     from models.proceso import Proceso
-    from datetime import datetime, timezone, timedelta
-
-    _COL = timezone(timedelta(hours=-5))
+    from datetime import datetime, timedelta
 
     p = Proceso(
-        ultima_sincronizacion=datetime.now(_COL) - timedelta(days=1),
+        ultima_sincronizacion=datetime.utcnow() - timedelta(days=1),
         fallos_consecutivos=1,
         dias_sin_cambios=0,
     )
     assert _debe_sincronizar(p) is True
 
-    p.ultima_sincronizacion = datetime.now(_COL) - timedelta(hours=1)
+    p.ultima_sincronizacion = datetime.utcnow() - timedelta(hours=1)
     assert _debe_sincronizar(p) is False
 
 
@@ -457,16 +455,14 @@ async def test_debe_sincronizar_con_backoff(db):
 async def test_debe_sincronizar_sin_cambios_recientes(db):
     from services.sync import _debe_sincronizar
     from models.proceso import Proceso
-    from datetime import datetime, timezone, timedelta
-
-    _COL = timezone(timedelta(hours=-5))
+    from datetime import datetime, timedelta
 
     p = Proceso(
-        ultima_sincronizacion=datetime.now(_COL) - timedelta(days=2),
+        ultima_sincronizacion=datetime.utcnow() - timedelta(days=2),
         fallos_consecutivos=0,
         dias_sin_cambios=3,
     )
     assert _debe_sincronizar(p) is True
 
-    p.ultima_sincronizacion = datetime.now(_COL) - timedelta(hours=12)
+    p.ultima_sincronizacion = datetime.utcnow() - timedelta(hours=12)
     assert _debe_sincronizar(p) is False
