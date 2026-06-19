@@ -95,22 +95,12 @@ def listar_novedades(db: Session = Depends(get_db), current_user: User = Depends
 
 
 def _auth_for_sync(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    """Dependencia que permite usar un `API_TOKEN` (workflow/CI) o la autenticación normal.
-
-    - Si `API_TOKEN` está configurado: el header `Authorization: Bearer <API_TOKEN>` autoriza la petición y se retorna `None`.
-    - Si `API_TOKEN` está configurado y no coincide: se devuelve 401.
-    - Si `API_TOKEN` está vacío: se usa la autenticación normal (token JWT) y se retorna el `User`.
-    """
-    auth_header = (request.headers.get("authorization") or "")
-    # Si hay API_TOKEN configurado, permitir solo si coincide
     if API_TOKEN:
+        auth_header = request.headers.get("authorization", "")
         if auth_header.startswith("Bearer "):
             token_value = auth_header.split(" ", 1)[1]
             if token_value == API_TOKEN:
                 return None
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
-
-    # En desarrollo/local, usamos autenticación normal
     return get_current_user(token=token, db=db)
 
 
@@ -124,7 +114,7 @@ def sync_manual(current_user: Optional[User] = Depends(_auth_for_sync)):
         )
     db = next(get_db())
     try:
-        resultado = sincronizar_radicados(db, user_id=current_user.id)
+        resultado = sincronizar_radicados_lote(db, lote=50, user_id=current_user.id)
         return resultado
     finally:
         db.close()
