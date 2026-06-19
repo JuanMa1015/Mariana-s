@@ -88,5 +88,7 @@ export interface NovedadDetalle {
 
 export interface NovedadesDetalle {
   total: number
+  skip: number
+  limit: number
   novedades: NovedadDetalle[]
 }

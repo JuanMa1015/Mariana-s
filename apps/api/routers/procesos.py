@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from models.database import get_db
 from models.actuacion import Actuacion
 from models.proceso import Proceso
@@ -275,17 +275,30 @@ def actuaciones_recientes(
 def novedades_detalle(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(50, ge=1, le=200),
     limit_actuaciones: int = Query(50, ge=1, le=200),
 ):
+    total = (
+        db.query(func.count(Proceso.id))
+        .filter(Proceso.notificado == False, Proceso.user_id == current_user.id)
+        .scalar()
+    )
+
     procesos = (
         db.query(Proceso)
+        .options(selectinload(Proceso.actuaciones).selectinload(Actuacion.documentos))
         .filter(Proceso.notificado == False, Proceso.user_id == current_user.id)
         .order_by(Proceso.fecha_ultima_actuacion.desc().nullslast(), Proceso.id.desc())
+        .offset(skip)
+        .limit(limit)
         .all()
     )
 
     return {
-        "total": len(procesos),
+        "total": total,
+        "skip": skip,
+        "limit": limit,
         "novedades": [
             {
                 "llave_proceso": p.llave_proceso,
@@ -320,13 +333,14 @@ def novedades_detalle(
                             for d in a.documentos
                         ],
                     }
-                    for a in (
-                        db.query(Actuacion)
-                        .filter(Actuacion.proceso_id == p.id)
-                        .order_by(Actuacion.fecha_actuacion.desc().nullslast(), Actuacion.id_reg_actuacion.desc())
-                        .limit(limit_actuaciones)
-                        .all()
-                    )
+                    for a in sorted(
+                        p.actuaciones,
+                        key=lambda a: (
+                            a.fecha_actuacion or "",
+                            a.id_reg_actuacion or 0,
+                        ),
+                        reverse=True,
+                    )[:limit_actuaciones]
                 ],
             }
             for p in procesos
