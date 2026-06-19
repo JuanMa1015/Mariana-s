@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react"
-import { getProceso, getProcesos, getNovedades, postAddRadicado } from "./api"
+import { useState, useEffect, useMemo, useCallback } from "react"
+import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync } from "./api"
 import toast from "react-hot-toast"
-import type { DetalleProceso, ListaProcesos, ListaNovedades } from "./types"
+import type { DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync } from "./types"
 import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
 import { useNavigate } from "react-router-dom"
@@ -36,10 +36,13 @@ export default function App() {
     return "Buenas noches"
   }, [])
   const [procesos, setProcesos] = useState<ListaProcesos | null>(null)
+  const [loadingLista, setLoadingLista] = useState(false)
   const [novedades, setNovedades] = useState<ListaNovedades | null>(null)
   const [newRadicado, setNewRadicado] = useState({ llave_proceso: "", categoria: "General" })
   const [detalle, setDetalle] = useState<DetalleProceso | null>(null)
   const [loadingDetalle, setLoadingDetalle] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<ResultadoSync | null>(null)
   const [page, setPage] = useState(1)
   const [limit] = useState(500)
   const [filtroCategoria, setFiltroCategoria] = useState("")
@@ -52,10 +55,12 @@ export default function App() {
   const esDetalle = view === "detalle" && Boolean(radicadoDetalle)
 
   const cargarLista = async () => {
+    setLoadingLista(true)
     const skip = (page - 1) * limit
     const [p, n] = await Promise.all([getProcesos(undefined, undefined, skip, limit, filtroCategoria || undefined, busqueda || undefined), getNovedades()])
     setProcesos(p)
     setNovedades(n)
+    setLoadingLista(false)
   }
 
   useEffect(() => {
@@ -83,6 +88,26 @@ export default function App() {
     navigate(`${url.pathname}${url.search}${url.hash}`)
   }
 
+  const handleSync = useCallback(async () => {
+    if (syncing) return
+    setSyncing(true)
+    setSyncResult(null)
+    const loadingToast = toast.loading("Sincronizando con Rama Judicial...")
+    try {
+      const result = await postSync()
+      setSyncResult(result)
+      toast.success(
+        `Sincronización completa: ${result.nuevos} nuevos, ${result.actualizados} actualizados, ${result.total_consultados} consultados`,
+        { id: loadingToast, duration: 5000 },
+      )
+      await cargarLista()
+    } catch (err: any) {
+      toast.error(err.message || "Error al sincronizar", { id: loadingToast })
+    } finally {
+      setSyncing(false)
+    }
+  }, [syncing])
+
   const handleLogout = () => {
     localStorage.removeItem("token")
     localStorage.removeItem("email")
@@ -99,6 +124,16 @@ export default function App() {
             <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">{saludo}, {username}</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
+            >
+              <svg className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+              </svg>
+              <span className="hidden sm:inline">{syncing ? "Sincronizando..." : "Sincronizar"}</span>
+            </button>
             <button
               onClick={() => navigate("/novedades")}
               className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 sm:px-4 sm:py-2 sm:text-sm"
@@ -150,6 +185,14 @@ export default function App() {
           </section>
         ) : (
           <>
+        {syncResult && (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
+            <span className="font-semibold">Sincronización completada:</span>{' '}
+            {syncResult.nuevos} nuevo{syncResult.nuevos !== 1 ? "s" : ""},{" "}
+            {syncResult.actualizados} actualizado{syncResult.actualizados !== 1 ? "s" : ""},{" "}
+            {syncResult.total_consultados} consultado{syncResult.total_consultados !== 1 ? "s" : ""}
+          </div>
+        )}
         <section className="grid gap-3 md:grid-cols-4">
           <div className="rounded-3xl border border-violet-200 bg-violet-50 px-5 py-4 text-slate-900 shadow-sm">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-500">Total procesos guardados</p>
@@ -254,7 +297,19 @@ export default function App() {
           </div>
 
           <div className="min-h-0 flex-1 border-t border-violet-50">
-            {procesos && <TablaProcesos procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={cargarLista} />}
+            {loadingLista ? (
+              <div className="flex h-full items-center justify-center py-16">
+                <div className="flex flex-col items-center gap-3 text-slate-400">
+                  <svg className="h-8 w-8 animate-spin text-violet-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <p className="text-sm font-medium">Cargando procesos...</p>
+                </div>
+              </div>
+            ) : procesos ? (
+              <TablaProcesos procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={cargarLista} />
+            ) : null}
           </div>
         </section>
         <div className="flex items-center justify-between px-1 pt-1 text-xs text-slate-500">
