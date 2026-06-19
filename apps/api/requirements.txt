@@ -40,3 +40,4 @@ wheel==0.47.0
 sendgrid==6.12.5
 sentry-sdk>=2.0.0
 alembic>=1.13.0
+slowapi>=0.1.9
