@@ -435,6 +435,7 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
     errores: list = []
     saltados: list = []
     privados: list = []
+    usuarios_afectados: set = set()
     acumuladas: dict[str, list[dict]] = {}
 
     for radicado in radicados:
@@ -459,8 +460,10 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
             datos_remotos.append(futuro.result())
 
     for datos in datos_remotos:
+        radicado = next((r for r in pendientes if r.llave_proceso == datos["llave_proceso"]), None)
+        if radicado is not None:
+            usuarios_afectados.add(radicado.user_id)
         if datos["status"] == "ok":
-            radicado = next((r for r in pendientes if r.llave_proceso == datos["llave_proceso"]), None)
             if radicado is not None:
                 try:
                     _aplicar_datos_remotos(db, radicado, datos, nuevos, actualizados, emails_enviados, errores, acumuladas)
@@ -477,7 +480,6 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
             errores.append({"radicado": datos["llave_proceso"], "error": datos.get("error", "unknown"), "paso": datos.get("paso", "remoto")})
         elif datos["status"] == "private":
             privados.append(datos["llave_proceso"])
-            radicado = next((r for r in pendientes if r.llave_proceso == datos["llave_proceso"]), None)
             if radicado is not None:
                 radicado.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None)
                 radicado.fallos_consecutivos = 0
@@ -496,4 +498,5 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
         "radicados_saltados_frecuencia": saltados,
         "radicados_privados": privados,
         "radicados_error_consulta": errores,
+        "usuarios_afectados": len(usuarios_afectados),
     }
