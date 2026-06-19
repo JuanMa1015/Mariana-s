@@ -31,3 +31,6 @@ SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
 # Telegram Bot (notificaciones alternativas)
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
+
+# Sentry (monitoreo de errores en produccion)
+SENTRY_DSN = os.getenv("SENTRY_DSN", "")
