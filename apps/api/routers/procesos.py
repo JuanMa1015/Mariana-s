@@ -132,7 +132,7 @@ def sync_status(task_id: str):
 def sync_lote(current_user: Optional[User] = Depends(_auth_for_sync), db: Session = Depends(get_db)):
     if not API_TOKEN:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="API_TOKEN no configurado")
-    if not rama_health_check():
+    if not _check_rama_con_alerta():
         return {"mensaje": "Rama Judicial no responde, se omite sync", "total_consultados": 0}
     resultado = sincronizar_radicados_lote(db, lote=25)
     return resultado
@@ -571,3 +571,36 @@ def update_proceso(llave_proceso: str, payload: UpdateProceso, db: Session = Dep
         db.commit()
 
     return {"updated": changed, "llave_proceso": proceso.llave_proceso}
+
+
+import time as _time
+from services.telegram import notificar_telegram
+
+_rama_fallos = 0
+_rama_ultima_alerta: float = 0
+_RAMA_ALERTA_THRESHOLD = 3
+_RAMA_ALERTA_COOLDOWN = 6 * 3600
+
+
+def _check_rama_con_alerta() -> bool:
+    global _rama_fallos, _rama_ultima_alerta
+    if rama_health_check():
+        _rama_fallos = 0
+        return True
+    _rama_fallos += 1
+    if _rama_fallos >= _RAMA_ALERTA_THRESHOLD:
+        ahora = _time.time()
+        if ahora - _rama_ultima_alerta > _RAMA_ALERTA_COOLDOWN:
+            _rama_ultima_alerta = ahora
+            notificar_telegram(
+                llave_proceso="",
+                despacho="",
+                departamento="",
+                fecha_ultima_actuacion=None,
+                custom_mensaje=(
+                    f"ALERTA: Rama Judicial no responde.\n"
+                    f"Lleva {_rama_fallos} intentos fallidos consecutivos.\n"
+                    f"Los radicados no se estan sincronizando."
+                ),
+            )
+    return False
