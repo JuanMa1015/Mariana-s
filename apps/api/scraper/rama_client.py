@@ -1,10 +1,42 @@
 from __future__ import annotations
 
-import httpx
 import time
 import warnings
 from typing import Optional
-from dataclasses import dataclass, field
+
+import httpx
+
+from scraper.types import (
+    Proceso,
+    Paginacion,
+    ResultadoBusqueda,
+    ResultadoActuaciones,
+    DetalleProceso,
+    DocumentoActuacion,
+    Actuacion,
+    parsear_proceso,
+    parsear_detalle,
+    parsear_actuacion,
+    parsear_documento,
+)
+
+# Re-export types for backward compatibility
+__all__ = [
+    "Proceso",
+    "Paginacion",
+    "ResultadoBusqueda",
+    "ResultadoActuaciones",
+    "DetalleProceso",
+    "DocumentoActuacion",
+    "Actuacion",
+    "buscar_por_nombre",
+    "buscar_por_radicado",
+    "buscar_detalle_proceso",
+    "buscar_actuaciones",
+    "buscar_documentos_actuacion",
+    "descargar_documento",
+    "rama_health_check",
+]
 
 warnings.filterwarnings("ignore", message=".*verify.*", category=UserWarning)
 
@@ -29,7 +61,7 @@ def _request_with_retry(client: httpx.Client, method: str, url: str, **kwargs) -
                 continue
         response.raise_for_status()
         return response
-    return response  # Never reached
+    return response
 
 BASE_URL = "https://consultaprocesos.ramajudicial.gov.co:448/api/v2/Procesos/Consulta"
 BASE_ROOT = BASE_URL.replace("/Procesos/Consulta", "")
@@ -44,103 +76,6 @@ HEADERS = {
 def _cliente():
     return httpx.Client(timeout=TIMEOUT, headers=HEADERS, verify=False)
 
-@dataclass
-class Paginacion:
-    cantidad_registros: int
-    registros_pagina: int
-    cantidad_paginas: int
-    pagina: int
-
-@dataclass
-class Proceso:
-    id_proceso: int
-    numero_radicacion: str
-    despacho: str
-    departamento: str
-    sujetos_procesales: str
-    tipo_proceso: str
-    clase_proceso: str
-    es_privado: Optional[bool]
-    fecha_proceso: Optional[str]
-    fecha_ultima_actuacion: Optional[str]
-
-@dataclass
-class ResultadoBusqueda:
-    procesos: list[Proceso]
-    paginacion: Paginacion
-
-
-@dataclass
-class ResultadoActuaciones:
-    actuaciones: list[Actuacion]
-    paginacion: Paginacion
-
-
-@dataclass
-class DetalleProceso:
-    id_reg_proceso: int
-    llave_proceso: str
-    id_conexion: int
-    es_privado: bool
-    fecha_proceso: Optional[str]
-    cod_despacho_completo: Optional[str]
-    despacho: str
-    ponente: Optional[str]
-    tipo_proceso: Optional[str]
-    clase_proceso: Optional[str]
-    subclase_proceso: Optional[str]
-    recurso: Optional[str]
-    ubicacion: Optional[str]
-    contenido_radicacion: Optional[str]
-    fecha_consulta: Optional[str]
-    ultima_actualizacion: Optional[str]
-
-
-@dataclass
-class DocumentoActuacion:
-    id_reg_documento: int
-    id_conexion: int | None
-    cons_actuacion: int | None
-    guid_documento_sxxiw: str
-    nombre: str
-    descripcion: str | None
-    tipo: str | None
-    fecha_carga: Optional[str]
-
-
-@dataclass
-class Actuacion:
-    id_reg_actuacion: int
-    llave_proceso: str
-    cons_actuacion: int
-    fecha_actuacion: Optional[str]
-    actuacion: str
-    anotacion: str | None
-    fecha_inicial: Optional[str]
-    fecha_final: Optional[str]
-    fecha_registro: Optional[str]
-    cod_regla: str | None
-    con_documentos: bool
-    cant: int | None
-    documentos: list[DocumentoActuacion] = field(default_factory=list)
-
-def _parsear_proceso(raw: dict) -> Proceso:
-    es_privado = raw.get("esPrivado")
-    if isinstance(es_privado, str):
-        es_privado = es_privado.strip().lower() in {"true", "1", "si", "sí"}
-
-    return Proceso(
-        id_proceso=int(raw.get("idProceso") or 0),
-        numero_radicacion=raw.get("llaveProceso", ""),
-        despacho=raw.get("despacho", "").strip(),
-        departamento=raw.get("departamento", ""),
-        sujetos_procesales=raw.get("sujetosProcesales", ""),
-        tipo_proceso=raw.get("tipoProceso", ""),
-        clase_proceso=raw.get("claseProceso", ""),
-        es_privado=es_privado,
-        fecha_proceso=raw.get("fechaProceso"),
-        fecha_ultima_actuacion=raw.get("fechaUltimaActuacion"),
-    )
 
 def buscar_por_nombre(
     nombre: str,
@@ -163,7 +98,7 @@ def buscar_por_nombre(
         print(f"Body: {response.text[:500]}")
         data = response.json()
 
-    procesos = [_parsear_proceso(p) for p in data.get("procesos", [])]
+    procesos = [parsear_proceso(p) for p in data.get("procesos", [])]
     pag = data.get("paginacion", {})
 
     return ResultadoBusqueda(
@@ -177,62 +112,11 @@ def buscar_por_nombre(
     )
 
 
-def _parsear_detalle(raw: dict) -> DetalleProceso:
-    return DetalleProceso(
-        id_reg_proceso=int(raw.get("idRegProceso") or 0),
-        llave_proceso=raw.get("llaveProceso", ""),
-        id_conexion=int(raw.get("idConexion") or 0),
-        es_privado=bool(raw.get("esPrivado")),
-        fecha_proceso=raw.get("fechaProceso"),
-        cod_despacho_completo=raw.get("codDespachoCompleto"),
-        despacho=raw.get("despacho", "").strip(),
-        ponente=raw.get("ponente"),
-        tipo_proceso=raw.get("tipoProceso"),
-        clase_proceso=raw.get("claseProceso"),
-        subclase_proceso=raw.get("subclaseProceso"),
-        recurso=raw.get("recurso"),
-        ubicacion=raw.get("ubicacion"),
-        contenido_radicacion=raw.get("contenidoRadicacion"),
-        fecha_consulta=raw.get("fechaConsulta"),
-        ultima_actualizacion=raw.get("ultimaActualizacion"),
-    )
-
-
-def _parsear_documento(raw: dict) -> DocumentoActuacion:
-    return DocumentoActuacion(
-        id_reg_documento=int(raw.get("idRegDocumento") or 0),
-        id_conexion=raw.get("idConexion"),
-        cons_actuacion=raw.get("consActuacion"),
-        guid_documento_sxxiw=raw.get("guidDocumento_SXXIW", ""),
-        nombre=raw.get("nombre", ""),
-        descripcion=raw.get("descripcion"),
-        tipo=raw.get("tipo"),
-        fecha_carga=raw.get("fechaCarga"),
-    )
-
-
-def _parsear_actuacion(raw: dict) -> Actuacion:
-    return Actuacion(
-        id_reg_actuacion=int(raw.get("idRegActuacion") or 0),
-        llave_proceso=raw.get("llaveProceso", ""),
-        cons_actuacion=int(raw.get("consActuacion") or 0),
-        fecha_actuacion=raw.get("fechaActuacion"),
-        actuacion=raw.get("actuacion", ""),
-        anotacion=raw.get("anotacion"),
-        fecha_inicial=raw.get("fechaInicial"),
-        fecha_final=raw.get("fechaFinal"),
-        fecha_registro=raw.get("fechaRegistro"),
-        cod_regla=raw.get("codRegla"),
-        con_documentos=bool(raw.get("conDocumentos")),
-        cant=raw.get("cant"),
-    )
-
-
 def buscar_detalle_proceso(id_proceso: int) -> DetalleProceso:
     with _cliente() as client:
         response = _request_with_retry(client, "GET", f"{BASE_ROOT}/Proceso/Detalle/{id_proceso}")
         data = response.json()
-    return _parsear_detalle(data)
+    return parsear_detalle(data)
 
 
 def buscar_actuaciones(id_proceso: int, pagina: int = 1) -> ResultadoActuaciones:
@@ -240,7 +124,7 @@ def buscar_actuaciones(id_proceso: int, pagina: int = 1) -> ResultadoActuaciones
         response = _request_with_retry(client, "GET", f"{BASE_ROOT}/Proceso/Actuaciones/{id_proceso}", params={"pagina": pagina})
         data = response.json()
 
-    actuaciones = [_parsear_actuacion(a) for a in data.get("actuaciones", [])]
+    actuaciones = [parsear_actuacion(a) for a in data.get("actuaciones", [])]
     pag = data.get("paginacion", {})
     return ResultadoActuaciones(
         actuaciones=actuaciones,
@@ -258,7 +142,7 @@ def buscar_documentos_actuacion(id_reg_actuacion: int) -> list[DocumentoActuacio
         response = _request_with_retry(client, "GET", f"{BASE_ROOT}/Proceso/DocumentosActuacion/{id_reg_actuacion}")
         data = response.json()
 
-    return [_parsear_documento(d) for d in data]
+    return [parsear_documento(d) for d in data]
 
 
 def descargar_documento(id_reg_documento: int) -> tuple[bytes, str]:
@@ -275,7 +159,7 @@ def descargar_documento(id_reg_documento: int) -> tuple[bytes, str]:
 
 
 def rama_health_check() -> bool:
-    """Verifica rápidamente que Rama Judicial responde. Retorna True si está operativo."""
+    """Verifica rapidamente que Rama Judicial responde. Retorna True si esta operativo."""
     try:
         with _cliente() as client:
             response = client.get(
@@ -301,7 +185,7 @@ def buscar_por_radicado(numero: str, solo_activos: bool = False, pagina: int = 1
         print(f"Body: {response.text[:500]}")
         data = response.json()
 
-    procesos = [_parsear_proceso(p) for p in data.get("procesos", [])]
+    procesos = [parsear_proceso(p) for p in data.get("procesos", [])]
     pag = data.get("paginacion", {})
 
     return ResultadoBusqueda(
