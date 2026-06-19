@@ -273,146 +273,28 @@ def _procesar_radicado(
     errores: list,
     acumuladas: dict,
 ):
-    if not re.fullmatch(r"\d{23}", radicado.llave_proceso or ""):
-        return
+    datos = _fetch_radicado_remoto(radicado)
 
-    try:
-        resultado: ResultadoBusqueda = buscar_por_radicado(radicado.llave_proceso, solo_activos=False)
-    except Exception as exc:
-        msg = f"{type(exc).__name__}: {exc}"
-        logger.warning("No se pudo consultar radicado %s: %s", radicado.llave_proceso, msg)
-        errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "buscar_por_radicado"})
+    if datos["status"] == "ignored":
+        return
+    if datos["status"] == "no_data":
+        return
+    if datos["status"] == "error":
+        errores.append({
+            "radicado": radicado.llave_proceso,
+            "error": datos["error"],
+            "paso": datos.get("paso", "remoto"),
+        })
         radicado.fallos_consecutivos = (radicado.fallos_consecutivos or 0) + 1
-        if "Timeout" in type(exc).__name__:
+        error_msg = datos.get("error", "")
+        if "Timeout" in error_msg:
             time.sleep(10)
-        elif "403" in msg:
-            time.sleep(8)
+        elif "403" in error_msg:
+            sleep_time = 8 if datos.get("paso") == "buscar_por_radicado" else 5
+            time.sleep(sleep_time)
         return
 
-    if not resultado.procesos:
-        return
-
-    resumen = _elegir_mejor_proceso(resultado.procesos)
-
-    try:
-        detalle = buscar_detalle_proceso(resumen.id_proceso)
-    except Exception as exc:
-        msg = f"{type(exc).__name__}: {exc}"
-        logger.warning("No se pudo traer detalle de Rama para %s: %s", radicado.llave_proceso, msg)
-        errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "detalle"})
-        radicado.fallos_consecutivos = (radicado.fallos_consecutivos or 0) + 1
-        if "Timeout" in type(exc).__name__:
-            time.sleep(10)
-        elif "403" in msg:
-            time.sleep(5)
-        return
-
-    resultado_actuaciones = None
-    for act_intento in range(3):
-        try:
-            resultado_actuaciones = buscar_actuaciones(resumen.id_proceso)
-            break
-        except Exception as exc:
-            msg = f"{type(exc).__name__}: {exc}"
-            logger.warning("Intento %d de actuaciones para %s falló: %s", act_intento + 1, radicado.llave_proceso, msg)
-            if act_intento < 2:
-                pausa = 5 * (2 ** act_intento)
-                time.sleep(pausa)
-    if resultado_actuaciones is None:
-        errores.append({"radicado": radicado.llave_proceso, "error": msg, "paso": "actuaciones"})
-        radicado.fallos_consecutivos = (radicado.fallos_consecutivos or 0) + 1
-        return
-
-    previous_latest_id = (
-        db.query(func.max(Actuacion.id_reg_actuacion))
-        .filter(Actuacion.proceso_id == radicado.id)
-        .scalar()
-    )
-    is_initial_sync = previous_latest_id is None
-
-    datos_cambiaron = _actualizar_campos_proceso(radicado, resumen, detalle)
-
-    latest_remote = _latest_actuacion(resultado_actuaciones.actuaciones)
-    if latest_remote is not None:
-        radicado.fecha_ultima_actuacion = _serializar_texto(latest_remote.fecha_actuacion)
-
-    for actuacion_remota in resultado_actuaciones.actuaciones:
-        actuacion_db = _upsert_actuacion(db, radicado, actuacion_remota)
-        if actuacion_remota.con_documentos:
-            try:
-                documentos = buscar_documentos_actuacion(actuacion_remota.id_reg_actuacion)
-            except Exception as exc:
-                logger.warning(
-                    "No se pudieron traer documentos de la actuación %s: %s",
-                    actuacion_remota.id_reg_actuacion,
-                    exc,
-                )
-                documentos = []
-            for documento_remoto in documentos:
-                _upsert_documento(db, actuacion_db, documento_remoto)
-
-    db.flush()
-
-    latest_stored_id = (
-        db.query(func.max(Actuacion.id_reg_actuacion))
-        .filter(Actuacion.proceso_id == radicado.id)
-        .scalar()
-    )
-
-    user_email = radicado.user.email.strip() if radicado.user and radicado.user.email else None
-    telegram_chat_id = radicado.user.telegram_chat_id if radicado.user else None
-    logger.info(
-        "Notificando %s -> email=%s, categoria=%s",
-        radicado.llave_proceso, user_email, radicado.categoria,
-    )
-
-    if is_initial_sync:
-        if latest_remote is not None and _es_reciente(latest_remote.fecha_actuacion):
-            radicado.notificado = False
-            radicado.tipo_novedad = "actualizacion"
-            actualizados.append(radicado.llave_proceso)
-            if user_email:
-                acumuladas.setdefault(user_email, []).append({
-                    "llave_proceso": radicado.llave_proceso,
-                    "despacho": radicado.despacho or "",
-                    "departamento": radicado.departamento or "",
-                    "fecha_ultima_actuacion": radicado.fecha_ultima_actuacion,
-                    "sujetos_procesales": radicado.sujetos_procesales or "",
-                    "actuacion": latest_remote.actuacion,
-                    "anotacion": latest_remote.anotacion,
-                    "fecha_registro": latest_remote.fecha_registro,
-                    "con_documentos": latest_remote.con_documentos,
-                    "categoria": radicado.categoria,
-                    "telegram_chat_id": telegram_chat_id,
-                })
-        else:
-            radicado.notificado = True
-            nuevos.append(radicado.llave_proceso)
-    elif latest_remote is not None and latest_stored_id != previous_latest_id:
-        radicado.notificado = False
-        radicado.tipo_novedad = "actualizacion"
-        actualizados.append(radicado.llave_proceso)
-        if user_email:
-            acumuladas.setdefault(user_email, []).append({
-                "llave_proceso": radicado.llave_proceso,
-                "despacho": radicado.despacho or "",
-                "departamento": radicado.departamento or "",
-                "fecha_ultima_actuacion": radicado.fecha_ultima_actuacion,
-                "sujetos_procesales": radicado.sujetos_procesales or "",
-                "actuacion": latest_remote.actuacion,
-                "anotacion": latest_remote.anotacion,
-                "fecha_registro": latest_remote.fecha_registro,
-                "con_documentos": latest_remote.con_documentos,
-                "categoria": radicado.categoria,
-                "telegram_chat_id": telegram_chat_id,
-            })
-
-    radicado.ultima_sincronizacion = datetime.utcnow()
-    radicado.dias_sin_cambios = _calcular_dias_sin_cambios(radicado.fecha_ultima_actuacion)
-    radicado.fallos_consecutivos = 0
-
-    if datos_cambiaron or latest_remote is not None or is_initial_sync:
-        db.commit()
+    _aplicar_datos_remotos(db, radicado, datos, nuevos, actualizados, emails_enviados, errores, acumuladas)
 
 
 def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list):
