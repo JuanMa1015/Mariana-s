@@ -1,0 +1,82 @@
+import logging
+
+import httpx
+
+from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+
+logger = logging.getLogger(__name__)
+
+API_BASE = "https://api.telegram.org/bot"
+
+
+def _mensaje_texto(
+    llave_proceso: str,
+    despacho: str,
+    departamento: str,
+    fecha_ultima_actuacion: str | None,
+    actuacion: str | None = None,
+    anotacion: str | None = None,
+    categoria: str | None = None,
+) -> str:
+    return (
+        f"📋 *Novedad judicial*\n"
+        f"┌─────────────────────\n"
+        f"│ Radicado: `{llave_proceso}`\n"
+        f"│ Categoría: {categoria or 'General'}\n"
+        f"│ Despacho: {despacho or '—'}\n"
+        f"│ Departamento: {departamento or '—'}\n"
+        f"│ Última act.: {fecha_ultima_actuacion or 'N/D'}\n"
+        f"│\n"
+        f"│ *Actuación:* {actuacion or 'N/D'}\n"
+        f"│ *Anotación:* {anotacion or 'N/D'}\n"
+        f"└─────────────────────"
+    )
+
+
+def notificar_telegram(
+    llave_proceso: str,
+    despacho: str,
+    departamento: str,
+    fecha_ultima_actuacion: str | None,
+    sujetos_procesales: str = "",
+    actuacion: str | None = None,
+    anotacion: str | None = None,
+    fecha_registro: str | None = None,
+    con_documentos: bool | None = None,
+    categoria: str | None = None,
+    custom_mensaje: str | None = None,
+) -> bool:
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        logger.info("Telegram no configurado (falta TELEGRAM_BOT_TOKEN o TELEGRAM_CHAT_ID)")
+        return False
+
+    texto = custom_mensaje or _mensaje_texto(
+        llave_proceso=llave_proceso,
+        despacho=despacho,
+        departamento=departamento,
+        fecha_ultima_actuacion=fecha_ultima_actuacion,
+        actuacion=actuacion,
+        anotacion=anotacion,
+        categoria=categoria,
+    )
+
+    url = f"{API_BASE}{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": texto,
+        "parse_mode": "Markdown",
+        "disable_web_page_preview": True,
+    }
+
+    try:
+        with httpx.Client(timeout=15) as client:
+            response = client.post(url, json=payload)
+            ok = response.status_code == 200
+            if ok:
+                logger.info("Telegram -> chat %s | ok", TELEGRAM_CHAT_ID)
+            else:
+                logger.warning("Telegram falló: %s | %s", response.status_code, response.text[:200])
+            return ok
+    except Exception as exc:
+        logger.error("Telegram error: %s", exc)
+        return False

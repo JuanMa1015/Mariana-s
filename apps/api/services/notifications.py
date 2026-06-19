@@ -150,4 +150,20 @@ def notificar_cambio_radicado(
         if not exito and SMTP_HOST:
             exito = _enviar_smtp(default_destinatarios, asunto, cuerpo_html, cuerpo_texto)
 
+    # Telegram como canal secundario (independiente del email)
+    from services.telegram import notificar_telegram
+    try:
+        notificar_telegram(
+            llave_proceso=llave_proceso,
+            despacho=despacho,
+            departamento=departamento,
+            fecha_ultima_actuacion=fecha_ultima_actuacion,
+            sujetos_procesales=sujetos_procesales,
+            actuacion=actuacion,
+            anotacion=anotacion,
+            categoria=categoria,
+        )
+    except Exception as exc:
+        logger.error("Telegram falló en notificar_cambio_radicado: %s", exc)
+
     return exito

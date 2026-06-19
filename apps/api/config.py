@@ -27,3 +27,7 @@ APP_URL = os.getenv("APP_URL", "https://marianas.vercel.app")
 
 # SendGrid (alternativa a SMTP directo)
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
+
+# Telegram Bot (notificaciones alternativas)
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
