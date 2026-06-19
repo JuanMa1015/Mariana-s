@@ -1,6 +1,6 @@
 import logging
 import time as _time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from fastapi.responses import JSONResponse
@@ -407,7 +407,7 @@ def obtener_proceso_publico(llave_proceso: str):
 
 def _sincronizar_radicado_actuaciones(db, proceso):
     # Skip if synced within last 30 minutes
-    if proceso.ultima_sincronizacion and (datetime.utcnow() - proceso.ultima_sincronizacion).total_seconds() < 1800:
+    if proceso.ultima_sincronizacion and (datetime.now(timezone.utc).replace(tzinfo=None) - proceso.ultima_sincronizacion).total_seconds() < 1800:
         return
 
     try:
@@ -421,9 +421,9 @@ def _sincronizar_radicado_actuaciones(db, proceso):
                     ultima_fecha = a.fecha_actuacion
             if ultima_fecha:
                 proceso.fecha_ultima_actuacion = ultima_fecha
-                dias_sin = (datetime.utcnow().date() - datetime.strptime(ultima_fecha[:10], "%Y-%m-%d").date()).days
+                dias_sin = (datetime.now(timezone.utc).replace(tzinfo=None).date() - datetime.strptime(ultima_fecha[:10], "%Y-%m-%d").date()).days
                 proceso.dias_sin_cambios = max(0, dias_sin)
-        proceso.ultima_sincronizacion = datetime.utcnow()
+        proceso.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None)
         db.commit()
     except Exception as exc:
         logger.warning("Sync falló para %s: %s", proceso.llave_proceso, exc)
