@@ -32,7 +32,7 @@ const DETALLE_MOCK = {
       fecha_registro: "2026-06-15T10:00:00Z",
       con_documentos: true,
       documentos: [
-        { id_reg_documento: 1, nombre: "auto.pdf", descripcion: "Auto", fecha_carga: "2026-06-15T10:00:00Z" },
+        { id_reg_documento: 1, nombre: "auto.pdf", descripcion: "Auto", fecha_carga: "2026-06-15T10:00:00Z", guid_documento_sxxiw: "guid-1" },
       ],
     },
     {
