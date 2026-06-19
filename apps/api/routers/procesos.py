@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from models.database import get_db
 from models.actuacion import Actuacion
 from models.proceso import Proceso
-from services.sync import sincronizar_radicados, sincronizar_radicados_lote, _elegir_usuario_para_sync
+from services.sync import sincronizar_radicados, sincronizar_radicados_lote
 from services.sync_manager import iniciar_sync_global, obtener_resultado
 from fastapi.responses import StreamingResponse
 from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones, descargar_documento, rama_health_check
@@ -134,11 +134,7 @@ def sync_lote(current_user: Optional[User] = Depends(_auth_for_sync), db: Sessio
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="API_TOKEN no configurado")
     if not rama_health_check():
         return {"mensaje": "Rama Judicial no responde, se omite sync", "total_consultados": 0}
-    user_id = _elegir_usuario_para_sync(db)
-    if user_id is None:
-        return {"mensaje": "No hay usuarios con radicados", "total_consultados": 0}
-    resultado = sincronizar_radicados_lote(db, lote=25, user_id=user_id)
-    resultado["usuario_sincronizado"] = user_id
+    resultado = sincronizar_radicados_lote(db, lote=25)
     return resultado
 
 

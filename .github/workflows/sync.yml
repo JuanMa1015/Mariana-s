@@ -54,7 +54,6 @@ jobs:
           fi
 
           echo ""
-          echo "Usuario:     $(echo "$BODY" | jq -r '.usuario_sincronizado // "?"')"
           echo "Consultados: $(echo "$BODY" | jq -r '.total_consultados // 0')"
           echo "Nuevos:      $(echo "$BODY" | jq -r '.nuevos // 0')"
           echo "Actualizados:$(echo "$BODY" | jq -r '.actualizados // 0')"
