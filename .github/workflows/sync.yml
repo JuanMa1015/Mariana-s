@@ -55,6 +55,7 @@ jobs:
 
           echo ""
           echo "Consultados: $(echo "$BODY" | jq -r '.total_consultados // 0')"
+          echo "Usuarios:   $(echo "$BODY" | jq -r '.usuarios_afectados // 0')"
           echo "Privados:   $(echo "$BODY" | jq -r '.radicados_privados | length')"
           echo "Nuevos:      $(echo "$BODY" | jq -r '.nuevos // 0')"
           echo "Actualizados:$(echo "$BODY" | jq -r '.actualizados // 0')"
