@@ -416,27 +416,8 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
     for email, notifs in acumuladas.items():
         destinatarios = [email]
         if len(notifs) > 3:
-            lines = []
-            for n in notifs:
-                lines.append(
-                    f"  Radicado:     {n['llave_proceso']}\n"
-                    f"  Categoría:    {n['categoria'] or 'General'}\n"
-                    f"  Despacho:     {n['despacho']}\n"
-                    f"  Departamento: {n['departamento']}\n"
-                    f"  Última act.:  {n['fecha_ultima_actuacion'] or 'N/D'}\n"
-                    f"  Actuación:    {n['actuacion'] or 'N/D'}\n"
-                    f"  Anotación:    {n['anotacion'] or 'N/D'}\n"
-                    f"  Fecha registro: {n['fecha_registro'] or 'N/D'}\n"
-                    f"  Documentos:   {'Sí' if n['con_documentos'] else 'No'}\n"
-                    f"  {'─' * 40}\n"
-                )
-            cuerpo = (
-                f"MARIANA'S — Monitor Judicial\n\n"
-                f"Resumen de {len(notifs)} novedades detectadas:\n\n"
-                + "\n".join(lines) +
-                f"\nVer en Mariana's: {APP_URL}\n"
-            )
-            asunto = f"[{len(notifs)} novedades] Resumen de actualizaciones judiciales"
+            from services.email_templates import template_resumen
+            asunto, cuerpo_html = template_resumen(notifs)
             ok = notificar_cambio_radicado(
                 llave_proceso="resumen",
                 despacho="",
@@ -449,7 +430,7 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                 con_documentos=None,
                 destinatarios=destinatarios,
                 custom_asunto=asunto,
-                custom_cuerpo=cuerpo,
+                custom_cuerpo=cuerpo_html,
             )
             if ok:
                 emails_enviados.append(f"resumen_{email}")
