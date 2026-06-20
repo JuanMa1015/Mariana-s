@@ -1,8 +1,9 @@
 import { it, expect, vi } from 'vitest'
+import React from 'react'
 import { render, screen } from '@testing-library/react'
 import ErrorBoundary from './ErrorBoundary'
 
-function Bomba() {
+function Bomba(): React.ReactNode {
   throw new Error("Algo explotó")
 }
 
