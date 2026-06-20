@@ -16,19 +16,17 @@ const mockPostAddRadicado = vi.fn()
 const mockGetProceso = vi.fn()
 
 vi.mock('./api', () => ({
-  getProcesos: (...args: any[]) => mockGetProcesos(...args),
-  getNovedades: (...args: any[]) => mockGetNovedades(...args),
-  postSync: (...args: any[]) => mockPostSync(...args),
-  postAddRadicado: (...args: any[]) => mockPostAddRadicado(...args),
-  getProceso: (...args: any[]) => mockGetProceso(...args),
-}))
+  getProcesos: mockGetProcesos,
+  getNovedades: mockGetNovedades,
+  postSync: mockPostSync,
+  postAddRadicado: mockPostAddRadicado,
+  getProceso: mockGetProceso,
+}) as any)
 
-const mockToast = { loading: vi.fn(() => 'toast-id'), success: vi.fn(), error: vi.fn() }
-vi.mock('react-hot-toast', () => ({
-  default: { loading: (...a: any[]) => mockToast.loading(...a), success: (...a: any[]) => mockToast.success(...a), error: (...a: any[]) => mockToast.error(...a) },
-}))
+const toastImpl = { loading: vi.fn(() => 'toast-id'), success: vi.fn(), error: vi.fn() }
+vi.mock('react-hot-toast', () => ({ default: toastImpl }))
 
-vi.mock('./api/cache', () => ({ getCache: vi.fn(() => null), setCache: vi.fn(), removeCache: vi.fn() }))
+vi.mock('./api/cache', () => ({ getCache: (() => null) as any, setCache: (() => {}) as any, removeCache: (() => {}) as any }))
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -45,6 +43,6 @@ it("debe mostrar toast generico cuando sync falla", async () => {
   await userEvent.click(btn)
 
   await vi.waitFor(() => {
-    expect(mockToast.error).toHaveBeenCalledWith("Error al sincronizar. Intenta de nuevo.", expect.any(Object))
+    expect(toastImpl.error).toHaveBeenCalledWith("Error al sincronizar. Intenta de nuevo.", expect.any(Object))
   })
 })
