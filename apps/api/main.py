@@ -1,6 +1,6 @@
 import logging
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.middleware import SlowAPIMiddleware
@@ -12,7 +12,9 @@ from services.keepalive import Keepalive
 from services.logging_config import configurar_logging, set_request_id, get_request_id
 from routers.procesos import router as procesos_router
 from routers.auth import router as auth_router
-from config import SENTRY_DSN
+from config import SENTRY_DSN, API_TOKEN
+from services.auth import get_current_user
+from models.user import User
 
 if SENTRY_DSN:
     import sentry_sdk
@@ -128,8 +130,13 @@ def health():
     }
 
 
+def _debug_auth(current_user: User = Depends(get_current_user)):
+    if not API_TOKEN:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="API_TOKEN no configurado")
+
+
 @app.get("/test-notificacion")
-def test_notificacion(llave_proceso: str = ""):
+def test_notificacion(_: None = Depends(_debug_auth), llave_proceso: str = ""):
     from models.database import SessionLocal
     from models.actuacion import Actuacion
     from models.proceso import Proceso
@@ -168,7 +175,7 @@ def test_notificacion(llave_proceso: str = ""):
 
 
 @app.get("/marcar-leido")
-def marcar_leido(llave_proceso: str):
+def marcar_leido(llave_proceso: str, _: None = Depends(_debug_auth)):
     from models.database import SessionLocal
     from models.proceso import Proceso
 
@@ -185,7 +192,7 @@ def marcar_leido(llave_proceso: str):
 
 
 @app.get("/resetear-radicado")
-def resetear_radicado(llave_proceso: str):
+def resetear_radicado(llave_proceso: str, _: None = Depends(_debug_auth)):
     from models.database import SessionLocal
     from models.actuacion import Actuacion
     from models.documento_actuacion import DocumentoActuacion
@@ -211,7 +218,7 @@ def resetear_radicado(llave_proceso: str):
 
 
 @app.post("/resetear-todos")
-def resetear_todos():
+def resetear_todos(_: None = Depends(_debug_auth)):
     from models.database import SessionLocal
     from models.actuacion import Actuacion
     from models.documento_actuacion import DocumentoActuacion
@@ -246,7 +253,7 @@ def resetear_todos():
 
 
 @app.get("/test-email")
-def test_email():
+def test_email(_: None = Depends(_debug_auth)):
     from config import EMAIL_TO as CFG_EMAIL_TO, SENDGRID_API_KEY, SMTP_HOST
     from services.notifications import _enviar_smtp, _enviar_sendgrid
 
