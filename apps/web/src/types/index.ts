@@ -67,6 +67,7 @@ export interface ResultadoSync {
   total_consultados: number
   nuevos: number
   actualizados: number
+  radicados_error_consulta?: { radicado: string; error: string }[]
 }
 
 export interface DetalleProceso extends Proceso {

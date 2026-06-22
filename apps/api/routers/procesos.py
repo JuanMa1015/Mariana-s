@@ -13,6 +13,7 @@ from services.sync import sincronizar_radicados, sincronizar_radicados_lote
 from fastapi.responses import StreamingResponse
 from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones, descargar_documento, rama_health_check
 from services.auth import get_current_user, oauth2_scheme
+from services.limiter import limiter
 from config import API_TOKEN
 from typing import Optional
 from pydantic import BaseModel, constr
@@ -129,7 +130,8 @@ class AddRadicado(BaseModel):
 
 
 @router.post("/add")
-def add_radicado(payload: AddRadicado, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@limiter.limit("10/minute")
+def add_radicado(request: Request, payload: AddRadicado, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     existente = db.query(Proceso).filter(Proceso.llave_proceso == payload.llave_proceso, Proceso.user_id == current_user.id).first()
     if existente:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Radicado ya existe")
@@ -599,3 +601,12 @@ def _check_rama_con_alerta() -> bool:
                 ),
             )
     return False
+
+
+@router.post("/marcar-todo-leido")
+def marcar_todo_leido(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    count = db.query(Proceso).filter(Proceso.notificado == False, Proceso.user_id == current_user.id).update(
+        {Proceso.notificado: True}, synchronize_session=False
+    )
+    db.commit()
+    return {"ok": True, "marcados": count}
