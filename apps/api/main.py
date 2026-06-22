@@ -286,30 +286,3 @@ def test_email(_: None = Depends(_debug_auth)):
 
 app.include_router(auth_router)
 app.include_router(procesos_router)
-
-
-@app.get("/admin/telegram-messages")
-def telegram_messages(_: None = Depends(_debug_auth)):
-    import httpx
-    from config import TELEGRAM_BOT_TOKEN
-
-    if not TELEGRAM_BOT_TOKEN:
-        return {"error": "TELEGRAM_BOT_TOKEN no configurado"}
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
-    resp = httpx.get(url, timeout=10)
-    data = resp.json()
-    if not data.get("ok") or not data.get("result"):
-        return {"mensajes": []}
-    vistos = set()
-    mensajes = []
-    for update in data["result"]:
-        msg = update.get("message", {})
-        chat = msg.get("chat", {})
-        chat_id = chat.get("id")
-        first_name = chat.get("first_name", "")
-        username = chat.get("username", "")
-        text = msg.get("text", "")
-        if chat_id and chat_id not in vistos:
-            vistos.add(chat_id)
-            mensajes.append({"chat_id": chat_id, "nombre": first_name, "user": username, "mensaje": text})
-    return {"mensajes": mensajes}
