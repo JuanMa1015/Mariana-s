@@ -7,6 +7,8 @@ on:
       - "apps/api/**"
       - "apps/web/**"
       - "infra/docker/**"
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -35,6 +37,7 @@ jobs:
         run: pytest -v --no-header --tb=short --cov=. --cov-report=term-missing
 
   api:
+    if: github.event_name == 'push'
     needs: [test]
     runs-on: ubuntu-latest
     permissions:
@@ -83,6 +86,7 @@ jobs:
         run: npx vitest run --reporter=verbose
 
   web:
+    if: github.event_name == 'push'
     needs: [test-web]
     runs-on: ubuntu-latest
     permissions:
