@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
-import { getNovedadesDetalle } from "../api"
+import { getNovedadesDetalle, marcarTodoLeido } from "../api"
+import toast from "react-hot-toast"
 import type { NovedadesDetalle, Actuacion } from "../types"
 import { useNavigate } from "react-router-dom"
 
@@ -130,6 +131,7 @@ export default function NovedadesPage() {
   const [data, setData] = useState<NovedadesDetalle | null>(null)
   const [loading, setLoading] = useState(true)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [marcando, setMarcando] = useState(false)
   const [skip, setSkip] = useState(0)
 
   const limit = 25
@@ -143,6 +145,21 @@ export default function NovedadesPage() {
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / limit)) : 1
   const currentPage = Math.floor(skip / limit) + 1
+
+  const handleMarcarTodo = async () => {
+    setMarcando(true)
+    try {
+      const res = await marcarTodoLeido()
+      toast.success(`${res.marcados} proceso${res.marcados !== 1 ? "s" : ""} marcado${res.marcados !== 1 ? "s" : ""} como leido${res.marcados !== 1 ? "s" : ""}`)
+      setSkip(0)
+      setExpanded(new Set())
+      getNovedadesDetalle(0, limit).then(setData)
+    } catch {
+      toast.error("Error al marcar como leido")
+    } finally {
+      setMarcando(false)
+    }
+  }
 
   const toggleExpand = (llave: string) => {
     setExpanded((prev) => {
@@ -195,6 +212,13 @@ export default function NovedadesPage() {
                 {data.total} proceso{data.total > 1 ? "s" : ""} con novedades
               </p>
               <div className="flex items-center gap-2">
+                <button
+                  onClick={handleMarcarTodo}
+                  disabled={marcando}
+                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40"
+                >
+                  {marcando ? "Marcando..." : "Marcar todo como leido"}
+                </button>
                 <button
                   onClick={() => setSkip((s) => Math.max(0, s - limit))}
                   disabled={skip === 0}

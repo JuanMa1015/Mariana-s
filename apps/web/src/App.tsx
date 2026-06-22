@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync } from "./api"
 import { getCache, setCache, removeCache } from "./api/cache"
 import toast from "react-hot-toast"
+import * as Sentry from "@sentry/react"
 import type { DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync } from "./types"
 import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
@@ -23,6 +24,23 @@ const FRASES: string[] = [
   "El derecho es la arquitectura de la convivencia social. — Anónimo",
   "Lo importante no es ganar el caso, es hacer justicia. — Anónimo",
   "Estudiar derecho es aprender a construir un mundo más justo. — Anónimo",
+  "La UdeA no te da un título, te da una herramienta para cambiar el país. — Anónimo",
+  "El mejor abogado no es el que más leyes sabe, sino el que más entiende a las personas. — Anónimo",
+  "Los procesos se ganan en los detalles. — Anónimo",
+  "La verdad no necesita abogado, pero agradece tener uno bueno. — Anónimo",
+  "La justicia sin fuerza es impotente; la fuerza sin justicia es tiranía. — Pascal",
+  "Un abogado es un poeta del deber. — Anónimo",
+  "La ley debe ser como la muerte, que no exceptúa a nadie. — Montesquieu",
+  "En la UdeA aprendí que el derecho sirve para algo más que para ganar plata. — Anónimo",
+  "La duda es el principio de la sabiduría jurídica. — Anónimo",
+  "Un caso difícil no se gana en el juzgado, se gana en la preparación. — Anónimo",
+  "El derecho penal es el derecho del miedo; el derecho civil es el derecho de la confianza. — Anónimo",
+  "Estudiar en la UdeA es entender que Colombia necesita abogados con conciencia social. — Anónimo",
+  "El que no conoce sus derechos, no puede exigirlos. — Anónimo",
+  "La abogacía no es una carrera para hacerse rico, es una carrera para hacerse útil. — Anónimo",
+  "La justicia es el pan de los pueblos. — Anónimo",
+  "Un abogado sin ética es un ladrón con toga. — Anónimo",
+  "El derecho nace del conflicto, pero busca la paz. — Anónimo",
 ]
 
 export default function App() {
@@ -148,6 +166,7 @@ export default function App() {
       removeCache("novedades")
       await cargarLista(true)
     } catch (err: any) {
+      Sentry.captureException(err)
       toast.error("Error al sincronizar. Intenta de nuevo.", { id: loadingToast })
     } finally {
       setSyncing(false)
@@ -238,10 +257,18 @@ export default function App() {
           <>
         {syncResult && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
-            <span className="font-semibold">Sincronización completada:</span>{' '}
+            <span className="font-semibold">Sincronizacion completada:</span>{' '}
             {syncResult.nuevos} nuevo{syncResult.nuevos !== 1 ? "s" : ""},{" "}
             {syncResult.actualizados} actualizado{syncResult.actualizados !== 1 ? "s" : ""},{" "}
             {syncResult.total_consultados} consultado{syncResult.total_consultados !== 1 ? "s" : ""}
+            {syncResult.radicados_error_consulta ? (
+              <>
+                <span className="mx-2 inline-block h-3 w-px bg-emerald-300" />
+                <span className="text-rose-600">
+                  {syncResult.radicados_error_consulta.length} error{syncResult.radicados_error_consulta.length !== 1 ? "es" : ""}
+                </span>
+              </>
+            ) : null}
           </div>
         )}
         <section className="grid gap-3 md:grid-cols-4">
@@ -303,6 +330,7 @@ export default function App() {
                     toast.error(res.detail || res.message || 'Error al agregar', { id: loadingToast })
                   }
                 } catch (err: any) {
+                  Sentry.captureException(err)
                   toast.error(err.message, { id: loadingToast })
                 }
               }}
@@ -351,14 +379,15 @@ export default function App() {
 
           <div className="min-h-0 flex-1 border-t border-violet-50">
             {loadingLista ? (
-              <div className="flex h-full items-center justify-center py-16">
-                <div className="flex flex-col items-center gap-3 text-slate-400">
-                  <svg className="h-8 w-8 animate-spin text-violet-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  <p className="text-sm font-medium">Cargando procesos...</p>
-                </div>
+              <div className="flex flex-col gap-2 px-1">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 rounded-2xl border border-violet-100 bg-white px-4 py-3">
+                    <div className="h-3 w-3 shrink-0 animate-pulse rounded-full bg-violet-200" />
+                    <div className="h-3 w-[18ch] animate-pulse rounded bg-violet-100" />
+                    <div className="ml-auto h-3 w-[10ch] animate-pulse rounded bg-violet-100" />
+                    <div className="h-6 w-6 shrink-0 animate-pulse rounded-full bg-violet-100" />
+                  </div>
+                ))}
               </div>
             ) : procesos ? (
               <TablaProcesos procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista(true) }} />

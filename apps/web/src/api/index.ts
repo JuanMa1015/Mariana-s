@@ -133,3 +133,8 @@ export async function updateProceso(llaveProceso: string, payload: Partial<{ lla
   if (!res.ok) throw new Error((await res.json()).detail || "Update failed")
   return res.json()
 }
+
+export async function marcarTodoLeido() {
+  const res = await fetchWithAuth(`${BASE_URL}/procesos/marcar-todo-leido`, { method: "POST" })
+  return res.json()
+}
