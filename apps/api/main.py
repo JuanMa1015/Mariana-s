@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 from slowapi.middleware import SlowAPIMiddleware
 from services.limiter import limiter
 from slowapi.errors import RateLimitExceeded
@@ -286,3 +287,52 @@ def test_email(_: None = Depends(_debug_auth)):
 
 app.include_router(auth_router)
 app.include_router(procesos_router)
+
+
+@app.get("/admin/telegram-listar")
+def admin_telegram_listar(_: None = Depends(_debug_auth)):
+    import httpx
+    from config import TELEGRAM_BOT_TOKEN
+
+    if not TELEGRAM_BOT_TOKEN:
+        return {"error": "TELEGRAM_BOT_TOKEN no configurado"}
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
+    resp = httpx.get(url, timeout=10)
+    data = resp.json()
+    if not data.get("ok") or not data.get("result"):
+        return {"usuarios": []}
+    vistos = set()
+    usuarios = []
+    for update in data["result"]:
+        msg = update.get("message", {})
+        chat = msg.get("chat", {})
+        chat_id = chat.get("id")
+        first_name = chat.get("first_name", "")
+        username = chat.get("username", "")
+        text = msg.get("text", "")
+        if chat_id and chat_id not in vistos:
+            vistos.add(chat_id)
+            usuarios.append({"chat_id": chat_id, "nombre": first_name, "user": username or "", "ultimo_mensaje": text or ""})
+    return {"usuarios": usuarios}
+
+
+class VincularTelegramPayload(BaseModel):
+    chat_id: str
+    email: str
+
+
+@app.post("/admin/telegram-vincular")
+def admin_telegram_vincular(payload: VincularTelegramPayload, _: None = Depends(_debug_auth)):
+    from models.database import SessionLocal
+    from models.user import User
+
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == payload.email).first()
+        if not user:
+            return {"ok": False, "error": "Usuario no encontrado"}
+        user.telegram_chat_id = payload.chat_id
+        db.commit()
+        return {"ok": True, "chat_id": payload.chat_id, "email": payload.email}
+    finally:
+        db.close()
