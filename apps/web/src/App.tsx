@@ -7,6 +7,8 @@ import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
 import { useNavigate } from "react-router-dom"
 
+const API = import.meta.env.VITE_API_URL || "http://localhost:8000"
+
 const FRASES: string[] = [
   "La justicia es la constante y perpetua voluntad de dar a cada uno su derecho. — Ulpiano",
   "El derecho es el conjunto de condiciones que permiten a la libertad de cada uno acomodarse a la libertad de todos. — Kant",
@@ -49,6 +51,15 @@ export default function App() {
   const [filtroCategoria, setFiltroCategoria] = useState("")
   const [busqueda, setBusqueda] = useState("")
   const [apiOffline, setApiOffline] = useState(false)
+  const [telegramMsgs, setTelegramMsgs] = useState<any>(null)
+
+  const verTelegram = async () => {
+    try {
+      const token = localStorage.getItem("token")
+      const res = await fetch(`${API}/admin/telegram-messages`, { headers: { Authorization: `Bearer ${token}` } })
+      setTelegramMsgs(await res.json())
+    } catch { setTelegramMsgs({ error: "Error al consultar" }) }
+  }
 
   useEffect(() => {
     const check = () => {
@@ -200,9 +211,16 @@ export default function App() {
             </a>
             <button
               onClick={handleLogout}
-              className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 sm:px-4 sm:py-2 sm:text-sm"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 sm:px-4 sm:py-2 sm:text-sm"
             >
-              Cerrar sesión
+              Salir
+            </button>
+            <button
+              onClick={verTelegram}
+              className="inline-flex items-center gap-1 rounded-full border border-telegram bg-sky-100 px-2 py-1 text-[10px] font-semibold text-sky-700 transition hover:bg-sky-200 sm:px-3 sm:py-1.5 sm:text-xs"
+              title="Ver mensajes de Telegram"
+            >
+              📩 TG
             </button>
           </div>
         </div>
@@ -242,6 +260,23 @@ export default function App() {
             {syncResult.nuevos} nuevo{syncResult.nuevos !== 1 ? "s" : ""},{" "}
             {syncResult.actualizados} actualizado{syncResult.actualizados !== 1 ? "s" : ""},{" "}
             {syncResult.total_consultados} consultado{syncResult.total_consultados !== 1 ? "s" : ""}
+          </div>
+        )}
+        {telegramMsgs && (
+          <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold">Mensajes de Telegram:</span>
+              <button onClick={() => setTelegramMsgs(null)} className="text-xs text-sky-500 hover:text-sky-700">Cerrar</button>
+            </div>
+            {telegramMsgs.mensajes?.length === 0 ? <p>Sin mensajes.</p> :
+              telegramMsgs.mensajes?.map((m: any, i: number) => (
+                <div key={i} className="border-t border-sky-100 py-2 first:border-t-0">
+                  <p><strong>{m.nombre}</strong> {m.user ? `(@${m.user})` : ""} — <code className="text-[10px]">{m.chat_id}</code></p>
+                  <p className="text-sky-700">{m.mensaje}</p>
+                </div>
+              ))
+            }
+            {telegramMsgs.error && <p className="text-rose-600">{telegramMsgs.error}</p>}
           </div>
         )}
         <section className="grid gap-3 md:grid-cols-4">
