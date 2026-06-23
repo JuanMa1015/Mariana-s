@@ -290,12 +290,19 @@ app.include_router(procesos_router)
 
 
 @app.get("/admin/telegram-listar")
-def admin_telegram_listar(_: None = Depends(_debug_auth)):
+def admin_telegram_listar(_: None = Depends(_debug_auth), test: str = ""):
     import httpx
     from config import TELEGRAM_BOT_TOKEN
 
     if not TELEGRAM_BOT_TOKEN:
         return {"error": "TELEGRAM_BOT_TOKEN no configurado"}
+
+    if test:
+        texto = "ESTO ES UNA PRUEBA - SAPA. No es un cambio real en tus radicados. Si recibes esto, significa que las notificaciones por Telegram te estan llegando correctamente."
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        resp = httpx.post(url, json={"chat_id": int(test), "text": texto}, timeout=10)
+        return {"ok": resp.json().get("ok", False), "chat_id": int(test)}
+
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
     resp = httpx.get(url, timeout=10)
     data = resp.json()
@@ -319,21 +326,6 @@ def admin_telegram_listar(_: None = Depends(_debug_auth)):
 class VincularTelegramPayload(BaseModel):
     chat_id: str
     email: str
-
-
-@app.get("/admin/telegram-test")
-def admin_telegram_test(_: None = Depends(_debug_auth)):
-    import httpx
-    from config import TELEGRAM_BOT_TOKEN
-
-    if not TELEGRAM_BOT_TOKEN:
-        return {"error": "TELEGRAM_BOT_TOKEN no configurado"}
-    chat_id = "6344426955"
-    texto = "ESTO ES UNA PRUEBA - SAPA. No es un cambio real en tus radicados. Si recibes esto, significa que las notificaciones por Telegram te estan llegando correctamente."
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    resp = httpx.post(url, json={"chat_id": int(chat_id), "text": texto}, timeout=10)
-    data = resp.json()
-    return {"ok": data.get("ok", False), "chat_id": chat_id, "respuesta": data}
 
 
 @app.post("/admin/telegram-vincular")
