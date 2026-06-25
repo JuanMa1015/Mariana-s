@@ -78,6 +78,7 @@ def notificar_cambio_radicado(
     custom_asunto: str | None = None,
     custom_cuerpo: str | None = None,
     telegram_chat_id: str | None = None,
+    actuaciones: list[dict] | None = None,
 ) -> bool:
     if not destinatarios:
         destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
@@ -105,23 +106,28 @@ def notificar_cambio_radicado(
             fecha_registro=fecha_registro,
             con_documentos=con_documentos,
             categoria=categoria,
+            actuaciones=actuaciones,
         )
         partes_sujetos = [p.strip() for p in (sujetos_procesales or "").split("|") if p.strip()]
         sujetos_texto = "\n".join(f"  {p}" for p in partes_sujetos) or "  Sin informacion"
         link_rama = f"https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion?numero={llave_proceso}"
+        if actuaciones:
+            lines = []
+            for act in actuaciones:
+                lines.append(f"  - {act.get('fecha_actuacion','N/D')[:10]}: {act.get('actuacion','N/D')}")
+            actuaciones_texto = "\n".join(lines)
+        else:
+            actuaciones_texto = f"  Actuacion: {actuacion or 'N/D'}\n  Anotacion: {anotacion or 'N/D'}\n  Fecha registro: {fecha_registro or 'N/D'}\n  Documentos: {'Si' if con_documentos else 'No'}"
         cuerpo_texto = (
             f"MARIANA'S — Monitor Judicial\n\n"
-            f"Se detectó una nueva actuación en el proceso:\n\n"
+            f"Se detectaron nuevas actuaciones en el proceso:\n\n"
             f"  Radicado:     {llave_proceso}\n"
-            f"  Categoría:    {categoria or 'General'}\n"
+            f"  Categoria:    {categoria or 'General'}\n"
             f"  Despacho:     {despacho}\n"
             f"  Departamento: {departamento}\n"
-            f"  Última act.:  {fecha_ultima_actuacion or 'N/D'}\n\n"
-            f"Nueva actuación:\n"
-            f"  Actuación:    {actuacion or 'N/D'}\n"
-            f"  Anotación:    {anotacion or 'N/D'}\n"
-            f"  Fecha registro: {fecha_registro or 'N/D'}\n"
-            f"  Documentos:   {'Sí' if con_documentos else 'No'}\n\n"
+            f"  Ultima act.:  {fecha_ultima_actuacion or 'N/D'}\n\n"
+            f"Nuevas actuaciones:\n"
+            f"{actuaciones_texto}\n\n"
             f"Sujetos procesales:\n"
             f"{sujetos_texto}\n"
             f"\n"
@@ -164,6 +170,7 @@ def notificar_cambio_radicado(
             anotacion=anotacion,
             categoria=categoria,
             chat_id=telegram_chat_id,
+            actuaciones=actuaciones,
         )
     except Exception as exc:
         logger.error("Telegram falló en notificar_cambio_radicado: %s", exc)

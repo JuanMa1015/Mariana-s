@@ -254,19 +254,21 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
             time.sleep(0.5)
         else:
             for n in notifs:
+                actuaciones = n.get("actuaciones", [])
                 ok = notificar_cambio_radicado(
                     llave_proceso=n["llave_proceso"],
                     despacho=n["despacho"],
                     departamento=n["departamento"],
                     fecha_ultima_actuacion=n["fecha_ultima_actuacion"],
                     sujetos_procesales=n["sujetos_procesales"],
-                    actuacion=n["actuacion"],
-                    anotacion=n["anotacion"],
-                    fecha_registro=n["fecha_registro"],
-                    con_documentos=n["con_documentos"],
+                    actuacion=None,
+                    anotacion=None,
+                    fecha_registro=None,
+                    con_documentos=None,
                     destinatarios=destinatarios,
                     categoria=n["categoria"],
                     telegram_chat_id=n.get("telegram_chat_id"),
+                    actuaciones=actuaciones,
                 )
                 if ok:
                     emails_enviados.append(n["llave_proceso"])
@@ -407,10 +409,13 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
                     "departamento": radicado.departamento or "",
                     "fecha_ultima_actuacion": radicado.fecha_ultima_actuacion,
                     "sujetos_procesales": radicado.sujetos_procesales or "",
-                    "actuacion": latest_remote.actuacion,
-                    "anotacion": latest_remote.anotacion,
-                    "fecha_registro": latest_remote.fecha_registro,
-                    "con_documentos": latest_remote.con_documentos,
+                    "actuaciones": [{
+                        "actuacion": latest_remote.actuacion,
+                        "anotacion": latest_remote.anotacion,
+                        "fecha_registro": latest_remote.fecha_registro,
+                        "fecha_actuacion": latest_remote.fecha_actuacion,
+                        "con_documentos": latest_remote.con_documentos,
+                    }],
                     "categoria": radicado.categoria,
                     "telegram_chat_id": telegram_chat_id,
                 })
@@ -421,6 +426,15 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
         radicado.notificado = False
         radicado.tipo_novedad = "actualizacion"
         actualizados.append(radicado.llave_proceso)
+        nuevas_actuaciones_db = (
+            db.query(Actuacion)
+            .filter(
+                Actuacion.proceso_id == radicado.id,
+                Actuacion.id_reg_actuacion > previous_latest_id,
+            )
+            .order_by(Actuacion.id_reg_actuacion.asc())
+            .all()
+        )
         if user_email:
             acumuladas.setdefault(user_email, []).append({
                 "llave_proceso": radicado.llave_proceso,
@@ -428,10 +442,16 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
                 "departamento": radicado.departamento or "",
                 "fecha_ultima_actuacion": radicado.fecha_ultima_actuacion,
                 "sujetos_procesales": radicado.sujetos_procesales or "",
-                "actuacion": latest_remote.actuacion,
-                "anotacion": latest_remote.anotacion,
-                "fecha_registro": latest_remote.fecha_registro,
-                "con_documentos": latest_remote.con_documentos,
+                "actuaciones": [
+                    {
+                        "actuacion": a.actuacion,
+                        "anotacion": a.anotacion,
+                        "fecha_registro": a.fecha_registro,
+                        "fecha_actuacion": a.fecha_actuacion,
+                        "con_documentos": a.con_documentos,
+                    }
+                    for a in nuevas_actuaciones_db
+                ],
                 "categoria": radicado.categoria,
                 "telegram_chat_id": telegram_chat_id,
             })
