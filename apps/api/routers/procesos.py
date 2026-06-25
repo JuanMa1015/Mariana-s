@@ -351,29 +351,32 @@ def diagnosticar_rama(llave_proceso: str):
         resultados["busqueda"] = {
             "ok": True,
             "procesos": len(busqueda.procesos),
-            "id_proceso": busqueda.procesos[0].id_proceso if busqueda.procesos else None,
         }
         if busqueda.procesos:
-            id_proc = busqueda.procesos[0].id_proceso
-            try:
-                detalle = buscar_detalle_proceso(id_proc)
-                resultados["detalle"] = {"ok": True, "despacho": detalle.despacho}
-            except Exception as exc:
-                resultados["detalle"] = {"ok": False, "error": str(exc)}
+            ids_proceso = sorted({p.id_proceso for p in busqueda.procesos if p.id_proceso})
+            resultados["busqueda"]["ids_proceso"] = ids_proceso
 
-            try:
-                acts = buscar_actuaciones(id_proc)
-                resultados["actuaciones"] = {
-                    "ok": True,
-                    "total": acts.paginacion.cantidad_registros,
-                    "traidas": len(acts.actuaciones),
-                    "primera": {
-                        "fecha": acts.actuaciones[0].fecha_actuacion,
-                        "actuacion": acts.actuaciones[0].actuacion,
-                    } if acts.actuaciones else None,
-                }
-            except Exception as exc:
-                resultados["actuaciones"] = {"ok": False, "error": str(exc)}
+            for id_proc in ids_proceso:
+                proc_key = f"id_proceso_{id_proc}"
+                try:
+                    detalle = buscar_detalle_proceso(id_proc)
+                    resultados[proc_key] = {"detalle": {"ok": True, "despacho": detalle.despacho}}
+                except Exception as exc:
+                    resultados[proc_key] = {"detalle": {"ok": False, "error": str(exc)}}
+
+                try:
+                    acts = buscar_actuaciones(id_proc)
+                    resultados[proc_key]["actuaciones"] = {
+                        "ok": True,
+                        "total": acts.paginacion.cantidad_registros,
+                        "traidas": len(acts.actuaciones),
+                        "primera": {
+                            "fecha": acts.actuaciones[0].fecha_actuacion,
+                            "actuacion": acts.actuaciones[0].actuacion,
+                        } if acts.actuaciones else None,
+                    }
+                except Exception as exc:
+                    resultados[proc_key]["actuaciones"] = {"ok": False, "error": str(exc)}
     except Exception as exc:
         resultados["busqueda"] = {"ok": False, "error": str(exc)}
 
@@ -387,7 +390,16 @@ def obtener_proceso_publico(llave_proceso: str):
         busqueda = buscar_por_radicado(llave_proceso, solo_activos=False)
         if not busqueda.procesos:
             return {"actuaciones": []}
-        acts = buscar_actuaciones(busqueda.procesos[0].id_proceso)
+        ids_proceso = sorted({p.id_proceso for p in busqueda.procesos if p.id_proceso})
+        if not ids_proceso:
+            ids_proceso = [busqueda.procesos[0].id_proceso]
+        todas = {}
+        for id_proc in ids_proceso:
+            acts = buscar_actuaciones(id_proc)
+            for a in acts.actuaciones:
+                if a.id_reg_actuacion not in todas:
+                    todas[a.id_reg_actuacion] = a
+        actuaciones = sorted(todas.values(), key=lambda a: (a.fecha_actuacion or "", a.id_reg_actuacion or 0))
         return {
             "actuaciones": [
                 {
@@ -395,7 +407,7 @@ def obtener_proceso_publico(llave_proceso: str):
                     "actuacion": a.actuacion,
                     "anotacion": a.anotacion,
                 }
-                for a in acts.actuaciones
+                for a in actuaciones
             ]
         }
     except Exception as exc:
@@ -410,12 +422,16 @@ def _sincronizar_radicado_actuaciones(db, proceso):
     try:
         resultado = buscar_por_radicado(proceso.llave_proceso, solo_activos=False)
         if resultado.procesos:
-            acts = buscar_actuaciones(resultado.procesos[0].id_proceso)
+            ids_proceso = sorted({p.id_proceso for p in resultado.procesos if p.id_proceso})
+            if not ids_proceso:
+                ids_proceso = [resultado.procesos[0].id_proceso]
             ultima_fecha = None
-            for a in acts.actuaciones:
-                _upsert_actuacion(db, proceso, a)
-                if a.fecha_actuacion and (ultima_fecha is None or a.fecha_actuacion > ultima_fecha):
-                    ultima_fecha = a.fecha_actuacion
+            for id_proc in ids_proceso:
+                acts = buscar_actuaciones(id_proc)
+                for a in acts.actuaciones:
+                    _upsert_actuacion(db, proceso, a)
+                    if a.fecha_actuacion and (ultima_fecha is None or a.fecha_actuacion > ultima_fecha):
+                        ultima_fecha = a.fecha_actuacion
             if ultima_fecha:
                 proceso.fecha_ultima_actuacion = ultima_fecha
                 dias_sin = (datetime.now(timezone.utc).replace(tzinfo=None).date() - datetime.strptime(ultima_fecha[:10], "%Y-%m-%d").date()).days
