@@ -20,10 +20,31 @@ def _mensaje_texto(
     sujetos_procesales: str = "",
     fecha_registro: str | None = None,
     con_documentos: bool | None = None,
+    actuaciones: list[dict] | None = None,
 ) -> str:
-    docs = "Si" if con_documentos else "No"
     partes = [p.strip() for p in (sujetos_procesales or "").split("|") if p.strip()]
     sujetos = "\n".join(f"> `{p}`" for p in partes) if partes else "> Sin informacion"
+
+    if actuaciones:
+        lines = []
+        for i, act in enumerate(actuaciones):
+            label = ">> " if i == 0 else "   "
+            docs = "Si" if act.get("con_documentos") else "No"
+            lines.append(
+                f"{label}{(act.get('fecha_actuacion') or 'N/D')[:10]} — {act.get('actuacion') or 'N/D'}\n"
+                f"   Anotacion: {act.get('anotacion') or 'N/D'}\n"
+                f"   Registro: {(act.get('fecha_registro') or 'N/D')[:10]} | Docs: {docs}"
+            )
+        actuaciones_texto = "\n\n".join(lines)
+    else:
+        docs = "Si" if con_documentos else "No"
+        actuaciones_texto = (
+            f"*Actuacion:* {actuacion or 'N/D'}\n"
+            f"*Anotacion:* {anotacion or 'N/D'}\n"
+            f"*Fecha registro:* {fecha_registro or 'N/D'}\n"
+            f"*Documentos:* {docs}"
+        )
+
     return (
         f"*Novedad judicial - {categoria or 'General'}*\n"
         f"\n"
@@ -31,10 +52,7 @@ def _mensaje_texto(
         f"{despacho or '-'} | {departamento or '-'}\n"
         f"Ultima actuacion: {fecha_ultima_actuacion or 'N/D'}\n"
         f"\n"
-        f"*Actuacion:* {actuacion or 'N/D'}\n"
-        f"*Anotacion:* {anotacion or 'N/D'}\n"
-        f"*Fecha registro:* {fecha_registro or 'N/D'}\n"
-        f"*Documentos:* {docs}\n"
+        f"{actuaciones_texto}\n"
         f"\n"
         f"{sujetos}"
     )
@@ -53,6 +71,7 @@ def notificar_telegram(
     categoria: str | None = None,
     custom_mensaje: str | None = None,
     chat_id: str | None = None,
+    actuaciones: list[dict] | None = None,
 ) -> bool:
     chat_id = chat_id or TELEGRAM_CHAT_ID
     if not TELEGRAM_BOT_TOKEN or not chat_id:
@@ -70,6 +89,7 @@ def notificar_telegram(
         sujetos_procesales=sujetos_procesales,
         fecha_registro=fecha_registro,
         con_documentos=con_documentos,
+        actuaciones=actuaciones,
     )
 
     url = f"{API_BASE}{TELEGRAM_BOT_TOKEN}/sendMessage"
