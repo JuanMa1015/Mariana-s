@@ -205,6 +205,27 @@ def _latest_actuacion(actuaciones: list[object]):
     )
 
 
+def _fetch_actuaciones_multi(ids_proceso: list[int]) -> dict:
+    todas = {}
+    docs = {}
+    for id_proc in ids_proceso:
+        try:
+            resultado = cached_call(buscar_actuaciones, 300, id_proc)
+            for act in resultado.actuaciones:
+                if act.id_reg_actuacion not in todas:
+                    todas[act.id_reg_actuacion] = act
+            for act in resultado.actuaciones:
+                if act.con_documentos and act.id_reg_actuacion not in docs:
+                    try:
+                        docs[act.id_reg_actuacion] = cached_call(buscar_documentos_actuacion, 300, act.id_reg_actuacion)
+                    except Exception:
+                        docs[act.id_reg_actuacion] = []
+        except Exception:
+            continue
+    actuaciones = sorted(todas.values(), key=lambda a: (a.fecha_actuacion or "", a.id_reg_actuacion or 0))
+    return {"actuaciones": actuaciones, "documentos_por_actuacion": docs}
+
+
 
 def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list):
     for email, notifs in acumuladas.items():
@@ -309,32 +330,28 @@ def _fetch_radicado_remoto(radicado: Proceso) -> dict:
     except Exception as exc:
         return {"status": "error", "llave_proceso": radicado.llave_proceso, "error": f"{type(exc).__name__}: {exc}", "paso": "detalle"}
 
-    resultado_actuaciones = None
+    ids_proceso = sorted({p.id_proceso for p in resultado.procesos if p.id_proceso})
+    if not ids_proceso:
+        ids_proceso = [resumen.id_proceso]
+
+    act_data = None
     for act_intento in range(3):
         try:
-            resultado_actuaciones = cached_call(buscar_actuaciones, 300, resumen.id_proceso)
+            act_data = _fetch_actuaciones_multi(ids_proceso)
             break
         except Exception as exc:
             if act_intento < 2:
                 time.sleep(5 * (2 ** act_intento))
-    if resultado_actuaciones is None:
+    if act_data is None:
         return {"status": "error", "llave_proceso": radicado.llave_proceso, "error": "actuaciones fallaron tras 3 intentos", "paso": "actuaciones"}
-
-    documentos_por_actuacion = {}
-    for act in resultado_actuaciones.actuaciones:
-        if act.con_documentos:
-            try:
-                documentos_por_actuacion[act.id_reg_actuacion] = cached_call(buscar_documentos_actuacion, 300, act.id_reg_actuacion)
-            except Exception:
-                documentos_por_actuacion[act.id_reg_actuacion] = []
 
     return {
         "status": "ok",
         "llave_proceso": radicado.llave_proceso,
         "resumen": resumen,
         "detalle": detalle,
-        "actuaciones": resultado_actuaciones.actuaciones,
-        "documentos_por_actuacion": documentos_por_actuacion,
+        "actuaciones": act_data["actuaciones"],
+        "documentos_por_actuacion": act_data["documentos_por_actuacion"],
     }
 
 
