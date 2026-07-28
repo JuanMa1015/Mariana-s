@@ -1,4 +1,5 @@
 import logging
+import threading
 import time as _time
 from datetime import datetime, timezone
 
@@ -588,7 +589,12 @@ def update_proceso(llave_proceso: str, payload: UpdateProceso, db: Session = Dep
 
 
 from services.telegram import notificar_telegram
+from config import SENTRY_DSN
 
+if SENTRY_DSN:
+    import sentry_sdk
+
+_rama_lock = threading.Lock()
 _rama_fallos = 0
 _rama_ultima_alerta: float = 0
 _RAMA_ALERTA_THRESHOLD = 3
@@ -597,25 +603,32 @@ _RAMA_ALERTA_COOLDOWN = 6 * 3600
 
 def _check_rama_con_alerta() -> bool:
     global _rama_fallos, _rama_ultima_alerta
-    if rama_health_check():
-        _rama_fallos = 0
-        return True
-    _rama_fallos += 1
-    if _rama_fallos >= _RAMA_ALERTA_THRESHOLD:
-        ahora = _time.time()
-        if ahora - _rama_ultima_alerta > _RAMA_ALERTA_COOLDOWN:
-            _rama_ultima_alerta = ahora
-            notificar_telegram(
-                llave_proceso="",
-                despacho="",
-                departamento="",
-                fecha_ultima_actuacion=None,
-                custom_mensaje=(
-                    f"ALERTA: Rama Judicial no responde.\n"
-                    f"Lleva {_rama_fallos} intentos fallidos consecutivos.\n"
-                    f"Los radicados no se estan sincronizando."
-                ),
-            )
+    with _rama_lock:
+        if rama_health_check():
+            _rama_fallos = 0
+            return True
+        _rama_fallos += 1
+        logger.warning("Rama Judicial no responde (intento %d/%d)", _rama_fallos, _RAMA_ALERTA_THRESHOLD)
+        if SENTRY_DSN:
+            sentry_sdk.capture_message(f"Rama Judicial caida (intento {_rama_fallos})", level="warning")
+        if _rama_fallos >= _RAMA_ALERTA_THRESHOLD:
+            ahora = _time.time()
+            if ahora - _rama_ultima_alerta > _RAMA_ALERTA_COOLDOWN:
+                _rama_ultima_alerta = ahora
+                logger.error("Rama Judicial lleva %d intentos fallidos. Enviando alerta...", _rama_fallos)
+                if SENTRY_DSN:
+                    sentry_sdk.capture_message("Rama Judicial caida persistente — alerta enviada por Telegram", level="error")
+                notificar_telegram(
+                    llave_proceso="",
+                    despacho="",
+                    departamento="",
+                    fecha_ultima_actuacion=None,
+                    custom_mensaje=(
+                        f"ALERTA: Rama Judicial no responde.\n"
+                        f"Lleva {_rama_fallos} intentos fallidos consecutivos.\n"
+                        f"Los radicados no se estan sincronizando."
+                    ),
+                )
     return False
 
 

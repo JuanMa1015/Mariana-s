@@ -5,6 +5,8 @@ from urllib.parse import quote
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+from config import DB_POOL_SIZE, DB_MAX_OVERFLOW
+
 BASE_DIR = Path(__file__).resolve().parent
 DATABASE_PATH = (BASE_DIR.parent / "marianas.db").resolve()
 
@@ -17,6 +19,8 @@ if DATABASE_URL.startswith("sqlite"):
 else:
     engine_kwargs["pool_pre_ping"] = True
     engine_kwargs["pool_recycle"] = 120
+    engine_kwargs["pool_size"] = DB_POOL_SIZE
+    engine_kwargs["max_overflow"] = DB_MAX_OVERFLOW
 
 engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(bind=engine)

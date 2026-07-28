@@ -4,18 +4,20 @@ function _esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos = 3) {
-  const token = localStorage.getItem("token")
-  const headers = new Headers(options.headers || {})
-  
-  if (token) {
-    headers.set("Authorization", `Bearer ${token}`)
+function fetchBase(url: string, options: RequestInit = {}) {
+  const merged: RequestInit = {
+    ...options,
+    credentials: "include",
+    headers: new Headers(options.headers || {}),
   }
+  return fetch(url, merged)
+}
 
+async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos = 3) {
   for (let intento = 0; intento < reintentos; intento++) {
     let res: Response
     try {
-      res = await fetch(url, { ...options, headers })
+      res = await fetchBase(url, options)
     } catch (err) {
       if (intento < reintentos - 1) {
         const espera = 1000 * 2 ** intento
@@ -27,7 +29,6 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos 
     }
 
     if (res.status === 401) {
-      localStorage.removeItem("token")
       window.location.href = "/login"
       throw new Error("Unauthorized")
     }
@@ -48,7 +49,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos 
 export async function loginUser(payload: { credential: string; password: string }) {
   let res: Response
   try {
-    res = await fetch(`${BASE_URL}/auth/login`, {
+    res = await fetchBase(`${BASE_URL}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -63,7 +64,7 @@ export async function loginUser(payload: { credential: string; password: string 
 export async function registerUser(payload: { email: string; password: string; username?: string }) {
   let res: Response
   try {
-    res = await fetch(`${BASE_URL}/auth/register`, {
+    res = await fetchBase(`${BASE_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -72,6 +73,16 @@ export async function registerUser(payload: { email: string; password: string; u
     throw new Error("Error de conexión. Revisa tu internet.")
   }
   if (!res.ok) throw new Error((await res.json()).detail || "Error en registro")
+  return res.json()
+}
+
+export async function getMe() {
+  const res = await fetchWithAuth(`${BASE_URL}/auth/me`)
+  return res.json()
+}
+
+export async function logoutUser() {
+  const res = await fetchWithAuth(`${BASE_URL}/auth/logout`, { method: "POST" })
   return res.json()
 }
 

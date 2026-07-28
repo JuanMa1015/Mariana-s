@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime, timezone
 from apscheduler.schedulers.background import BackgroundScheduler
 from models import init_db
@@ -17,13 +18,27 @@ _last_sync: dict = {
     "ultimo_error": None,
 }
 
+def _rama_health_with_retry(max_intentos: int = 3) -> bool:
+    for intento in range(max_intentos):
+        ok = rama_health_check()
+        if ok:
+            return True
+        if intento < max_intentos - 1:
+            espera = 2 ** (intento + 1)
+            logger.warning("Rama Judicial no responde (intento %d/%d), reintentando en %ds...", intento + 1, max_intentos, espera)
+            time.sleep(espera)
+        else:
+            logger.error("Rama Judicial no responde tras %d intentos", max_intentos)
+    return False
+
+
 def job_sincronizar():
     global _last_sync
     _last_sync["ultima_ejecucion"] = datetime.now(timezone.utc).isoformat()
     _last_sync["ultimo_error"] = None
 
     logger.info("Verificando estado de Rama Judicial...")
-    rama_ok = rama_health_check()
+    rama_ok = _rama_health_with_retry()
     _last_sync["rama_ok"] = rama_ok
     if not rama_ok:
         logger.warning("Rama Judicial no responde. Se omite este ciclo.")

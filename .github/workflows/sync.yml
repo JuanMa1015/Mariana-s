@@ -20,27 +20,31 @@ jobs:
             exit 1
           fi
 
-      - name: Wake up server
+      - name: Wake up server (max 3 min)
         run: |
           echo "Esperando a que el servidor responda..."
-          for i in $(seq 1 12); do
-            if curl -fsS "${{ secrets.API_URL }}/health" > /dev/null 2>&1; then
+          for i in $(seq 1 18); do
+            RESP=$(curl -sS -o /dev/null -w "%{http_code}" "${{ secrets.API_URL }}/health" 2>&1)
+            if [ "$RESP" = "200" ]; then
               echo "Servidor listo"
               exit 0
             fi
-            echo "Intento $i/12 - aun no responde, esperando 10s..."
+            echo "Intento $i/18 - respuesta $RESP, esperando 10s..."
             sleep 10
           done
           echo "El servidor no respondio a tiempo"
           exit 1
 
-      - name: Sync lote
+      - name: Sync lote (con retry)
         env:
           API_URL: ${{ secrets.API_URL }}
           API_TOKEN: ${{ secrets.API_TOKEN }}
         run: |
           echo "Sincronizando lote de 25 radicados..."
-          RESULT=$(curl -s -w "\n%{http_code}" -X POST "${API_URL}/procesos/sync-lote" \
+
+          RESULT=$(curl -s -w "\n%{http_code}" \
+            --retry 3 --retry-delay 30 --retry-all-errors \
+            -X POST "${API_URL}/procesos/sync-lote" \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer ${API_TOKEN}" \
             --max-time 600)
@@ -53,6 +57,13 @@ jobs:
             exit 1
           fi
 
+          MENSAJE=$(echo "$BODY" | jq -r '.mensaje // empty')
+          if [ -n "$MENSAJE" ]; then
+            echo "⚠️  $MENSAJE"
+            echo "Esto no es un error de la app — Rama Judicial esta caida."
+            exit 0
+          fi
+
           echo ""
           echo "Consultados: $(echo "$BODY" | jq -r '.total_consultados // 0')"
           echo "Usuarios:   $(echo "$BODY" | jq -r '.usuarios_afectados // 0')"
@@ -61,9 +72,11 @@ jobs:
           echo "Actualizados:$(echo "$BODY" | jq -r '.actualizados // 0')"
           echo "Notificaciones: $(echo "$BODY" | jq -r '.emails_enviados | length')"
           echo "Errores:     $(echo "$BODY" | jq -r '.radicados_error_consulta | length')"
-          ERRORS=$(echo "$BODY" | jq -r '.radicados_error_consulta[] | "  - \(.radicado // "?"): \(.error // "?")"')
+
+          ERRORS=$(echo "$BODY" | jq -r '.radicados_error_consulta[] | "  - \(.radicado // "?"): \(.error // "?")"' 2>/dev/null)
           if [ -n "$ERRORS" ]; then
             echo "$ERRORS"
           fi
+
           echo ""
           echo "Sync lote completado"

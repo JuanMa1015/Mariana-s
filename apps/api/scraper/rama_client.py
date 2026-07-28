@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+import logging
 import time
-import warnings
 from typing import Optional
 
 import httpx
@@ -19,6 +19,9 @@ from scraper.types import (
     parsear_actuacion,
     parsear_documento,
 )
+from config import RAMA_VERIFY_SSL
+
+logger = logging.getLogger(__name__)
 
 # Re-export types for backward compatibility
 __all__ = [
@@ -37,8 +40,6 @@ __all__ = [
     "descargar_documento",
     "rama_health_check",
 ]
-
-warnings.filterwarnings("ignore", message=".*verify.*", category=UserWarning)
 
 TIMEOUT = httpx.Timeout(120.0, connect=20.0)
 MAX_RETRIES = 5
@@ -74,7 +75,7 @@ HEADERS = {
 
 
 def _cliente():
-    return httpx.Client(timeout=TIMEOUT, headers=HEADERS, verify=False)
+    return httpx.Client(timeout=TIMEOUT, headers=HEADERS, verify=RAMA_VERIFY_SSL)
 
 
 def buscar_por_nombre(
@@ -94,8 +95,7 @@ def buscar_por_nombre(
 
     with _cliente() as client:
         response = _request_with_retry(client, "GET", f"{BASE_URL}/NombreRazonSocial", params=params)
-        print(f"Status: {response.status_code}")
-        print(f"Body: {response.text[:500]}")
+        logger.debug("buscar_por_nombre status=%s", response.status_code)
         data = response.json()
 
     procesos = [parsear_proceso(p) for p in data.get("procesos", [])]
@@ -119,20 +119,42 @@ def buscar_detalle_proceso(id_proceso: int) -> DetalleProceso:
     return parsear_detalle(data)
 
 
-def buscar_actuaciones(id_proceso: int, pagina: int = 1) -> ResultadoActuaciones:
-    with _cliente() as client:
-        response = _request_with_retry(client, "GET", f"{BASE_ROOT}/Proceso/Actuaciones/{id_proceso}", params={"pagina": pagina})
-        data = response.json()
+def buscar_actuaciones(id_proceso: int, pagina: int = 1, max_paginas: int = 10) -> ResultadoActuaciones:
+    todas: list[Actuacion] = []
+    paginacion_final = None
+    pagina_actual = pagina
 
-    actuaciones = [parsear_actuacion(a) for a in data.get("actuaciones", [])]
-    pag = data.get("paginacion", {})
+    with _cliente() as client:
+        while pagina_actual <= max_paginas:
+            response = _request_with_retry(
+                client, "GET", f"{BASE_ROOT}/Proceso/Actuaciones/{id_proceso}",
+                params={"pagina": pagina_actual}
+            )
+            data = response.json()
+
+            actuaciones = [parsear_actuacion(a) for a in data.get("actuaciones", [])]
+            if not actuaciones:
+                break
+            todas.extend(actuaciones)
+
+            pag = data.get("paginacion", {})
+            paginacion_final = Paginacion(
+                cantidad_registros=pag.get("cantidadRegistros", 0),
+                registros_pagina=pag.get("registrosPagina", 40),
+                cantidad_paginas=pag.get("cantidadPaginas", 0),
+                pagina=pag.get("pagina", 1),
+            )
+
+            total_paginas = pag.get("cantidadPaginas", 0)
+            if pagina_actual >= total_paginas:
+                break
+            pagina_actual += 1
+            time.sleep(0.5)
+
     return ResultadoActuaciones(
-        actuaciones=actuaciones,
-        paginacion=Paginacion(
-            cantidad_registros=pag.get("cantidadRegistros", 0),
-            registros_pagina=pag.get("registrosPagina", 40),
-            cantidad_paginas=pag.get("cantidadPaginas", 0),
-            pagina=pag.get("pagina", 1),
+        actuaciones=todas,
+        paginacion=paginacion_final or Paginacion(
+            cantidad_registros=0, registros_pagina=40, cantidad_paginas=0, pagina=1
         ),
     )
 
@@ -160,16 +182,21 @@ def descargar_documento(id_reg_documento: int) -> tuple[bytes, str]:
 
 def rama_health_check() -> bool:
     """Verifica rapidamente que Rama Judicial responde. Retorna True si esta operativo."""
-    try:
-        with _cliente() as client:
-            response = client.get(
-                f"{BASE_URL}/NumeroRadicacion",
-                params={"numero": "05001310301720240048000", "soloActivos": "false", "pagina": 1},
-                timeout=httpx.Timeout(15.0, connect=10.0),
-            )
-            return response.status_code < 500
-    except Exception:
-        return False
+    # Intentar con endpoint principal primero
+    for intento, (url, params, timeout) in enumerate([
+        (f"{BASE_URL}/NumeroRadicacion", {"numero": "05001310301720240048000", "soloActivos": "false", "pagina": 1}, httpx.Timeout(15.0, connect=10.0)),
+        (f"{BASE_ROOT}/Proceso/Actuaciones/1", {}, httpx.Timeout(10.0, connect=8.0)),
+    ]):
+        try:
+            with _cliente() as client:
+                response = client.get(url, params=params, timeout=timeout)
+                if response.status_code < 500:
+                    return True
+                logger.debug("rama_health_check intento %d: status=%d", intento + 1, response.status_code)
+        except Exception as exc:
+            logger.debug("rama_health_check intento %d fallo: %s", intento + 1, exc)
+    logger.warning("Rama Judicial no responde en ningun endpoint")
+    return False
 
 
 def buscar_por_radicado(numero: str, solo_activos: bool = False, pagina: int = 1) -> ResultadoBusqueda:
@@ -181,8 +208,7 @@ def buscar_por_radicado(numero: str, solo_activos: bool = False, pagina: int = 1
 
     with _cliente() as client:
         response = _request_with_retry(client, "GET", f"{BASE_URL}/NumeroRadicacion", params=params)
-        print(f"Status: {response.status_code}")
-        print(f"Body: {response.text[:500]}")
+        logger.debug("buscar_por_radicado status=%s", response.status_code)
         data = response.json()
 
     procesos = [parsear_proceso(p) for p in data.get("procesos", [])]

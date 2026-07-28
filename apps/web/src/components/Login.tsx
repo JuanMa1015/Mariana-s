@@ -23,7 +23,6 @@ export default function Login() {
     const loadingToast = toast.loading("Iniciando sesión...")
     try {
       const data = await loginUser({ credential, password })
-      localStorage.setItem("token", data.access_token)
       localStorage.setItem("email", data.email)
       if (data.username) localStorage.setItem("username", data.username)
       if (rememberMe) {

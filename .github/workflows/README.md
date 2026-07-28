@@ -1,7 +1,9 @@
 Sync workflow
 
-- Este workflow se ejecuta 4 veces al día: 6am, 12pm, 6pm y medianoche (hora de Colombia).
-- Llama al endpoint `POST /procesos/sync` del backend desplegado (p. ej. Railway).
-- Requiere dos secretos de repositorio: `API_URL` (base URL del API) y `API_TOKEN` (token secreto para autorizar la llamada).
-- Puede ejecutarse manualmente desde la pestaña de GitHub Actions (`workflow_dispatch`).
-- El paso principal reintenta hasta 3 veces en caso de fallo (`--retry 3 --retry-delay 10`).
+- Se ejecuta cada hora via cron (`0 * * * *`).
+- Llama a `POST /procesos/sync-lote` del backend (Render).
+- Requiere `API_URL` y `API_TOKEN` como secrets del repositorio.
+- Wake-up: hasta 18 intentos (3 min) para esperar cold start de Render.
+- Sync: `--retry 3 --retry-delay 30` para tolerar errores transitorios.
+- Si Rama Judicial está caída, el API responde 200 con mensaje claro.
+- El workflow NO falla cuando Rama está caída (es externo).

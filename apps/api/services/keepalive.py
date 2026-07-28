@@ -1,49 +1,40 @@
+import asyncio
 import logging
-import threading
-import time
 
 import httpx
 from config import API_URL
 
 logger = logging.getLogger(__name__)
 
-_INTERVALO_SEGUNDOS = 300  # 5 minutos
-
-
-def _loop_keepalive(stop_event: threading.Event, url: str):
-    while not stop_event.is_set():
-        if stop_event.wait(_INTERVALO_SEGUNDOS):
-            break
-        if not url:
-            continue
-        try:
-            httpx.get(url, timeout=10)
-            logger.debug("Keepalive enviado a %s", url)
-        except Exception:
-            pass
+_INTERVALO_SEGUNDOS = 300
 
 
 class Keepalive:
     def __init__(self):
-        self._stop = threading.Event()
-        self._thread: threading.Thread | None = None
+        self._task: asyncio.Task | None = None
 
     def iniciar(self):
         url = f"{API_URL.rstrip('/')}/health" if API_URL else ""
         if not url:
             logger.warning("API_URL no configurada, keepalive desactivado")
             return
-        self._stop.clear()
-        self._thread = threading.Thread(
-            target=_loop_keepalive,
-            args=(self._stop, url),
-            daemon=True,
-        )
-        self._thread.start()
+        self._task = asyncio.create_task(_loop_keepalive(url))
         logger.info("Keepalive iniciado — cada %ds a %s", _INTERVALO_SEGUNDOS, url)
 
     def detener(self):
-        self._stop.set()
-        if self._thread:
-            self._thread.join(timeout=3)
+        if self._task and not self._task.done():
+            self._task.cancel()
         logger.info("Keepalive detenido")
+
+
+async def _loop_keepalive(url: str):
+    while True:
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                await client.get(url)
+            logger.debug("Keepalive enviado a %s", url)
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            pass
+        await asyncio.sleep(_INTERVALO_SEGUNDOS)

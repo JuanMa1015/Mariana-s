@@ -208,6 +208,7 @@ def _latest_actuacion(actuaciones: list[object]):
 def _fetch_actuaciones_multi(ids_proceso: list[int]) -> dict:
     todas = {}
     docs = {}
+    fallos = 0
     for id_proc in ids_proceso:
         try:
             resultado = cached_call(buscar_actuaciones, 300, id_proc)
@@ -220,8 +221,13 @@ def _fetch_actuaciones_multi(ids_proceso: list[int]) -> dict:
                         docs[act.id_reg_actuacion] = cached_call(buscar_documentos_actuacion, 300, act.id_reg_actuacion)
                     except Exception:
                         docs[act.id_reg_actuacion] = []
-        except Exception:
-            continue
+        except Exception as exc:
+            fallos += 1
+            logger.debug("_fetch_actuaciones_multi id_proc=%s fallo: %s", id_proc, exc)
+    if fallos == len(ids_proceso):
+        raise RuntimeError(f"Todas las consultas de actuaciones fallaron ({fallos}/{len(ids_proceso)} ids_proceso)")
+    if fallos > 0:
+        logger.warning("_fetch_actuaciones_multi: %d/%d ids_proceso fallaron", fallos, len(ids_proceso))
     actuaciones = sorted(todas.values(), key=lambda a: (a.fecha_actuacion or "", a.id_reg_actuacion or 0))
     return {"actuaciones": actuaciones, "documentos_por_actuacion": docs}
 

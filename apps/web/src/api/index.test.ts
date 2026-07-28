@@ -58,8 +58,7 @@ describe('registerUser', () => {
 })
 
 describe('fetchWithAuth (via getProcesos)', () => {
-  it('should add Bearer token from localStorage', async () => {
-    localStorage.setItem('token', 'my-token')
+  it('should send credentials include', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: () => Promise.resolve({ total: 0, procesos: [] }),
@@ -69,12 +68,10 @@ describe('fetchWithAuth (via getProcesos)', () => {
     await getProcesos()
 
     const call = mockFetch.mock.calls[0]
-    const headers = call[1]?.headers as Headers
-    expect(headers.get('Authorization')).toBe('Bearer my-token')
+    expect(call[1]?.credentials).toBe('include')
   })
 
-  it('should remove token and redirect on 401', async () => {
-    localStorage.setItem('token', 'bad-token')
+  it('should redirect on 401', async () => {
     const originalLocation = window.location
     Object.defineProperty(window, 'location', {
       value: { ...originalLocation, href: '' },
@@ -88,7 +85,6 @@ describe('fetchWithAuth (via getProcesos)', () => {
 
     const { getProcesos } = await import('./index')
     await expect(getProcesos()).rejects.toThrow('Unauthorized')
-    expect(localStorage.getItem('token')).toBeNull()
     expect(window.location.href).toBe('/login')
   })
 

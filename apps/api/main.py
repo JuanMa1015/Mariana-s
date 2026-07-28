@@ -13,7 +13,7 @@ from services.keepalive import Keepalive
 from services.logging_config import configurar_logging, set_request_id, get_request_id
 from routers.procesos import router as procesos_router
 from routers.auth import router as auth_router
-from config import SENTRY_DSN, API_TOKEN
+from config import SENTRY_DSN, API_TOKEN, CORS_ORIGINS
 from services.auth import get_current_user
 from models.user import User
 
@@ -31,7 +31,18 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    import time as _time
+
+    for intento in range(3):
+        try:
+            init_db()
+            break
+        except Exception as exc:
+            logger.warning("Intento %d/3 de conexion a BD fallo: %s", intento + 1, exc)
+            if intento < 2:
+                _time.sleep(2 ** intento)
+            else:
+                logger.error("No se pudo conectar a la BD tras 3 intentos. Continuando...")
     scheduler = iniciar_scheduler(intervalo_horas=1)
     keepalive = Keepalive()
     keepalive.iniciar()
@@ -45,11 +56,13 @@ app.state.limiter = limiter
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    origin = request.headers.get("origin", "")
+    acao = origin if origin in CORS_ORIGINS else CORS_ORIGINS[0]
     return JSONResponse(
         status_code=429,
         content={"detail": "Demasiadas solicitudes. Intenta de nuevo en un minuto."},
         headers={
-            "Access-Control-Allow-Origin": "https://mariana-app-nu.vercel.app",
+            "Access-Control-Allow-Origin": acao,
             "Access-Control-Allow-Credentials": "true",
         },
     )
@@ -64,23 +77,43 @@ async def global_exception_handler(request: Request, exc: Exception):
     else:
         detail = "Error interno del servidor"
         status_code = 500
+    origin = request.headers.get("origin", "")
+    acao = origin if origin in CORS_ORIGINS else CORS_ORIGINS[0]
     return JSONResponse(
         status_code=status_code,
         content={"detail": detail},
         headers={
-            "Access-Control-Allow-Origin": "https://mariana-app-nu.vercel.app",
+            "Access-Control-Allow-Origin": acao,
             "Access-Control-Allow-Credentials": "true",
         },
     )
 
 
+from fastapi.middleware.gzip import GZipMiddleware
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 app.add_middleware(SlowAPIMiddleware)
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    if "x-content-type-options" not in response.headers:
+        response.headers["X-Content-Type-Options"] = "nosniff"
+    if "x-frame-options" not in response.headers:
+        response.headers["X-Frame-Options"] = "DENY"
+    if "x-xss-protection" not in response.headers:
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+    if "referrer-policy" not in response.headers:
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 
 @app.middleware("http")
@@ -90,18 +123,6 @@ async def request_id_middleware(request: Request, call_next):
     logger.info("→ %s %s", request.method, request.url.path)
     response = await call_next(request)
     response.headers["X-Request-Id"] = get_request_id()
-    return response
-
-
-@app.middleware("http")
-async def cors_fallback(request: Request, call_next):
-    response = await call_next(request)
-    if "access-control-allow-origin" not in response.headers:
-        response.headers["Access-Control-Allow-Origin"] = "*"
-    if "access-control-allow-headers" not in response.headers:
-        response.headers["Access-Control-Allow-Headers"] = "*"
-    if "access-control-allow-methods" not in response.headers:
-        response.headers["Access-Control-Allow-Methods"] = "*"
     return response
 
 @app.get("/health")

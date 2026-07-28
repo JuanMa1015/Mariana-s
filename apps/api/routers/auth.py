@@ -1,11 +1,11 @@
 import re
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from models.database import get_db
 from models.user import User
-from services.auth import verify_password, get_password_hash, create_access_token, get_current_user
+from services.auth import verify_password, get_password_hash, create_access_token, get_current_user, set_token_cookie, clear_token_cookie
 from services.limiter import limiter
 from config import ACCESS_TOKEN_EXPIRE_MINUTES
 
@@ -37,8 +37,8 @@ def _generar_username(base: str, db: Session) -> str:
 
 
 @router.post("/register")
-@limiter.limit("3/minute")
-def register_user(user: UserCreate, request: Request, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register_user(user: UserCreate, request: Request, response: Response, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
@@ -55,6 +55,7 @@ def register_user(user: UserCreate, request: Request, db: Session = Depends(get_
     access_token = create_access_token(
         data={"sub": new_user.email}, expires_delta=access_token_expires
     )
+    set_token_cookie(response, access_token)
 
     return {
         "access_token": access_token,
@@ -66,8 +67,8 @@ def register_user(user: UserCreate, request: Request, db: Session = Depends(get_
 
 
 @router.post("/login")
-@limiter.limit("10/minute")
-def login_user(user: UserLogin, request: Request, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def login_user(user: UserLogin, request: Request, response: Response, db: Session = Depends(get_db)):
     credential = user.credential.strip()
 
     if "@" in credential:
@@ -86,6 +87,8 @@ def login_user(user: UserLogin, request: Request, db: Session = Depends(get_db))
     access_token = create_access_token(
         data={"sub": db_user.email}, expires_delta=access_token_expires
     )
+    set_token_cookie(response, access_token)
+
     return {
         "access_token": access_token,
         "token_type": "bearer",
@@ -105,3 +108,18 @@ def actualizar_telegram_chat_id(
     db_user.telegram_chat_id = data.telegram_chat_id
     db.commit()
     return {"telegram_chat_id": db_user.telegram_chat_id}
+
+
+@router.get("/me")
+def me(current_user: User = Depends(get_current_user)):
+    return {
+        "email": current_user.email,
+        "username": current_user.username,
+        "telegram_chat_id": current_user.telegram_chat_id,
+    }
+
+
+@router.post("/logout")
+def logout(response: Response):
+    clear_token_cookie(response)
+    return {"ok": True}

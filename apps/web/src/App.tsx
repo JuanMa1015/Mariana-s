@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync } from "./api"
+import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync, logoutUser } from "./api"
 import { getCache, setCache, removeCache } from "./api/cache"
 import toast from "react-hot-toast"
 import * as Sentry from "@sentry/react"
@@ -173,10 +173,9 @@ export default function App() {
     }
   }, [syncing, cacheKey, cargarLista])
 
-  const handleLogout = () => {
-    localStorage.removeItem("token")
-    localStorage.removeItem("email")
-    localStorage.removeItem("username")
+  const handleLogout = async () => {
+    try { await logoutUser() } catch { /* ignore */ }
+    localStorage.clear()
     navigate("/login", { replace: true })
   }
 

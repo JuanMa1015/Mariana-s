@@ -1,15 +1,18 @@
-import { StrictMode } from 'react'
+import { StrictMode, lazy, Suspense, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import * as Sentry from '@sentry/react'
 import './index.css'
-import App from './App.tsx'
 import Login from './components/Login.tsx'
 import Register from './components/Register.tsx'
-import NovedadesPage from './components/NovedadesPage.tsx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
+
+import { getMe } from './api'
+
+const App = lazy(() => import('./App.tsx'))
+const NovedadesPage = lazy(() => import('./components/NovedadesPage.tsx'))
 
 if (import.meta.env.VITE_SENTRY_DSN) {
   Sentry.init({
@@ -19,10 +22,20 @@ if (import.meta.env.VITE_SENTRY_DSN) {
 }
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
-  const token = localStorage.getItem("token")
-  if (!token) {
+  const [ok, setOk] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    getMe().then(() => setOk(true)).catch(() => setOk(false))
+  }, [])
+
+  if (ok === null) {
+    return <div className="flex min-h-screen items-center justify-center text-slate-500">Verificando sesión...</div>
+  }
+
+  if (!ok) {
     return <Navigate to="/login" replace />
   }
+
   return children
 }
 
@@ -36,12 +49,16 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/register" element={<Register />} />
           <Route path="/novedades" element={
             <ProtectedRoute>
-              <NovedadesPage />
+              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
+                <NovedadesPage />
+              </Suspense>
             </ProtectedRoute>
           } />
           <Route path="/*" element={
             <ProtectedRoute>
-              <App />
+              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
+                <App />
+              </Suspense>
             </ProtectedRoute>
           } />
         </Routes>
