@@ -15,8 +15,6 @@ from services.logging_config import configurar_logging, set_request_id, get_requ
 from routers.procesos import router as procesos_router
 from routers.auth import router as auth_router
 from config import SENTRY_DSN, API_TOKEN, CORS_ORIGINS
-from services.auth import get_current_user
-from models.user import User
 
 if SENTRY_DSN:
     import sentry_sdk
@@ -126,6 +124,21 @@ async def request_id_middleware(request: Request, call_next):
     response.headers["X-Request-Id"] = get_request_id()
     return response
 
+@app.middleware("http")
+async def csrf_origin_middleware(request: Request, call_next):
+    if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        auth_header = request.headers.get("authorization", "")
+        is_bearer = auth_header.lower().startswith("bearer ")
+        origin = request.headers.get("origin", "")
+        if not is_bearer and origin and origin not in CORS_ORIGINS:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Origen no permitido"},
+                headers={"Access-Control-Allow-Origin": origin, "Access-Control-Allow-Credentials": "true"},
+            )
+    return await call_next(request)
+
+
 @app.get("/health")
 def health():
     from models.database import SessionLocal
@@ -154,9 +167,15 @@ def health():
     }
 
 
-def _debug_auth(current_user: User = Depends(get_current_user)):
+def _debug_auth(request: Request):
     if not API_TOKEN:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="API_TOKEN no configurado")
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        token_value = auth_header.split(" ", 1)[1]
+        if token_value == API_TOKEN:
+            return None
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
 
 
 @app.get("/test-notificacion")

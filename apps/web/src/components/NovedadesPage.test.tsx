@@ -51,7 +51,6 @@ const NOVEDADES_MOCK = {
 
 beforeEach(async () => {
   vi.clearAllMocks()
-  localStorage.setItem("token", "test-token")
 })
 
 describe("NovedadesPage", () => {

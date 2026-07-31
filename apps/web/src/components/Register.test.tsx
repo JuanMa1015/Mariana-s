@@ -60,7 +60,6 @@ describe("Register", () => {
     const { default: Register } = await import("./Register")
     const { registerUser } = await import("../api")
     vi.mocked(registerUser).mockResolvedValue({
-      access_token: "tok",
       email: "test@example.com",
       username: "tester",
     })
@@ -68,18 +67,17 @@ describe("Register", () => {
     render(<BrowserRouter><Register /></BrowserRouter>)
     fireEvent.change(screen.getByLabelText(/correo electrónico/i), { target: { value: "test@example.com" } })
     fireEvent.change(screen.getByLabelText(/nombre de usuario/i), { target: { value: "tester" } })
-    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: "pass123" } })
+    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: "password123" } })
     fireEvent.click(screen.getByRole("button", { name: /registrarse/i }))
 
     await waitFor(() => {
       expect(registerUser).toHaveBeenCalledWith({
         email: "test@example.com",
         username: "tester",
-        password: "pass123",
+        password: "password123",
       })
     })
 
-    expect(localStorage.getItem("token")).toBe("tok")
     expect(localStorage.getItem("email")).toBe("test@example.com")
     expect(localStorage.getItem("username")).toBe("tester")
     expect(mockToast.success).toHaveBeenCalled()

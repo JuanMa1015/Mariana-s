@@ -18,9 +18,8 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
   const descargarDocumento = (id: number, nombre: string) => async (e: React.MouseEvent) => {
     e.stopPropagation()
     try {
-      const token = localStorage.getItem("token")
       const res = await fetch(`${BASE_URL}/procesos/documento/${id}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        credentials: "include",
       })
       if (!res.ok) throw new Error("Error al descargar")
       const blob = await res.blob()

@@ -39,6 +39,9 @@ def _generar_username(base: str, db: Session) -> str:
 @router.post("/register")
 @limiter.limit("5/minute")
 def register_user(user: UserCreate, request: Request, response: Response, db: Session = Depends(get_db)):
+    if len(user.password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
@@ -58,8 +61,6 @@ def register_user(user: UserCreate, request: Request, response: Response, db: Se
     set_token_cookie(response, access_token)
 
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
         "email": new_user.email,
         "username": new_user.username,
         "telegram_chat_id": None,
@@ -90,8 +91,6 @@ def login_user(user: UserLogin, request: Request, response: Response, db: Sessio
     set_token_cookie(response, access_token)
 
     return {
-        "access_token": access_token,
-        "token_type": "bearer",
         "email": db_user.email,
         "username": db_user.username,
         "telegram_chat_id": db_user.telegram_chat_id,

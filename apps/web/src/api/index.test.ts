@@ -12,7 +12,7 @@ describe('loginUser', () => {
   it('should POST credentials and return JSON', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ access_token: 'abc', email: 'test@example.com' }),
+      json: () => Promise.resolve({ email: 'test@example.com' }),
     })
 
     const { loginUser } = await import('./index')
@@ -25,7 +25,7 @@ describe('loginUser', () => {
         body: JSON.stringify({ credential: 'test@example.com', password: 'pass' }),
       }),
     )
-    expect(result.access_token).toBe('abc')
+    expect(result.email).toBe('test@example.com')
   })
 
   it('should throw on error response', async () => {
@@ -43,7 +43,7 @@ describe('registerUser', () => {
   it('should POST registration and return JSON', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ access_token: 'abc', email: 'new@example.com' }),
+      json: () => Promise.resolve({ email: 'new@example.com' }),
     })
 
     const { registerUser } = await import('./index')
@@ -53,7 +53,7 @@ describe('registerUser', () => {
       expect.stringContaining('/auth/register'),
       expect.objectContaining({ method: 'POST' }),
     )
-    expect(result.access_token).toBe('abc')
+    expect(result.email).toBe('new@example.com')
   })
 })
 

@@ -75,7 +75,7 @@ it('should show remembered email on mount', () => {
 
 it('should call loginUser on submit and navigate', async () => {
   const user = userEvent.setup()
-  mockLoginUser.mockResolvedValueOnce({ access_token: 'abc', email: 'test@example.com', username: 'testuser' })
+  mockLoginUser.mockResolvedValueOnce({ email: 'test@example.com', username: 'testuser' })
 
   const { container } = renderLogin()
 

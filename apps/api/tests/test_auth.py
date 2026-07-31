@@ -10,15 +10,25 @@ async def test_register_user(client):
     assert response.status_code == 200
     data = response.json()
     assert data["email"] == "nuevo@example.com"
-    assert "access_token" in data
+    assert "access_token" in response.cookies
     assert data["telegram_chat_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_register_short_password(client):
+    response = await client.post(
+        "/auth/register",
+        json={"email": "corta@example.com", "password": "corta"},
+    )
+    assert response.status_code == 400
+    assert "8 caracteres" in response.json()["detail"]
 
 
 @pytest.mark.asyncio
 async def test_register_duplicate_email(client, test_user):
     response = await client.post(
         "/auth/register",
-        json={"email": "test@example.com", "password": "otra123"},
+        json={"email": "test@example.com", "password": "otra1234"},
     )
     assert response.status_code == 400
     assert "registrado" in response.json()["detail"].lower()
@@ -32,7 +42,7 @@ async def test_login_with_email(client, test_user):
     )
     assert response.status_code == 200
     data = response.json()
-    assert "access_token" in data
+    assert "access_token" in response.cookies
     assert data["email"] == "test@example.com"
 
 
@@ -52,6 +62,39 @@ async def test_login_wrong_password(client, test_user):
         json={"credential": "test@example.com", "password": "incorrecta"},
     )
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_mutation_with_disallowed_origin(client):
+    response = await client.post(
+        "/auth/login",
+        json={"credential": "test@example.com", "password": "password123"},
+        headers={"Origin": "https://sitio-malicioso.example"},
+    )
+    assert response.status_code == 403
+    assert "no permitido" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_mutation_with_allowed_origin(client, test_user):
+    response = await client.post(
+        "/auth/login",
+        json={"credential": "test@example.com", "password": "password123"},
+        headers={"Origin": "http://localhost:5173"},
+    )
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_mutation_with_bearer_skips_origin_check(client, test_user):
+    from services.auth import create_access_token
+    token = create_access_token(data={"sub": test_user.email})
+    response = await client.post(
+        "/auth/login",
+        json={"credential": "test@example.com", "password": "password123"},
+        headers={"Authorization": f"Bearer {token}", "Origin": "https://cualquiera.example"},
+    )
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio

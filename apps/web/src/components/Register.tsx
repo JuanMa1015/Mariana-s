@@ -15,7 +15,6 @@ export default function Register() {
     const loadingToast = toast.loading("Creando cuenta...")
     try {
       const data = await registerUser({ email, username: username || undefined, password })
-      localStorage.setItem("token", data.access_token)
       localStorage.setItem("email", data.email)
       if (data.username) localStorage.setItem("username", data.username)
       toast.success("¡Cuenta creada con éxito!", { id: loadingToast })
@@ -63,6 +62,7 @@ export default function Register() {
                 id="reg-password"
                 type={showPassword ? "text" : "password"}
                 required
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 pl-4 pr-12 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
@@ -85,6 +85,7 @@ export default function Register() {
                 )}
               </button>
             </div>
+            <p className="mt-1 text-xs text-slate-400">Mínimo 8 caracteres</p>
           </div>
           <button type="submit" className="mt-2 w-full rounded-2xl border border-violet-300 bg-violet-400 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 active:scale-95">
             Registrarse
