@@ -89,15 +89,15 @@ function Row({ index, style, data }: ListChildProps) {
             <tr className="bg-white border-b border-slate-100">
               <td className="relative px-5 py-4 align-middle">
                 <div className={`absolute left-0 top-0 bottom-0 w-[3px] ${statusColor.bar} rounded-r`} />
-                <div className="flex items-center gap-2.5" onClick={() => toggleExpand(p.llave_proceso)}>
+                <div className="flex items-center gap-2.5" role="button" tabIndex={0} aria-expanded={isOpen} onClick={() => toggleExpand(p.llave_proceso)} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(p.llave_proceso) } }}>
                   <div className="text-slate-400 cursor-pointer">
                     <IconChevronDown open={isOpen} />
                   </div>
                   <div>
-                    <span className="block font-mono text-[11px] font-bold tracking-widest text-slate-800 leading-tight">
+                    <span className="block font-mono text-xs font-bold tracking-widest text-slate-800 leading-tight">
                       {p.llave_proceso}
                     </span>
-                    <span className="text-[10px] text-slate-400 mt-0.5 block">Radicado principal</span>
+                    <span className="text-[11px] text-slate-500 mt-0.5 block">Radicado principal</span>
                   </div>
                 </div>
               </td>
@@ -109,7 +109,7 @@ function Row({ index, style, data }: ListChildProps) {
               <td className="px-5 py-4 align-middle">
                 {p.departamento ? (
                   <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">{p.departamento}</span>
-                ) : <span className="text-xs text-slate-400 italic">—</span>}
+                ) : <span className="text-xs text-slate-500 italic">—</span>}
               </td>
               <td className="px-5 py-4 align-middle">
                 {p.categoria ? (
@@ -119,33 +119,33 @@ function Row({ index, style, data }: ListChildProps) {
                     <span className={`h-1.5 w-1.5 rounded-full ${p.categoria === "Trabajo" ? "bg-sky-500" : p.categoria === "Consultorio" ? "bg-amber-500" : "bg-violet-500"}`} />
                     {p.categoria}
                   </span>
-                ) : <span className="text-xs text-slate-400 italic">—</span>}
+                ) : <span className="text-xs text-slate-500 italic">—</span>}
               </td>
               <td className="px-5 py-4 align-middle max-w-[22rem]">
                 <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                  {p.sujetos_procesales || <span className="italic text-slate-400">Sin sujetos procesales</span>}
+                  {p.sujetos_procesales || <span className="italic text-slate-500">Sin sujetos procesales</span>}
                 </p>
               </td>
               <td className="px-5 py-4 align-middle">
                 {p.fecha_ultima_actuacion ? (
-                  <><p className="text-sm font-semibold text-slate-800">{new Date(p.fecha_ultima_actuacion).toLocaleDateString("es-CO")}</p><p className="text-[10px] text-slate-400 mt-0.5">Último cambio</p></>
-                ) : <span className="text-xs text-slate-400 italic">Sin actualización</span>}
+                  <><p className="text-sm font-semibold text-slate-800">{new Date(p.fecha_ultima_actuacion).toLocaleDateString("es-CO")}</p><p className="text-[11px] text-slate-500 mt-0.5">Último cambio</p></>
+                ) : <span className="text-xs text-slate-500 italic">Sin actualización</span>}
               </td>
               <td className="px-5 py-4 align-middle">
-                <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${statusColor.badge}`}>
+                <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusColor.badge}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${statusColor.dot}`} />
                   {statusColor.label}
                 </span>
               </td>
               <td className="px-5 py-4 align-middle">
                 <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); onOpenDetalle(p.llave_proceso) }} title="Ver actuaciones" className="inline-flex items-center gap-1.5 rounded-xl bg-violet-400 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-violet-500 active:scale-95"><IconEye /><span>Detalle</span></button>
-                  <a href="https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion" target="_blank" rel="noreferrer" title="Abrir en Rama Judicial" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100 active:scale-95"><IconExternalLink /><span>Oficial</span></a>
-                  <button type="button" onClick={(e) => { e.stopPropagation(); abrirEditor(p.llave_proceso) }} title="Editar radicado" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm transition hover:bg-amber-50 hover:text-amber-600 active:scale-95">
+                  <button type="button" onClick={(e) => { e.stopPropagation(); onOpenDetalle(p.llave_proceso) }} title="Ver actuaciones" className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-95"><IconEye /><span>Detalle</span></button>
+                  <a href="https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion" target="_blank" rel="noreferrer" title="Abrir en Rama Judicial" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100 active:scale-95"><IconExternalLink /><span>Oficial</span></a>
+                  <button type="button" onClick={(e) => { e.stopPropagation(); abrirEditor(p.llave_proceso) }} title="Editar radicado" aria-label="Editar radicado" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:bg-amber-50 hover:text-amber-600 active:scale-95">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg>
                   </button>
-                  <button type="button" onClick={(e) => handleCopy(e, p.llave_proceso)} title="Copiar radicado" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm transition hover:bg-violet-50 hover:text-violet-600 active:scale-95"><IconClipboard /></button>
-                  <button type="button" onClick={(e) => handleDelete(e, p.llave_proceso)} title="Eliminar radicado" className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-1.5 text-rose-400 shadow-sm transition hover:bg-rose-100 hover:text-rose-600 active:scale-95"><IconTrash /></button>
+                  <button type="button" onClick={(e) => handleCopy(e, p.llave_proceso)} title="Copiar radicado" aria-label="Copiar radicado" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:bg-violet-50 hover:text-violet-600 active:scale-95"><IconClipboard /></button>
+                  <button type="button" onClick={(e) => handleDelete(e, p.llave_proceso)} title="Eliminar radicado" aria-label="Eliminar radicado" className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-500 shadow-sm transition hover:bg-rose-100 hover:text-rose-600 active:scale-95"><IconTrash /></button>
                 </div>
               </td>
             </tr>
@@ -157,7 +157,7 @@ function Row({ index, style, data }: ListChildProps) {
                       <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-500">Información del proceso</p>
                       <h4 className="mt-1 font-mono text-sm font-bold tracking-widest text-slate-900">{p.llave_proceso}</h4>
                     </div>
-                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${statusColor.badge}`}>
+                    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusColor.badge}`}>
                       <span className={`h-1.5 w-1.5 rounded-full ${statusColor.dot}`} />
                       {statusColor.label}
                     </span>
@@ -173,9 +173,9 @@ function Row({ index, style, data }: ListChildProps) {
                       { label: "Última actualización", value: p.actualizado_en ? new Date(p.actualizado_en).toLocaleString("es-CO") : null },
                     ].map(({ label, value }) => (
                       <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">{label}</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
                         <p className="mt-1.5 text-sm font-medium text-slate-800">
-                          {value ?? <span className="text-slate-400 italic font-normal">Sin dato</span>}
+                          {value ?? <span className="text-slate-500 italic font-normal">Sin dato</span>}
                         </p>
                       </div>
                     ))}
@@ -194,6 +194,14 @@ function Row({ index, style, data }: ListChildProps) {
       <table className="w-full text-left text-sm border-separate border-spacing-0">
         <tbody>
           <tr
+            tabIndex={0}
+            aria-expanded={isOpen}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                toggleExpand(p.llave_proceso)
+              }
+            }}
             className="group cursor-pointer bg-white hover:bg-violet-50/70 transition-colors duration-150 border-b border-slate-100"
             onClick={() => toggleExpand(p.llave_proceso)}
           >
@@ -204,10 +212,10 @@ function Row({ index, style, data }: ListChildProps) {
                   <IconChevronDown open={isOpen} />
                 </div>
                 <div>
-                  <span className="block font-mono text-[11px] font-bold tracking-widest text-slate-800 leading-tight">
+                  <span className="block font-mono text-xs font-bold tracking-widest text-slate-800 leading-tight">
                     {p.llave_proceso}
                   </span>
-                  <span className="text-[10px] text-slate-400 mt-0.5 block">Radicado principal</span>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">Radicado principal</span>
                 </div>
               </div>
             </td>
@@ -219,7 +227,7 @@ function Row({ index, style, data }: ListChildProps) {
             <td className="px-5 py-4 align-middle">
               {p.departamento ? (
                 <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">{p.departamento}</span>
-              ) : <span className="text-xs text-slate-400 italic">—</span>}
+              ) : <span className="text-xs text-slate-500 italic">—</span>}
             </td>
             <td className="px-5 py-4 align-middle">
               {p.categoria ? (
@@ -229,33 +237,33 @@ function Row({ index, style, data }: ListChildProps) {
                   <span className={`h-1.5 w-1.5 rounded-full ${p.categoria === "Trabajo" ? "bg-sky-500" : p.categoria === "Consultorio" ? "bg-amber-500" : "bg-violet-500"}`} />
                   {p.categoria}
                 </span>
-              ) : <span className="text-xs text-slate-400 italic">—</span>}
+              ) : <span className="text-xs text-slate-500 italic">—</span>}
             </td>
             <td className="px-5 py-4 align-middle max-w-[22rem]">
               <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                {p.sujetos_procesales || <span className="italic text-slate-400">Sin sujetos procesales</span>}
+                {p.sujetos_procesales || <span className="italic text-slate-500">Sin sujetos procesales</span>}
               </p>
             </td>
             <td className="px-5 py-4 align-middle">
               {p.fecha_ultima_actuacion ? (
-                <><p className="text-sm font-semibold text-slate-800">{new Date(p.fecha_ultima_actuacion).toLocaleDateString("es-CO")}</p><p className="text-[10px] text-slate-400 mt-0.5">Último cambio</p></>
-              ) : <span className="text-xs text-slate-400 italic">Sin actualización</span>}
+                <><p className="text-sm font-semibold text-slate-800">{new Date(p.fecha_ultima_actuacion).toLocaleDateString("es-CO")}</p><p className="text-[11px] text-slate-500 mt-0.5">Último cambio</p></>
+              ) : <span className="text-xs text-slate-500 italic">Sin actualización</span>}
             </td>
             <td className="px-5 py-4 align-middle">
-              <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${statusColor.badge}`}>
+              <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${statusColor.badge}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${statusColor.dot}`} />
                 {statusColor.label}
               </span>
             </td>
             <td className="px-5 py-4 align-middle">
               <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                <button type="button" onClick={(e) => { e.stopPropagation(); onOpenDetalle(p.llave_proceso) }} title="Ver actuaciones" className="inline-flex items-center gap-1.5 rounded-xl bg-violet-400 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-violet-500 active:scale-95"><IconEye /><span>Detalle</span></button>
-                <a href="https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion" target="_blank" rel="noreferrer" title="Abrir en Rama Judicial" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100 active:scale-95"><IconExternalLink /><span>Oficial</span></a>
-                <button type="button" onClick={(e) => { e.stopPropagation(); abrirEditor(p.llave_proceso) }} title="Editar radicado" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm transition hover:bg-amber-50 hover:text-amber-600 active:scale-95">
+                <button type="button" onClick={(e) => { e.stopPropagation(); onOpenDetalle(p.llave_proceso) }} title="Ver actuaciones" className="inline-flex items-center gap-1.5 rounded-xl bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-95"><IconEye /><span>Detalle</span></button>
+                <a href="https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion" target="_blank" rel="noreferrer" title="Abrir en Rama Judicial" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 shadow-sm transition hover:bg-violet-100 active:scale-95"><IconExternalLink /><span>Oficial</span></a>
+                <button type="button" onClick={(e) => { e.stopPropagation(); abrirEditor(p.llave_proceso) }} title="Editar radicado" aria-label="Editar radicado" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:bg-amber-50 hover:text-amber-600 active:scale-95">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5"><path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" /><path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" /></svg>
                 </button>
-                <button type="button" onClick={(e) => handleCopy(e, p.llave_proceso)} title="Copiar radicado" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-1.5 text-slate-400 shadow-sm transition hover:bg-violet-50 hover:text-violet-600 active:scale-95"><IconClipboard /></button>
-                <button type="button" onClick={(e) => handleDelete(e, p.llave_proceso)} title="Eliminar radicado" className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-1.5 text-rose-400 shadow-sm transition hover:bg-rose-100 hover:text-rose-600 active:scale-95"><IconTrash /></button>
+                <button type="button" onClick={(e) => handleCopy(e, p.llave_proceso)} title="Copiar radicado" aria-label="Copiar radicado" className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm transition hover:bg-violet-50 hover:text-violet-600 active:scale-95"><IconClipboard /></button>
+                <button type="button" onClick={(e) => handleDelete(e, p.llave_proceso)} title="Eliminar radicado" aria-label="Eliminar radicado" className="inline-flex items-center justify-center rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-500 shadow-sm transition hover:bg-rose-100 hover:text-rose-600 active:scale-95"><IconTrash /></button>
               </div>
             </td>
           </tr>
@@ -358,7 +366,7 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
           <thead className="sticky top-0 z-10">
             <tr>
               {["Radicado", "Despacho", "Departamento", "Categoría", "Sujetos", "Última actuación", "Estado", "Acciones"].map((col) => (
-                <th key={col} className="bg-violet-100 px-5 py-3.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-600 first:rounded-tl-2xl last:rounded-tr-2xl">
+                <th key={col} className="bg-violet-100 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600 first:rounded-tl-2xl last:rounded-tr-2xl">
                   {col}
                 </th>
               ))}

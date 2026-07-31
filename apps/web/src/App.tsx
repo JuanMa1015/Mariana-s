@@ -5,48 +5,24 @@ import toast from "react-hot-toast"
 import type { DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync } from "./types"
 import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { captureException } from "./sentry"
 
-const FRASES: string[] = [
-  "La justicia es la constante y perpetua voluntad de dar a cada uno su derecho. — Ulpiano",
-  "El derecho es el conjunto de condiciones que permiten a la libertad de cada uno acomodarse a la libertad de todos. — Kant",
-  "Donde hay justicia no hay pobreza. — Séneca",
-  "El abogado no es dueño de la verdad, es dueño de la argumentación. — Anónimo",
-  "La ley es razón libre de pasión. — Aristóteles",
-  "Un buen abogado conoce el derecho; un gran abogado conoce al juez. — Anónimo",
-  "La justicia tarda, pero llega. — Refrán popular",
-  "El estudio del derecho no solo te enseña leyes, te enseña a pensar. — Anónimo",
-  "La libertad sin ley es anarquía; la ley sin libertad es tiranía. — Simón Bolívar",
-  "La perseverancia es la madre de la justicia. — Anónimo",
-  "No hay causa perdida, solo abogados que se rinden. — Anónimo",
-  "De la UdeA para el mundo: orgullo, compromiso y excelencia. — Anónimo",
-  "El derecho es la arquitectura de la convivencia social. — Anónimo",
-  "Lo importante no es ganar el caso, es hacer justicia. — Anónimo",
-  "Estudiar derecho es aprender a construir un mundo más justo. — Anónimo",
-  "La UdeA no te da un título, te da una herramienta para cambiar el país. — Anónimo",
-  "El mejor abogado no es el que más leyes sabe, sino el que más entiende a las personas. — Anónimo",
-  "Los procesos se ganan en los detalles. — Anónimo",
-  "La verdad no necesita abogado, pero agradece tener uno bueno. — Anónimo",
-  "La justicia sin fuerza es impotente; la fuerza sin justicia es tiranía. — Pascal",
-  "Un abogado es un poeta del deber. — Anónimo",
-  "La ley debe ser como la muerte, que no exceptúa a nadie. — Montesquieu",
-  "En la UdeA aprendí que el derecho sirve para algo más que para ganar plata. — Anónimo",
-  "La duda es el principio de la sabiduría jurídica. — Anónimo",
-  "Un caso difícil no se gana en el juzgado, se gana en la preparación. — Anónimo",
-  "El derecho penal es el derecho del miedo; el derecho civil es el derecho de la confianza. — Anónimo",
-  "Estudiar en la UdeA es entender que Colombia necesita abogados con conciencia social. — Anónimo",
-  "El que no conoce sus derechos, no puede exigirlos. — Anónimo",
-  "La abogacía no es una carrera para hacerse rico, es una carrera para hacerse útil. — Anónimo",
-  "La justicia es el pan de los pueblos. — Anónimo",
-  "Un abogado sin ética es un ladrón con toga. — Anónimo",
-  "El derecho nace del conflicto, pero busca la paz. — Anónimo",
-]
+function tiempoRelativo(fecha: string | null | undefined): string {
+  if (!fecha) return "Aún sin sincronizar"
+  const t = new Date(fecha).getTime()
+  if (isNaN(t)) return "Aún sin sincronizar"
+  const min = Math.floor((Date.now() - t) / 60000)
+  if (min < 1) return "hace un momento"
+  if (min < 60) return `hace ${min} min`
+  const horas = Math.floor(min / 60)
+  if (horas < 24) return `hace ${horas} hora${horas !== 1 ? "s" : ""}`
+  return new Date(t).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })
+}
 
 export default function App() {
   const navigate = useNavigate()
   const username = localStorage.getItem("username") || localStorage.getItem("email")?.split("@")[0] || "Mariana"
-  const frase = useMemo(() => FRASES[Math.floor(Math.random() * FRASES.length)], [])
 
   const saludo = useMemo(() => {
     const h = new Date().getHours()
@@ -68,6 +44,21 @@ export default function App() {
   const [busqueda, setBusqueda] = useState("")
   const [apiOffline, setApiOffline] = useState(false)
 
+  const ultimaSync = useMemo(() => {
+    let mejor: string | null = null
+    let mejorT = -Infinity
+    for (const p of procesos?.procesos ?? []) {
+      const f = p.ultima_sincronizacion
+      if (!f) continue
+      const t = new Date(f).getTime()
+      if (!isNaN(t) && t > mejorT) {
+        mejorT = t
+        mejor = f
+      }
+    }
+    return mejor
+  }, [procesos])
+
   useEffect(() => {
     const check = () => {
       fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/health`, { signal: AbortSignal.timeout(5000) })
@@ -79,12 +70,11 @@ export default function App() {
     return () => clearInterval(id)
   }, [])
 
-  const searchParams = new URLSearchParams(window.location.search)
-  const view = searchParams.get("view")
-  const radicadoDetalle = searchParams.get("radicado")
+  const { llaveProceso } = useParams()
 
-  const esDetalle = view === "detalle" && Boolean(radicadoDetalle)
+  const esDetalle = Boolean(llaveProceso)
   const fetchingRef = useRef(false)
+  const searchRef = useRef<HTMLInputElement>(null)
 
   const cacheKey = `lista:${page}:${limit}:${filtroCategoria || ""}:${busqueda || ""}`
 
@@ -130,25 +120,42 @@ export default function App() {
   }, [cargarLista])
 
   useEffect(() => {
-    if (!esDetalle || !radicadoDetalle) return
+    if (!esDetalle || !llaveProceso) return
     setLoadingDetalle(true)
     setDetalle(null)
-    getProceso(radicadoDetalle).then(setDetalle).finally(() => setLoadingDetalle(false))
-  }, [esDetalle, radicadoDetalle])
+    getProceso(llaveProceso).then(setDetalle).finally(() => setLoadingDetalle(false))
+  }, [esDetalle, llaveProceso])
 
-  const abrirDetalle = (llaveProceso: string) => {
-    const url = new URL(window.location.href)
-    url.searchParams.set("view", "detalle")
-    url.searchParams.set("radicado", llaveProceso)
-    navigate(`${url.pathname}${url.search}${url.hash}`)
+  const abrirDetalle = (llave: string) => {
+    navigate(`/procesos/${llave}`)
   }
 
   const volverLista = () => {
-    const url = new URL(window.location.href)
-    url.searchParams.delete("view")
-    url.searchParams.delete("radicado")
-    navigate(`${url.pathname}${url.search}${url.hash}`)
+    navigate("/")
   }
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = document.activeElement
+      const enInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement
+      if (enInput) {
+        if (e.key === "Escape") (document.activeElement as HTMLElement).blur()
+        return
+      }
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault()
+        navigate("/novedades")
+      } else if (e.key === "/") {
+        e.preventDefault()
+        searchRef.current?.focus()
+      } else if (e.key === "Escape" && esDetalle) {
+        e.preventDefault()
+        navigate("/")
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [navigate, esDetalle])
 
   const handleSync = useCallback(async () => {
     if (syncing) return
@@ -184,13 +191,14 @@ export default function App() {
       <header className="border-b border-violet-100 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-none items-center justify-between px-4 py-3 sm:px-5">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-400">Mariana's</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-violet-500">Mariana's</p>
             <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">{saludo}, {username}</h1>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={handleSync}
               disabled={syncing}
+              aria-label="Sincronizar procesos con Rama Judicial"
               className="inline-flex items-center gap-1.5 rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100 disabled:opacity-50 sm:px-4 sm:py-2 sm:text-sm"
             >
               <svg className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -200,6 +208,7 @@ export default function App() {
             </button>
             <button
               onClick={() => navigate("/novedades")}
+              aria-label="Ver novedades"
               className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 sm:px-4 sm:py-2 sm:text-sm"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -211,6 +220,7 @@ export default function App() {
               href="https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion"
               target="_blank"
               rel="noreferrer"
+              aria-label="Abrir consulta oficial en Rama Judicial"
               className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 sm:px-4 sm:py-2 sm:text-sm"
             >
               <span className="hidden sm:inline">Consulta oficial</span>
@@ -218,7 +228,8 @@ export default function App() {
             </a>
             <button
               onClick={handleLogout}
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 sm:px-4 sm:py-2 sm:text-sm"
+              aria-label="Cerrar sesión"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 sm:px-4 sm:py-2 sm:text-sm"
             >
               Salir
             </button>
@@ -228,7 +239,7 @@ export default function App() {
 
       <main className="mx-auto flex w-full max-w-none flex-1 min-h-0 flex-col gap-3 px-4 py-4 sm:px-5 sm:py-5">
         {apiOffline && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm">
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm no-print">
             <span className="font-semibold">API no disponible:</span> los datos pueden estar desactualizados. Intenta recargar la pagina.
           </div>
         )}
@@ -255,7 +266,7 @@ export default function App() {
         ) : (
           <>
         {syncResult && (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm no-print">
             <span className="font-semibold">Sincronizacion completada:</span>{' '}
             {syncResult.nuevos} nuevo{syncResult.nuevos !== 1 ? "s" : ""},{" "}
             {syncResult.actualizados} actualizado{syncResult.actualizados !== 1 ? "s" : ""},{" "}
@@ -280,7 +291,7 @@ export default function App() {
         )}
         <section className="grid gap-3 md:grid-cols-4">
           <div className="rounded-3xl border border-violet-200 bg-violet-50 px-5 py-4 text-slate-900 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-500">Total procesos guardados</p>
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-600">Total procesos guardados</p>
             <p className="mt-1 text-3xl font-black tracking-tight text-violet-900">{procesos?.total ?? 0}</p>
           </div>
           <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-slate-900 shadow-sm">
@@ -292,31 +303,54 @@ export default function App() {
             <p className="mt-1 text-3xl font-black tracking-tight text-emerald-900">{Math.max((procesos?.total ?? 0) - (novedades?.total ?? 0), 0)}</p>
           </div>
           <div className="rounded-3xl border border-indigo-200 bg-indigo-50 px-5 py-4 text-slate-900 shadow-sm">
-            <p className="text-[10px] font-medium uppercase tracking-[0.15em] text-indigo-500">Frase del día</p>
-            <p className="mt-1 text-sm leading-snug text-indigo-700">{frase}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-indigo-600">Última sincronización</p>
+            <p className="mt-1 text-2xl font-black tracking-tight text-indigo-900">
+              {ultimaSync ? tiempoRelativo(ultimaSync) : "Sin datos"}
+            </p>
+            <p className="mt-1 text-xs text-indigo-700">
+              {ultimaSync ? "Datos actualizados desde Rama Judicial." : "Agrega un radicado y sincroniza."}
+            </p>
           </div>
         </section>
 
         <section className="rounded-3xl border border-violet-100 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="flex flex-1 flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-              <input
-                placeholder="Radicado de 23 dígitos"
-                value={newRadicado.llave_proceso}
-                onChange={(e) => setNewRadicado({ ...newRadicado, llave_proceso: e.target.value.replace(/\D/g, "") })}
-                className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition placeholder:text-violet-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
-                maxLength={23}
-                inputMode="numeric"
-              />
-              <select
-                value={newRadicado.categoria}
-                onChange={(e) => setNewRadicado({ ...newRadicado, categoria: e.target.value })}
-                className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 sm:w-44"
-              >
-                <option value="General">General</option>
-                <option value="Trabajo">Trabajo</option>
-                <option value="Consultorio">Consultorio</option>
-              </select>
+            <div className="flex flex-1 flex-col gap-1.5">
+              <div className="flex gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                <input
+                  aria-label="Radicado de 23 dígitos"
+                  placeholder="Radicado de 23 dígitos"
+                  value={newRadicado.llave_proceso}
+                  onChange={(e) => {
+                    const digitos = e.target.value.replace(/\D/g, "").slice(0, 23)
+                    setNewRadicado({ ...newRadicado, llave_proceso: digitos })
+                  }}
+                  className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition placeholder:text-violet-400 focus:ring-4 ${
+                    newRadicado.llave_proceso.length > 0 && newRadicado.llave_proceso.length !== 23
+                      ? "border-rose-300 bg-rose-50/30 focus:border-rose-400 focus:ring-rose-100"
+                      : "border-violet-200 bg-violet-50/30 focus:border-violet-400 focus:ring-violet-100"
+                  }`}
+                  maxLength={23}
+                  inputMode="numeric"
+                />
+                <select
+                  aria-label="Categoría del radicado"
+                  value={newRadicado.categoria}
+                  onChange={(e) => setNewRadicado({ ...newRadicado, categoria: e.target.value })}
+                  className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 sm:w-44"
+                >
+                  <option value="General">General</option>
+                  <option value="Trabajo">Trabajo</option>
+                  <option value="Consultorio">Consultorio</option>
+                </select>
+              </div>
+              <p className={`text-xs ${newRadicado.llave_proceso.length > 0 && newRadicado.llave_proceso.length !== 23 ? "text-rose-600" : "text-slate-500"}`}>
+                {newRadicado.llave_proceso.length === 0
+                  ? "Solo números, sin guiones ni espacios."
+                  : newRadicado.llave_proceso.length === 23
+                    ? "Formato válido."
+                    : `${newRadicado.llave_proceso.length} de 23 dígitos.`}
+              </p>
             </div>
             <button
               onClick={async () => {
@@ -341,7 +375,7 @@ export default function App() {
                   toast.error(err.message, { id: loadingToast })
                 }
               }}
-              className="rounded-2xl border border-violet-300 bg-violet-400 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 active:scale-95"
+              className="rounded-2xl border border-violet-500 bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-95"
             >
               Agregar
             </button>
@@ -351,11 +385,12 @@ export default function App() {
         <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-violet-100 px-4 py-3 sm:px-5">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-400">Lista de seguimiento</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-500">Lista de seguimiento</p>
               <h3 className="mt-1 text-base font-semibold text-slate-800 sm:text-lg">Radicados guardados y novedades</h3>
             </div>
             <div className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-semibold text-violet-600 sm:text-xs">
               {procesos?.total ?? 0} guardados · {novedades?.total ?? 0} novedades
+              {ultimaSync ? <span className="hidden sm:inline"> · sincronizado {tiempoRelativo(ultimaSync)}</span> : null}
             </div>
           </div>
 
@@ -377,10 +412,13 @@ export default function App() {
               ))}
             </div>
             <input
-              placeholder="Buscar radicado..."
+              ref={searchRef}
+              aria-label="Buscar por radicado, parte o juzgado"
+              title="Buscar (atajo: /)"
+              placeholder="Buscar por radicado, parte o juzgado..."
               value={busqueda}
               onChange={(e) => { setBusqueda(e.target.value); setPage(1) }}
-              className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-2 text-sm outline-none transition placeholder:text-violet-300 focus:border-violet-400 focus:ring-4 focus:ring-violet-100 sm:w-64"
+              className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-2 text-sm outline-none transition placeholder:text-violet-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100 sm:w-80"
             />
           </div>
 
@@ -415,6 +453,7 @@ export default function App() {
               Página {page} de {procesos?.total_paginas ?? 1}
             </div>
             <select
+              aria-label="Procesos por página"
               value={limit}
               onChange={(e) => { setLimit(Number(e.target.value)); setPage(1) }}
               className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-600 outline-none transition hover:bg-violet-50"

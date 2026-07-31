@@ -13,7 +13,7 @@ function formatearFecha(iso: string | null | undefined): string {
 
 function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"] }) {
   const [open, setOpen] = useState(false)
-  if (!documentos?.length) return <span className="text-slate-300">—</span>
+  if (!documentos?.length) return <span className="text-slate-400">—</span>
 
   const descargarDocumento = (id: number, nombre: string) => async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -40,7 +40,9 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-[11px] font-semibold text-sky-700 transition hover:bg-sky-100"
+        aria-label={`${documentos.length} documento${documentos.length !== 1 ? "s" : ""}`}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
       >
         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -51,10 +53,10 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute right-0 top-full z-20 mt-1 w-96 rounded-xl border border-sky-100 bg-white p-3 shadow-lg">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-sky-600">Documentos</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-sky-600">Documentos</p>
             <div className="space-y-2">
               {documentos.map((doc) => (
-                <div key={doc.id_reg_documento} className="rounded-lg bg-sky-50 p-2 text-[11px]">
+                <div key={doc.id_reg_documento} className="rounded-lg bg-sky-50 p-2 text-xs">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-sky-800 truncate">{doc.nombre}</p>
@@ -63,7 +65,8 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
                     </div>
                     <button
                       onClick={descargarDocumento(doc.id_reg_documento, doc.nombre)}
-                      className="shrink-0 rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-sky-600 shadow-sm ring-1 ring-sky-200 transition hover:bg-sky-50"
+                      aria-label={`Descargar ${doc.nombre}`}
+                      className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-sky-600 shadow-sm ring-1 ring-sky-200 transition hover:bg-sky-50"
                     >
                       Descargar
                     </button>
@@ -81,9 +84,9 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
 function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-[11px]">
+      <table className="w-full border-collapse text-xs">
         <thead>
-          <tr className="border-b border-violet-100 text-left text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          <tr className="border-b border-violet-100 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             <th className="px-3 py-2">Fecha actuación</th>
             <th className="px-3 py-2">Actuación</th>
             <th className="px-3 py-2">Anotación</th>
@@ -101,7 +104,7 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
             >
               <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-700">
                 {i === 0 && (
-                  <span className="mr-1.5 inline-block rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-700">Última</span>
+                  <span className="mr-1.5 inline-block rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-700">Última</span>
                 )}
                 {formatearFecha(a.fecha_actuacion)}
               </td>
@@ -145,19 +148,43 @@ export default function NovedadesPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / limit)) : 1
   const currentPage = Math.floor(skip / limit) + 1
 
-  const handleMarcarTodo = async () => {
-    setMarcando(true)
-    try {
-      const res = await marcarTodoLeido()
-      toast.success(`${res.marcados} proceso${res.marcados !== 1 ? "s" : ""} marcado${res.marcados !== 1 ? "s" : ""} como leido${res.marcados !== 1 ? "s" : ""}`)
-      setSkip(0)
-      setExpanded(new Set())
-      getNovedadesDetalle(0, limit).then(setData)
-    } catch {
-      toast.error("Error al marcar como leido")
-    } finally {
-      setMarcando(false)
-    }
+  const handleMarcarTodo = () => {
+    toast((t) => (
+      <div className="flex flex-col gap-3">
+        <p className="text-sm font-semibold text-slate-800">¿Marcar todos como leído?</p>
+        <p className="text-xs text-slate-500">
+          {data ? `Se marcarán ${data.total} proceso${data.total !== 1 ? "s" : ""} como leído${data.total !== 1 ? "s" : ""}.` : "Se marcarán todos los procesos pendientes."}
+        </p>
+        <div className="flex gap-2">
+          <button
+            className="flex-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition"
+            onClick={async () => {
+              toast.dismiss(t.id)
+              setMarcando(true)
+              try {
+                const res = await marcarTodoLeido()
+                toast.success(`${res.marcados} proceso${res.marcados !== 1 ? "s" : ""} marcado${res.marcados !== 1 ? "s" : ""} como leido${res.marcados !== 1 ? "s" : ""}`)
+                setSkip(0)
+                setExpanded(new Set())
+                getNovedadesDetalle(0, limit).then(setData)
+              } catch {
+                toast.error("Error al marcar como leido")
+              } finally {
+                setMarcando(false)
+              }
+            }}
+          >
+            Sí, marcar todo
+          </button>
+          <button
+            className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+            onClick={() => toast.dismiss(t.id)}
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    ), { duration: Infinity, style: { background: "#fff", padding: "16px", borderRadius: "16px" } })
   }
 
   const toggleExpand = (llave: string) => {
@@ -264,7 +291,7 @@ export default function NovedadesPage() {
                       </span>
 
                       {nov.tipo_novedad && (
-                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
                           nov.tipo_novedad === "nuevo" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
                         }`}>
                           {nov.tipo_novedad === "nuevo" ? "Nuevo" : "Actualización"}
@@ -272,7 +299,7 @@ export default function NovedadesPage() {
                       )}
 
                       {nov.categoria && (
-                        <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
                           nov.categoria === "Trabajo" ? "bg-sky-100 text-sky-700" : nov.categoria === "Consultorio" ? "bg-amber-100 text-amber-700" : "bg-violet-100 text-violet-700"
                         }`}>
                           {nov.categoria}
@@ -297,7 +324,7 @@ export default function NovedadesPage() {
                         <ActuacionesTable actuaciones={nov.actuaciones} />
                         <div className="mt-3 flex justify-end">
                           <button
-                            onClick={() => navigate(`/?view=detalle&radicado=${nov.llave_proceso}`)}
+                            onClick={() => navigate(`/procesos/${nov.llave_proceso}`)}
                             className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
                           >
                             Ver detalle completo →

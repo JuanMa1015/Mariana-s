@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, selectinload
 from models.database import get_db
 from models.actuacion import Actuacion
@@ -44,7 +44,14 @@ def listar_procesos(
     if categoria:
         query = query.filter(Proceso.categoria == categoria)
     if q:
-        query = query.filter(Proceso.llave_proceso.ilike(f"%{q}%"))
+        term = f"%{q}%"
+        query = query.filter(
+            or_(
+                Proceso.llave_proceso.ilike(term),
+                Proceso.sujetos_procesales.ilike(term),
+                Proceso.despacho.ilike(term),
+            )
+        )
 
     total = query.count()
     procesos = query.offset(skip).limit(limit).all()

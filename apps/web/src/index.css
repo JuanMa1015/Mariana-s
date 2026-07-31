@@ -1,1 +1,28 @@
 @import "tailwindcss";
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  @media print {
+    header,
+    .no-print {
+      display: none !important;
+    }
+
+    body {
+      background: #fff !important;
+    }
+  }
+}
+
+:focus-visible:not(input):not(select):not(textarea) {
+  outline: 2px solid #7c3aed;
+  outline-offset: 2px;
+  border-radius: 6px;
+}

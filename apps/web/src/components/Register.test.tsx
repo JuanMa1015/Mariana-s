@@ -32,7 +32,7 @@ describe("Register", () => {
     render(<BrowserRouter><Register /></BrowserRouter>)
     expect(screen.getByLabelText(/correo electrónico/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/nombre de usuario/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
+    expect(screen.getByLabelText("Contraseña")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /registrarse/i })).toBeInTheDocument()
   })
 
@@ -67,7 +67,7 @@ describe("Register", () => {
     render(<BrowserRouter><Register /></BrowserRouter>)
     fireEvent.change(screen.getByLabelText(/correo electrónico/i), { target: { value: "test@example.com" } })
     fireEvent.change(screen.getByLabelText(/nombre de usuario/i), { target: { value: "tester" } })
-    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: "password123" } })
+    fireEvent.change(screen.getByLabelText("Contraseña"), { target: { value: "password123" } })
     fireEvent.click(screen.getByRole("button", { name: /registrarse/i }))
 
     await waitFor(() => {
@@ -91,7 +91,7 @@ describe("Register", () => {
 
     render(<BrowserRouter><Register /></BrowserRouter>)
     fireEvent.change(screen.getByLabelText(/correo electrónico/i), { target: { value: "dup@example.com" } })
-    fireEvent.change(screen.getByLabelText(/contraseña/i), { target: { value: "pass123" } })
+    fireEvent.change(screen.getByLabelText("Contraseña"), { target: { value: "pass123" } })
     fireEvent.click(screen.getByRole("button", { name: /registrarse/i }))
 
     await waitFor(() => {

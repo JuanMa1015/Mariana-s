@@ -87,9 +87,9 @@ const StatusBadge = ({ notificado }: { notificado: boolean }) =>
 
 const InfoCard = ({ label, value, highlight = false }: { label: string; value?: string | null; highlight?: boolean }) => (
   <div className={`rounded-2xl border p-4 ${highlight ? "border-sky-200 bg-sky-50" : "border-slate-200 bg-white shadow-sm"}`}>
-    <p className={`text-[10px] font-semibold uppercase tracking-[0.2em] ${highlight ? "text-sky-600" : "text-slate-400"}`}>{label}</p>
+    <p className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${highlight ? "text-sky-600" : "text-slate-500"}`}>{label}</p>
     <p className={`mt-1.5 text-sm font-semibold ${highlight ? "text-sky-900" : "text-slate-800"}`}>
-      {value ?? <span className="italic font-normal text-slate-400">Sin dato</span>}
+      {value ?? <span className="italic font-normal text-slate-500">Sin dato</span>}
     </p>
   </div>
 )
@@ -97,12 +97,34 @@ const InfoCard = ({ label, value, highlight = false }: { label: string; value?: 
 const DocumentosList = ({ docs }: { docs: DocumentoActuacion[] }) => {
   const [open, setOpen] = useState(false)
   if (!docs.length) return null
+
+  const descargar = async (id: number, nombre: string) => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/procesos/documento/${id}`, {
+        credentials: "include",
+      })
+      if (!res.ok) throw new Error("Error al descargar")
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = nombre
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch {
+      toast.error("No se pudo descargar el documento")
+    }
+  }
+
   return (
     <div className="mt-2">
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-600 hover:text-violet-800 transition"
+        aria-expanded={open}
+        className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 transition"
       >
         <IconDocument />
         {docs.length} documento{docs.length > 1 ? "s" : ""}
@@ -111,9 +133,19 @@ const DocumentosList = ({ docs }: { docs: DocumentoActuacion[] }) => {
       {open && (
         <ul className="mt-1.5 space-y-1">
           {docs.map((doc) => (
-            <li key={doc.id_reg_documento} className="rounded-lg bg-slate-50 px-3 py-1.5 text-[11px] text-slate-600">
-              <p className="font-medium text-slate-700">{doc.nombre}</p>
-              {doc.descripcion && <p className="text-slate-400 truncate">{doc.descripcion}</p>}
+            <li key={doc.id_reg_documento} className="flex items-start justify-between gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-xs text-slate-600">
+              <div className="min-w-0">
+                <p className="font-medium text-slate-700 truncate">{doc.nombre}</p>
+                {doc.descripcion && <p className="text-slate-500 truncate">{doc.descripcion}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={() => descargar(doc.id_reg_documento, doc.nombre)}
+                aria-label={`Descargar ${doc.nombre}`}
+                className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-violet-600 shadow-sm ring-1 ring-violet-200 transition hover:bg-violet-50"
+              >
+                Descargar
+              </button>
             </li>
           ))}
         </ul>
@@ -133,7 +165,7 @@ const ActuacionCard = ({ actuacion, isLatest }: { actuacion: Actuacion; isLatest
       <div className={`rounded-2xl border p-4 transition ${isLatest ? "border-violet-200 bg-violet-50/50 shadow-sm" : "border-slate-100 bg-white hover:bg-slate-50/50"}`}>
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-semibold text-violet-600 whitespace-nowrap">
+            <span className="text-xs font-semibold text-violet-600 whitespace-nowrap">
               {formatearFecha(actuacion.fecha_actuacion)}
             </span>
             {isLatest && (
@@ -147,7 +179,7 @@ const ActuacionCard = ({ actuacion, isLatest }: { actuacion: Actuacion; isLatest
               </span>
             )}
           </div>
-          <span className="text-[10px] text-slate-400">{actuacion.cons_actuacion}</span>
+          <span className="text-[11px] text-slate-500">{actuacion.cons_actuacion}</span>
         </div>
 
         <p className="mt-1.5 text-sm font-semibold text-slate-800">{actuacion.actuacion}</p>
@@ -156,7 +188,7 @@ const ActuacionCard = ({ actuacion, isLatest }: { actuacion: Actuacion; isLatest
           <p className="mt-1 text-xs text-slate-600 leading-relaxed">{actuacion.anotacion}</p>
         )}
 
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
           {actuacion.fecha_inicial && <span>Inicio: {formatearFecha(actuacion.fecha_inicial)}</span>}
           {actuacion.fecha_final && <span>Fin: {formatearFecha(actuacion.fecha_final)}</span>}
           {actuacion.fecha_registro && <span>Registro: {formatearFecha(actuacion.fecha_registro)}</span>}
@@ -199,7 +231,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
   return (
     <div className="flex flex-col gap-5">
       {/* ── Top nav bar ── */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-2 flex-wrap no-print">
         <button
           type="button"
           onClick={onVolver}
@@ -214,6 +246,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
               type="button"
               onClick={handleMarcarLeido}
               disabled={marcando}
+              aria-label={marcando ? "Marcando como leído" : "Marcar como leído"}
               className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 shadow-sm transition hover:bg-emerald-100 active:scale-95 disabled:opacity-50"
             >
               <IconCheck />
@@ -222,16 +255,26 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
           )}
           <button
             onClick={handleCopy}
+            aria-label="Copiar radicado"
             className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 active:scale-95"
           >
             <IconClipboard />
             <span className="hidden sm:block">Copiar</span>
           </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            aria-label="Imprimir detalle del proceso"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 active:scale-95"
+          >
+            <span className="hidden sm:block">Imprimir</span>
+          </button>
           <a
             href="https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion"
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-400 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-500 active:scale-95"
+            aria-label="Abrir en Rama Judicial"
+            className="inline-flex items-center gap-2 rounded-xl border border-violet-500 bg-violet-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-95"
           >
             <IconExternalLink />
             <span className="hidden sm:block">Oficial</span>
@@ -250,7 +293,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
               <IconScale />
             </div>
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-500">Proceso judicial</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600">Proceso judicial</p>
               <h2 className="mt-0.5 font-mono text-lg font-bold tracking-widest text-slate-800 leading-tight">
                 {detalle.llave_proceso}
               </h2>
@@ -275,19 +318,19 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl bg-white/60 border border-violet-200 px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-500">Última actuación</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600">Última actuación</p>
             <p className="mt-1 text-sm font-semibold text-slate-700">
               {fechaUltima ?? <span className="italic font-normal text-slate-400">Sin dato</span>}
             </p>
           </div>
           <div className="rounded-xl bg-white/60 border border-violet-200 px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-500">Tipo</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600">Tipo</p>
             <p className="mt-1 text-sm font-semibold text-slate-700">
               {detalle.tipo_proceso ?? <span className="italic font-normal text-slate-400">Sin dato</span>}
             </p>
           </div>
           <div className="rounded-xl bg-white/60 border border-violet-200 px-4 py-3">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-500">Clase</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600">Clase</p>
             <p className="mt-1 text-sm font-semibold text-slate-700">
               {detalle.clase_proceso ?? <span className="italic font-normal text-slate-400">Sin dato</span>}
             </p>
@@ -309,7 +352,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
       {/* ── Sujetos procesales ── */}
       {detalle.sujetos_procesales && (
         <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-400 mb-3">Sujetos procesales</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-500 mb-3">Sujetos procesales</p>
           <p className="whitespace-pre-line text-sm leading-7 text-slate-700">{detalle.sujetos_procesales}</p>
         </div>
       )}
@@ -318,7 +361,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
       <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm" id="actuaciones">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-violet-400">Actuaciones</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-500">Actuaciones</p>
             <h3 className="mt-1 text-lg font-semibold text-slate-800">Historial del proceso</h3>
           </div>
           <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">

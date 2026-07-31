@@ -49,6 +49,13 @@ createRoot(document.getElementById('root')!).render(
               </Suspense>
             </ProtectedRoute>
           } />
+          <Route path="/procesos/:llaveProceso" element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
+                <App />
+              </Suspense>
+            </ProtectedRoute>
+          } />
           <Route path="/*" element={
             <ProtectedRoute>
               <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>

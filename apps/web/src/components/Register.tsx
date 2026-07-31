@@ -34,21 +34,23 @@ export default function Register() {
 
         <form onSubmit={handleRegister} className="flex flex-col gap-4">
           <div>
-            <label htmlFor="reg-email" className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Correo Electrónico</label>
+            <label htmlFor="reg-email" className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 mb-1 block">Correo Electrónico</label>
             <input
               id="reg-email"
               type="email"
               required
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
             />
           </div>
           <div>
-            <label htmlFor="reg-username" className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Nombre de Usuario</label>
+            <label htmlFor="reg-username" className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 mb-1 block">Nombre de Usuario</label>
             <input
               id="reg-username"
               type="text"
+              autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
               className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
@@ -56,13 +58,14 @@ export default function Register() {
             />
           </div>
           <div>
-            <label htmlFor="reg-password" className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1 block">Contraseña</label>
+            <label htmlFor="reg-password" className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 mb-1 block">Contraseña</label>
             <div className="relative">
               <input
                 id="reg-password"
                 type={showPassword ? "text" : "password"}
                 required
                 minLength={8}
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 pl-4 pr-12 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
@@ -70,7 +73,8 @@ export default function Register() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 flex items-center pr-4 text-violet-300 hover:text-violet-600"
+                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                className="absolute inset-y-0 right-0 flex items-center pr-4 text-violet-500 hover:text-violet-700"
                 tabIndex={-1}
               >
                 {showPassword ? (
@@ -85,9 +89,9 @@ export default function Register() {
                 )}
               </button>
             </div>
-            <p className="mt-1 text-xs text-slate-400">Mínimo 8 caracteres</p>
+            <p className="mt-1 text-xs text-slate-500">Mínimo 8 caracteres</p>
           </div>
-          <button type="submit" className="mt-2 w-full rounded-2xl border border-violet-300 bg-violet-400 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-500 active:scale-95">
+          <button type="submit" className="mt-2 w-full rounded-2xl border border-violet-500 bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-95 focus-visible:outline-none">
             Registrarse
           </button>
         </form>

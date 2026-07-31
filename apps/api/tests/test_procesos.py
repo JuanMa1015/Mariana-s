@@ -74,6 +74,52 @@ async def test_list_procesos_with_data(client, auth_headers, test_user, db):
 
 
 @pytest.mark.asyncio
+async def test_search_by_sujetos_procesales(client, auth_headers, test_user, db):
+    from models.proceso import Proceso
+
+    db.add(
+        Proceso(
+            llave_proceso="05001310301220210012300",
+            sujetos_procesales="DEMANDANTE: Paula Correa\nDEMANDADO: Empresa SAS",
+            user_id=test_user.id,
+        )
+    )
+    db.add(
+        Proceso(
+            llave_proceso="05001400300520230010000",
+            sujetos_procesales="DEMANDANTE: Otra Parte",
+            user_id=test_user.id,
+        )
+    )
+    db.commit()
+
+    response = await client.get(f"{PREFIX}/?q=paula", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+    assert data["procesos"][0]["llave_proceso"] == "05001310301220210012300"
+
+
+@pytest.mark.asyncio
+async def test_search_by_despacho(client, auth_headers, test_user, db):
+    from models.proceso import Proceso
+
+    db.add(
+        Proceso(
+            llave_proceso="05001310301220210012300",
+            despacho="Juzgado 17 Civil del Circuito de Medellín",
+            user_id=test_user.id,
+        )
+    )
+    db.commit()
+
+    response = await client.get(f"{PREFIX}/?q=civil", headers=auth_headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total"] == 1
+
+
+@pytest.mark.asyncio
 async def test_list_procesos_other_user_not_visible(
     client, auth_headers, otro_usuario, db
 ):
