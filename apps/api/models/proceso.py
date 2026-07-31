@@ -31,6 +31,9 @@ class Proceso(Base):
     ultima_sincronizacion = Column(DateTime, nullable=True)
     dias_sin_cambios = Column(Integer, default=0)
     fallos_consecutivos = Column(Integer, default=0)
+    notificacion_pendiente = Column(Boolean, default=False)
+    intentos_notificacion = Column(Integer, default=0)
+    ultima_notificacion_intento = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="procesos")
     actuaciones = relationship("Actuacion", back_populates="proceso", cascade="all, delete-orphan")

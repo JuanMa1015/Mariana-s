@@ -260,11 +260,19 @@ export default function App() {
             {syncResult.nuevos} nuevo{syncResult.nuevos !== 1 ? "s" : ""},{" "}
             {syncResult.actualizados} actualizado{syncResult.actualizados !== 1 ? "s" : ""},{" "}
             {syncResult.total_consultados} consultado{syncResult.total_consultados !== 1 ? "s" : ""}
-            {syncResult.radicados_error_consulta ? (
+            {(syncResult.errores_app ?? 0) > 0 ? (
               <>
                 <span className="mx-2 inline-block h-3 w-px bg-emerald-300" />
-                <span className="text-rose-600">
-                  {syncResult.radicados_error_consulta.length} error{syncResult.radicados_error_consulta.length !== 1 ? "es" : ""}
+                <span className="font-semibold text-rose-600">
+                  {(syncResult.errores_app ?? 0)} error{(syncResult.errores_app ?? 0) !== 1 ? "es" : ""} interno{(syncResult.errores_app ?? 0) !== 1 ? "s" : ""}
+                </span>
+              </>
+            ) : null}
+            {(syncResult.errores_rama ?? 0) > 0 || (syncResult.radicados_saltados_rama?.length ?? 0) > 0 ? (
+              <>
+                <span className="mx-2 inline-block h-3 w-px bg-emerald-300" />
+                <span className="font-medium text-amber-600">
+                  {((syncResult.errores_rama ?? 0) + (syncResult.radicados_saltados_rama?.length ?? 0))} por Rama Judicial (la app esta bien)
                 </span>
               </>
             ) : null}

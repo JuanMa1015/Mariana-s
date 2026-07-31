@@ -150,4 +150,4 @@ async def test_backoff_dias():
     assert _backoff_dias(p3) == 7
 
     p4 = Proceso(fallos_consecutivos=5)
-    assert _backoff_dias(p4) == 15
+    assert _backoff_dias(p4) == 7

@@ -15,7 +15,7 @@ async def test_notificar_sin_config_retorna_false():
         actuacion="Se admitio demanda",
         anotacion="Auto admisorio",
     )
-    assert result is False
+    assert result == {"email": False, "telegram": False}
 
 
 @pytest.mark.asyncio
@@ -29,7 +29,7 @@ async def test_notificar_sujetos_procesales_vacios():
         fecha_ultima_actuacion=None,
         sujetos_procesales="",
     )
-    assert result is False
+    assert result == {"email": False, "telegram": False}
 
 
 @pytest.mark.asyncio
@@ -62,7 +62,7 @@ async def test_enviar_smtp_sin_host_retorna_false():
 async def test_notificar_telegram_fallback_sin_token():
     from services.notifications import notificar_cambio_radicado
 
-    with patch("services.telegram.notificar_telegram") as mock_tg:
+    with patch("services.telegram.notificar_telegram", return_value=False) as mock_tg:
         result = notificar_cambio_radicado(
             llave_proceso="05001310301220210012300",
             despacho="Juzgado 12",
@@ -71,7 +71,7 @@ async def test_notificar_telegram_fallback_sin_token():
             sujetos_procesales="Perez, Juan",
             actuacion="Se admitio demanda",
         )
-        assert result is False
+        assert result == {"email": False, "telegram": False}
         mock_tg.assert_called_once()
 
 
@@ -82,7 +82,7 @@ async def test_notificar_con_custom_asunto_cuerpo():
     with (
         patch("services.notifications.SENDGRID_API_KEY", "fake-key"),
         patch("services.notifications._enviar_sendgrid") as mock_sg,
-        patch("services.telegram.notificar_telegram"),
+        patch("services.telegram.notificar_telegram", return_value=False),
     ):
         mock_sg.return_value = True
         result = notificar_cambio_radicado(
@@ -94,7 +94,7 @@ async def test_notificar_con_custom_asunto_cuerpo():
             custom_asunto="Asunto personalizado",
             custom_cuerpo="<p>Cuerpo personalizado</p>",
         )
-        assert result is True
+        assert result["email"] is True
         mock_sg.assert_called_once()
         args, kwargs = mock_sg.call_args
         assert "Asunto personalizado" in args[1]

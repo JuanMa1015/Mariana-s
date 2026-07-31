@@ -62,7 +62,7 @@ async def test_enviar_notificaciones_individuales():
     emails = []
 
     with (
-        patch("services.sync.notificar_cambio_radicado", return_value=True) as m_ncr,
+        patch("services.sync.notificar_cambio_radicado", return_value={"email": True, "telegram": False}) as m_ncr,
         patch("services.sync.time.sleep"),
     ):
         _enviar_notificaciones_acumuladas(acumuladas, emails)
@@ -87,7 +87,7 @@ async def test_enviar_notificaciones_resumen():
     emails = []
 
     with (
-        patch("services.sync.notificar_cambio_radicado", return_value=True) as m_ncr,
+        patch("services.sync.notificar_cambio_radicado", return_value={"email": True, "telegram": False}) as m_ncr,
         patch("services.email_templates.template_resumen") as m_tr,
         patch("services.sync.time.sleep"),
     ):
@@ -118,7 +118,7 @@ async def test_enviar_notificaciones_con_telegram():
     emails = []
 
     with (
-        patch("services.sync.notificar_cambio_radicado", return_value=True) as m_ncr,
+        patch("services.sync.notificar_cambio_radicado", return_value={"email": True, "telegram": False}) as m_ncr,
         patch("services.sync.time.sleep"),
     ):
         _enviar_notificaciones_acumuladas(acumuladas, emails)
@@ -127,9 +127,213 @@ async def test_enviar_notificaciones_con_telegram():
         assert kwargs.get("telegram_chat_id") == "12345"
 
 
-# ─── _sincronizar_lista tests ────────────────────────────────────────────────
+@pytest.mark.asyncio
+async def test_fetch_actuaciones_multi_raise_si_uno_falla():
+    from services.sync import _fetch_actuaciones_multi
+    from scraper.rama_client import ResultadoActuaciones
+
+    pag = _make_paginacion(cantidad=1)
+    ok = ResultadoActuaciones(actuaciones=[_make_actuacion(id_reg_actuacion=1)], paginacion=pag)
+
+    with patch("services.sync.cached_call", side_effect=[Exception("Rama caida"), ok]):
+        with pytest.raises(RuntimeError):
+            _fetch_actuaciones_multi([100, 200])
+
 
 @pytest.mark.asyncio
+async def test_aplicar_datos_remotos_telegram_only(db, test_user):
+    from services.sync import _aplicar_datos_remotos
+    from models.proceso import Proceso
+
+    test_user.telegram_chat_id = "12345"
+    test_user.email = ""
+    db.commit()
+
+    p = Proceso(llave_proceso=RADICADO, user_id=test_user.id, notificado=True)
+    db.add(p)
+    db.commit()
+
+    act = _make_actuacion(id_reg_actuacion=10)
+    datos = {
+        "status": "ok",
+        "resumen": _make_proceso_remoto(),
+        "detalle": _make_detalle(),
+        "actuaciones": [act],
+        "documentos_por_actuacion": {},
+    }
+    nuevos, actualizados, emails, errores, acumuladas = [], [], [], [], {}
+
+    with patch("services.sync._es_reciente", return_value=True):
+        _aplicar_datos_remotos(db, p, datos, nuevos, actualizados, emails, errores, acumuladas)
+
+    assert p.notificado is False
+    assert p.notificacion_pendiente is True
+    assert "telegram:12345" in acumuladas
+    entry = acumuladas["telegram:12345"][0]
+    assert entry["email"] is None
+    assert entry["telegram_chat_id"] == "12345"
+    assert entry["llave_proceso"] == RADICADO
+
+
+@pytest.mark.asyncio
+async def test_reenviar_notificaciones_pendientes_exitoso(db, test_user):
+    from services.sync import _reenviar_notificaciones_pendientes
+    from models.proceso import Proceso
+
+    p = Proceso(
+        llave_proceso=RADICADO,
+        user_id=test_user.id,
+        notificado=False,
+        notificacion_pendiente=True,
+        intentos_notificacion=1,
+        ultima_notificacion_intento=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=5),
+    )
+    db.add(p)
+    db.commit()
+
+    with patch("services.sync.notificar_cambio_radicado", return_value={"email": True, "telegram": False}):
+        reenviadas = _reenviar_notificaciones_pendientes(db)
+
+    assert reenviadas == [RADICADO]
+    db.refresh(p)
+    assert p.notificacion_pendiente is False
+    assert p.intentos_notificacion == 0
+
+
+@pytest.mark.asyncio
+async def test_reenviar_notificaciones_pendientes_en_cooldown(db, test_user):
+    from services.sync import _reenviar_notificaciones_pendientes
+    from models.proceso import Proceso
+
+    p = Proceso(
+        llave_proceso=RADICADO,
+        user_id=test_user.id,
+        notificacion_pendiente=True,
+        intentos_notificacion=1,
+        ultima_notificacion_intento=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1),
+    )
+    db.add(p)
+    db.commit()
+
+    with patch("services.sync.notificar_cambio_radicado", return_value={"email": False, "telegram": False}):
+        reenviadas = _reenviar_notificaciones_pendientes(db)
+
+    assert reenviadas == []
+    db.refresh(p)
+    assert p.notificacion_pendiente is True
+    assert p.intentos_notificacion == 1
+
+
+@pytest.mark.asyncio
+async def test_reenviar_notificaciones_pendientes_agota_intentos(db, test_user):
+    from services.sync import _reenviar_notificaciones_pendientes
+    from models.proceso import Proceso
+
+    p = Proceso(
+        llave_proceso=RADICADO,
+        user_id=test_user.id,
+        notificacion_pendiente=True,
+        intentos_notificacion=5,
+        ultima_notificacion_intento=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=30),
+    )
+    db.add(p)
+    db.commit()
+
+    with patch("services.sync.notificar_cambio_radicado", return_value={"email": False, "telegram": False}):
+        reenviadas = _reenviar_notificaciones_pendientes(db)
+
+    assert reenviadas == []
+    db.refresh(p)
+    assert p.notificacion_pendiente is True
+    assert p.intentos_notificacion == 5
+
+
+@pytest.mark.asyncio
+async def test_ejecutar_lote_circuit_breaker(db, test_user):
+    from services.sync import _ejecutar_lote
+    from models.proceso import Proceso
+
+    radicados = [Proceso(llave_proceso=f"{i:023d}", user_id=test_user.id) for i in range(1, 8)]
+
+    def fake_fetch(radicado):
+        if radicado.llave_proceso.startswith(("00000000000000000000001", "00000000000000000000002", "00000000000000000000003")):
+            return {"status": "error", "llave_proceso": radicado.llave_proceso, "error": "Rama caida", "paso": "buscar_por_radicado"}
+        return {"status": "ok", "llave_proceso": radicado.llave_proceso}
+
+    with (
+        patch("services.sync._fetch_radicado_remoto", side_effect=fake_fetch),
+        patch("services.sync.time.sleep"),
+    ):
+        datos, saltados = _ejecutar_lote(radicados)
+
+    errores = [d for d in datos if d["status"] == "error"]
+    assert len(errores) == 3
+    assert len(saltados) == 4
+    assert all(d["status"] == "ok" for d in datos if d not in errores)
+
+
+@pytest.mark.asyncio
+async def test_sincronizar_lista_reintenta_errores_rama(db, test_user):
+    from services.sync import _sincronizar_lista
+    from models.proceso import Proceso
+
+    p = Proceso(llave_proceso=RADICADO, user_id=test_user.id)
+    db.add(p)
+    db.commit()
+
+    llamadas = {"n": 0}
+
+    def fake_fetch(radicado):
+        llamadas["n"] += 1
+        if llamadas["n"] <= 1:
+            return {"status": "error", "llave_proceso": radicado.llave_proceso, "error": "Rama caida", "paso": "buscar_por_radicado"}
+        return {
+            "status": "ok",
+            "llave_proceso": radicado.llave_proceso,
+            "resumen": _make_proceso_remoto(),
+            "detalle": _make_detalle(),
+            "actuaciones": [_make_actuacion(id_reg_actuacion=10)],
+            "documentos_por_actuacion": {},
+        }
+
+    with (
+        patch("services.sync._fetch_radicado_remoto", side_effect=fake_fetch),
+        patch("services.sync.rama_health_check", return_value=True),
+        patch("services.sync.notificar_cambio_radicado", return_value={"email": True, "telegram": False}),
+        patch("services.sync._es_reciente", return_value=True),
+        patch("services.sync.time.sleep"),
+    ):
+        result = _sincronizar_lista(db, [p])
+
+    assert llamadas["n"] == 2
+    assert result["errores_rama"] == 0
+    assert result["errores_app"] == 0
+    assert result["actualizados"] == 1
+    assert result["rama_estable"] is True
+
+
+@pytest.mark.asyncio
+async def test_sincronizar_lista_marca_origen_rama(db, test_user):
+    from services.sync import _sincronizar_lista
+    from models.proceso import Proceso
+
+    p = Proceso(llave_proceso=RADICADO, user_id=test_user.id)
+    db.add(p)
+    db.commit()
+
+    with (
+        patch("services.sync._fetch_radicado_remoto", return_value={"status": "error", "llave_proceso": RADICADO, "error": "timeout", "paso": "detalle"}),
+        patch("services.sync.rama_health_check", return_value=False),
+        patch("services.sync.time.sleep"),
+    ):
+        result = _sincronizar_lista(db, [p])
+
+    assert result["errores_rama"] == 1
+    assert result["rama_estable"] is False
+    assert result["radicados_error_consulta"][0]["origen"] == "rama"
+
+
+# ─── _sincronizar_lista tests ────────────────────────────────────────────────@pytest.mark.asyncio
 async def test_sincronizar_lista_con_radicados(test_user, db):
     from services.sync import _sincronizar_lista
     from models.proceso import Proceso
@@ -150,7 +354,7 @@ async def test_sincronizar_lista_con_radicados(test_user, db):
         patch("services.sync.buscar_actuaciones") as m_ba,
         patch("services.sync.buscar_documentos_actuacion", return_value=[]),
         patch("services.sync.time.sleep"),
-        patch("services.sync.notificar_cambio_radicado", return_value=True),
+        patch("services.sync.notificar_cambio_radicado", return_value={"email": True, "telegram": False}),
         patch("services.sync._es_reciente", return_value=True),
     ):
         m_br.return_value = ResultadoBusqueda(procesos=[mock_proc], paginacion=pag)

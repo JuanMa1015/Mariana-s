@@ -79,88 +79,88 @@ def notificar_cambio_radicado(
     custom_cuerpo: str | None = None,
     telegram_chat_id: str | None = None,
     actuaciones: list[dict] | None = None,
-) -> bool:
+) -> dict:
     if not destinatarios:
         destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
 
-    if not destinatarios:
-        logger.info("Correo no configurado; se omite notificación para %s", llave_proceso)
-        return False
-
-    from services.email_templates import template_novedad
-
-    if custom_asunto and custom_cuerpo:
-        asunto = custom_asunto
-        cuerpo_html = custom_cuerpo
-        cuerpo_texto = re.sub(r"<[^>]+>", "", custom_cuerpo).strip()
-    else:
-        asunto = f"Novedad judicial: {llave_proceso}"
-        cuerpo_html = template_novedad(
-            llave_proceso=llave_proceso,
-            despacho=despacho,
-            departamento=departamento,
-            fecha_ultima_actuacion=fecha_ultima_actuacion,
-            sujetos_procesales=sujetos_procesales,
-            actuacion=actuacion,
-            anotacion=anotacion,
-            fecha_registro=fecha_registro,
-            con_documentos=con_documentos,
-            categoria=categoria,
-            actuaciones=actuaciones,
-        )
-        partes_sujetos = [p.strip() for p in (sujetos_procesales or "").split("|") if p.strip()]
-        sujetos_texto = "\n".join(f"  {p}" for p in partes_sujetos) or "  Sin informacion"
-        link_rama = f"https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion?numero={llave_proceso}"
-        if actuaciones:
-            lines = []
-            for act in actuaciones:
-                lines.append(f"  - {act.get('fecha_actuacion','N/D')[:10]}: {act.get('actuacion','N/D')}")
-            actuaciones_texto = "\n".join(lines)
-        else:
-            actuaciones_texto = f"  Actuacion: {actuacion or 'N/D'}\n  Anotacion: {anotacion or 'N/D'}\n  Fecha registro: {fecha_registro or 'N/D'}\n  Documentos: {'Si' if con_documentos else 'No'}"
-        cuerpo_texto = (
-            f"MARIANA'S — Monitor Judicial\n\n"
-            f"Se detectaron nuevas actuaciones en el proceso:\n\n"
-            f"  Radicado:     {llave_proceso}\n"
-            f"  Categoria:    {categoria or 'General'}\n"
-            f"  Despacho:     {despacho}\n"
-            f"  Departamento: {departamento}\n"
-            f"  Ultima act.:  {fecha_ultima_actuacion or 'N/D'}\n\n"
-            f"Nuevas actuaciones:\n"
-            f"{actuaciones_texto}\n\n"
-            f"Sujetos procesales:\n"
-            f"{sujetos_texto}\n"
-            f"\n"
-            f"---\n"
-            f"Consultar en Rama Judicial: {link_rama}\n"
-            f"Ver en Mariana's: {APP_URL}\n"
-        )
-
-    default_destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
-    using_defaults = set(destinatarios) == set(default_destinatarios)
-
     exito = False
-    if SENDGRID_API_KEY:
-        exito = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+    if destinatarios:
+        from services.email_templates import template_novedad
 
-    if not exito and SMTP_HOST:
-        logger.warning("SendGrid falló, reintentando con SMTP para %s", destinatarios)
-        exito = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+        if custom_asunto and custom_cuerpo:
+            asunto = custom_asunto
+            cuerpo_html = custom_cuerpo
+            cuerpo_texto = re.sub(r"<[^>]+>", "", custom_cuerpo).strip()
+        else:
+            asunto = f"Novedad judicial: {llave_proceso}"
+            cuerpo_html = template_novedad(
+                llave_proceso=llave_proceso,
+                despacho=despacho,
+                departamento=departamento,
+                fecha_ultima_actuacion=fecha_ultima_actuacion,
+                sujetos_procesales=sujetos_procesales,
+                actuacion=actuacion,
+                anotacion=anotacion,
+                fecha_registro=fecha_registro,
+                con_documentos=con_documentos,
+                categoria=categoria,
+                actuaciones=actuaciones,
+            )
+            partes_sujetos = [p.strip() for p in (sujetos_procesales or "").split("|") if p.strip()]
+            sujetos_texto = "\n".join(f"  {p}" for p in partes_sujetos) or "  Sin informacion"
+            link_rama = f"https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion?numero={llave_proceso}"
+            if actuaciones:
+                lines = []
+                for act in actuaciones:
+                    lines.append(f"  - {act.get('fecha_actuacion','N/D')[:10]}: {act.get('actuacion','N/D')}")
+                actuaciones_texto = "\n".join(lines)
+            else:
+                actuaciones_texto = f"  Actuacion: {actuacion or 'N/D'}\n  Anotacion: {anotacion or 'N/D'}\n  Fecha registro: {fecha_registro or 'N/D'}\n  Documentos: {'Si' if con_documentos else 'No'}"
+            cuerpo_texto = (
+                f"MARIANA'S — Monitor Judicial\n\n"
+                f"Se detectaron nuevas actuaciones en el proceso:\n\n"
+                f"  Radicado:     {llave_proceso}\n"
+                f"  Categoria:    {categoria or 'General'}\n"
+                f"  Despacho:     {despacho}\n"
+                f"  Departamento: {departamento}\n"
+                f"  Ultima act.:  {fecha_ultima_actuacion or 'N/D'}\n\n"
+                f"Nuevas actuaciones:\n"
+                f"{actuaciones_texto}\n\n"
+                f"Sujetos procesales:\n"
+                f"{sujetos_texto}\n"
+                f"\n"
+                f"---\n"
+                f"Consultar en Rama Judicial: {link_rama}\n"
+                f"Ver en Mariana's: {APP_URL}\n"
+            )
 
-    if not exito and not using_defaults and default_destinatarios:
-        logger.warning(
-            "Fallo envío a %s, reintentando con destinatarios por defecto: %s",
-            destinatarios, default_destinatarios,
-        )
+        default_destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
+        using_defaults = set(destinatarios) == set(default_destinatarios)
+
         if SENDGRID_API_KEY:
-            exito = _enviar_sendgrid(default_destinatarios, asunto, cuerpo_html, cuerpo_texto)
-        if not exito and SMTP_HOST:
-            exito = _enviar_smtp(default_destinatarios, asunto, cuerpo_html, cuerpo_texto)
+            exito = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
 
-    # Telegram como canal secundario (independiente del email)
+        if not exito and SMTP_HOST:
+            logger.warning("SendGrid falló, reintentando con SMTP para %s", destinatarios)
+            exito = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+
+        if not exito and not using_defaults and default_destinatarios:
+            logger.warning(
+                "Fallo envío a %s, reintentando con destinatarios por defecto: %s",
+                destinatarios, default_destinatarios,
+            )
+            if SENDGRID_API_KEY:
+                exito = _enviar_sendgrid(default_destinatarios, asunto, cuerpo_html, cuerpo_texto)
+            if not exito and SMTP_HOST:
+                exito = _enviar_smtp(default_destinatarios, asunto, cuerpo_html, cuerpo_texto)
+    else:
+        logger.info("Correo no configurado; se omite email para %s", llave_proceso)
+
+    # Telegram como canal independiente del email
+    telegram_ok = False
     from services.telegram import notificar_telegram
     try:
-        notificar_telegram(
+        telegram_ok = notificar_telegram(
             llave_proceso=llave_proceso,
             despacho=despacho,
             departamento=departamento,
@@ -175,4 +175,4 @@ def notificar_cambio_radicado(
     except Exception as exc:
         logger.error("Telegram falló en notificar_cambio_radicado: %s", exc)
 
-    return exito
+    return {"email": exito, "telegram": telegram_ok}

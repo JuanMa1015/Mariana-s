@@ -71,11 +71,29 @@ jobs:
           echo "Nuevos:      $(echo "$BODY" | jq -r '.nuevos // 0')"
           echo "Actualizados:$(echo "$BODY" | jq -r '.actualizados // 0')"
           echo "Notificaciones: $(echo "$BODY" | jq -r '.emails_enviados | length')"
-          echo "Errores:     $(echo "$BODY" | jq -r '.radicados_error_consulta | length')"
+          echo "Reenviadas:  $(echo "$BODY" | jq -r '.notificaciones_reenviadas | length')"
+          echo "Errores Rama: $(echo "$BODY" | jq -r '.errores_rama // 0')"
+          echo "Errores App:  $(echo "$BODY" | jq -r '.errores_app // 0')"
+          echo "Saltados (Rama inestable): $(echo "$BODY" | jq -r '.radicados_saltados_rama | length')"
 
-          ERRORS=$(echo "$BODY" | jq -r '.radicados_error_consulta[] | "  - \(.radicado // "?"): \(.error // "?")"' 2>/dev/null)
-          if [ -n "$ERRORS" ]; then
-            echo "$ERRORS"
+          APP_ERRORS=$(echo "$BODY" | jq -r '[.radicados_error_consulta[]? | select(.origen == "app")] | length' 2>/dev/null || echo 0)
+          if [ "$APP_ERRORS" -gt 0 ]; then
+            echo "🔴 ATENCION: $APP_ERRORS error(es) internos de la app. Revisar logs de Render."
+            echo "$BODY" | jq -r '.radicados_error_consulta[]? | select(.origen == "app") | "  - \(.radicado // "?"): \(.error // "?")"'
+            echo "FALLO: hay errores internos de la app." >&2
+            exit 1
+          fi
+
+          RAMA_ERRORS=$(echo "$BODY" | jq -r '[.radicados_error_consulta[]? | select(.origen == "rama")] | length' 2>/dev/null || echo 0)
+          if [ "$RAMA_ERRORS" -gt 0 ]; then
+            echo "⚠️  $RAMA_ERRORS radicado(s) fallaron por Rama Judicial (la app esta bien)."
+            echo "Se reintentara en el proximo ciclo automaticamente."
+          fi
+
+          SALTADOS=$(echo "$BODY" | jq -r '.radicados_saltados_rama | length')
+          if [ "$SALTADOS" -gt 0 ]; then
+            echo "⚠️  Rama Judicial se volvio inestable a mitad del lote; $SALTADOS radicados se saltaron."
+            echo "La app detecto el problema y no se colgo (la app esta bien)."
           fi
 
           echo ""

@@ -181,7 +181,7 @@ def test_notificacion(_: None = Depends(_debug_auth), llave_proceso: str = ""):
             .order_by(Actuacion.fecha_actuacion.desc().nullslast(), Actuacion.id_reg_actuacion.desc())
             .first()
         )
-        ok = notificar_cambio_radicado(
+        res = notificar_cambio_radicado(
             llave_proceso=proceso.llave_proceso,
             despacho=proceso.despacho or "",
             departamento=proceso.departamento or "",
@@ -193,7 +193,12 @@ def test_notificacion(_: None = Depends(_debug_auth), llave_proceso: str = ""):
             con_documentos=ultima.con_documentos if ultima else False,
             categoria=proceso.categoria,
         )
-        return {"email_enviado": ok, "radicado": proceso.llave_proceso, "actuacion": ultima.actuacion if ultima else "N/A"}
+        return {
+            "email_enviado": res.get("email"),
+            "telegram_enviado": res.get("telegram"),
+            "radicado": proceso.llave_proceso,
+            "actuacion": ultima.actuacion if ultima else "N/A",
+        }
     finally:
         db.close()
 

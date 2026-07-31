@@ -1,7 +1,7 @@
 import logging
 import re
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
 from datetime import datetime, timezone, timedelta
 
 import httpx
@@ -20,6 +20,7 @@ from scraper.rama_client import (
     buscar_detalle_proceso,
     buscar_documentos_actuacion,
     buscar_por_radicado,
+    rama_health_check,
 )
 from services.notifications import notificar_cambio_radicado
 from config import APP_URL
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 _COLOMBIA_TZ = timezone(timedelta(hours=-5))
 _PARALELISMO = 3
+_MAX_FALLOS_CONSECUTIVOS_RAMA = 3
 
 
 def _normalizar_texto(valor: str | None) -> str:
@@ -90,7 +92,7 @@ def _backoff_dias(proceso: Proceso) -> int:
         return 3
     if fallos == 3:
         return 7
-    return 15
+    return 7
 
 
 def _debe_sincronizar(proceso: Proceso) -> bool:
@@ -110,7 +112,7 @@ def _debe_sincronizar(proceso: Proceso) -> bool:
     elif dias_sin_cambios < 90:
         return dias_desde_sync >= 7
     else:
-        return dias_desde_sync >= 15
+        return dias_desde_sync >= 7
 
 
 def _actualizar_campos_proceso(proceso: Proceso, resumen, detalle) -> bool:
@@ -224,23 +226,23 @@ def _fetch_actuaciones_multi(ids_proceso: list[int]) -> dict:
         except Exception as exc:
             fallos += 1
             logger.debug("_fetch_actuaciones_multi id_proc=%s fallo: %s", id_proc, exc)
-    if fallos == len(ids_proceso):
-        raise RuntimeError(f"Todas las consultas de actuaciones fallaron ({fallos}/{len(ids_proceso)} ids_proceso)")
     if fallos > 0:
-        logger.warning("_fetch_actuaciones_multi: %d/%d ids_proceso fallaron", fallos, len(ids_proceso))
+        raise RuntimeError(f"{fallos}/{len(ids_proceso)} consultas de actuaciones fallaron")
     actuaciones = sorted(todas.values(), key=lambda a: (a.fecha_actuacion or "", a.id_reg_actuacion or 0))
     return {"actuaciones": actuaciones, "documentos_por_actuacion": docs}
 
 
 
-def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list):
-    for email, notifs in acumuladas.items():
-        destinatarios = [email]
-        chat_id = notifs[0].get("telegram_chat_id") if notifs else None
+def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list) -> set[str]:
+    entregadas: set[str] = set()
+    for llave_grupo, notifs in acumuladas.items():
+        email = notifs[0].get("email")
+        destinatarios = [email] if email else None
+        chat_id = notifs[0].get("telegram_chat_id")
         if len(notifs) > 3:
             from services.email_templates import template_resumen
             asunto, cuerpo_html = template_resumen(notifs)
-            ok = notificar_cambio_radicado(
+            res = notificar_cambio_radicado(
                 llave_proceso="resumen",
                 despacho="",
                 departamento="",
@@ -255,13 +257,14 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                 custom_cuerpo=cuerpo_html,
                 telegram_chat_id=chat_id,
             )
-            if ok:
-                emails_enviados.append(f"resumen_{email}")
+            if res.get("email") or res.get("telegram"):
+                emails_enviados.append(f"resumen_{llave_grupo}")
+                entregadas.update(n["llave_proceso"] for n in notifs)
             time.sleep(0.5)
         else:
             for n in notifs:
                 actuaciones = n.get("actuaciones", [])
-                ok = notificar_cambio_radicado(
+                res = notificar_cambio_radicado(
                     llave_proceso=n["llave_proceso"],
                     despacho=n["despacho"],
                     departamento=n["departamento"],
@@ -276,9 +279,82 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                     telegram_chat_id=n.get("telegram_chat_id"),
                     actuaciones=actuaciones,
                 )
-                if ok:
+                if res.get("email") or res.get("telegram"):
                     emails_enviados.append(n["llave_proceso"])
+                    entregadas.add(n["llave_proceso"])
                 time.sleep(0.5)
+    return entregadas
+
+
+_INTENTOS_MAX_NOTIFICACION = 5
+_BACKOFF_NOTIFICACION_HORAS = [1, 3, 6, 12, 24]
+
+
+def _backoff_notificacion_horas(intentos: int) -> int:
+    return _BACKOFF_NOTIFICACION_HORAS[min(intentos, len(_BACKOFF_NOTIFICACION_HORAS) - 1)]
+
+
+def _reenviar_notificaciones_pendientes(db: Session) -> list[str]:
+    """Reintenta envíos fallidos de novedades usando datos de la BD (sin llamar a Rama)."""
+    pendientes = db.query(Proceso).filter(Proceso.notificacion_pendiente.is_(True)).all()
+    ahora = datetime.now(timezone.utc).replace(tzinfo=None)
+    reenviadas: list[str] = []
+
+    for radicado in pendientes:
+        intentos = radicado.intentos_notificacion or 0
+        if intentos >= _INTENTOS_MAX_NOTIFICACION:
+            logger.warning(
+                "Notificacion de %s alcanzó el máximo de %d intentos; queda visible en la app",
+                radicado.llave_proceso, _INTENTOS_MAX_NOTIFICACION,
+            )
+            continue
+        espera_h = _backoff_notificacion_horas(intentos)
+        if radicado.ultima_notificacion_intento and \
+                (ahora - radicado.ultima_notificacion_intento).total_seconds() < espera_h * 3600:
+            continue
+
+        user_email = radicado.user.email.strip() if radicado.user and radicado.user.email else None
+        telegram_chat_id = radicado.user.telegram_chat_id if radicado.user else None
+
+        actuaciones_db = (
+            db.query(Actuacion)
+            .filter(Actuacion.proceso_id == radicado.id)
+            .order_by(Actuacion.id_reg_actuacion.desc())
+            .limit(10)
+            .all()
+        )
+        actuaciones = [
+            {
+                "actuacion": a.actuacion,
+                "anotacion": a.anotacion,
+                "fecha_registro": a.fecha_registro,
+                "fecha_actuacion": a.fecha_actuacion,
+                "con_documentos": a.con_documentos,
+            }
+            for a in actuaciones_db
+        ]
+
+        res = notificar_cambio_radicado(
+            llave_proceso=radicado.llave_proceso,
+            despacho=radicado.despacho or "",
+            departamento=radicado.departamento or "",
+            fecha_ultima_actuacion=radicado.fecha_ultima_actuacion,
+            sujetos_procesales=radicado.sujetos_procesales or "",
+            destinatarios=[user_email] if user_email else None,
+            categoria=radicado.categoria,
+            telegram_chat_id=telegram_chat_id,
+            actuaciones=actuaciones,
+        )
+
+        radicado.intentos_notificacion = intentos + 1
+        radicado.ultima_notificacion_intento = ahora
+        if res.get("email") or res.get("telegram"):
+            radicado.notificacion_pendiente = False
+            radicado.intentos_notificacion = 0
+            reenviadas.append(radicado.llave_proceso)
+        db.commit()
+
+    return reenviadas
 
 
 
@@ -402,14 +478,17 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
 
     user_email = radicado.user.email.strip() if radicado.user and radicado.user.email else None
     telegram_chat_id = radicado.user.telegram_chat_id if radicado.user else None
+    tiene_canal = bool(user_email or telegram_chat_id)
+    llave_acumulada = user_email or f"telegram:{telegram_chat_id}"
 
     if is_initial_sync:
         if latest_remote is not None and _es_reciente(latest_remote.fecha_actuacion):
             radicado.notificado = False
             radicado.tipo_novedad = "actualizacion"
             actualizados.append(radicado.llave_proceso)
-            if user_email:
-                acumuladas.setdefault(user_email, []).append({
+            if tiene_canal:
+                radicado.notificacion_pendiente = True
+                acumuladas.setdefault(llave_acumulada, []).append({
                     "llave_proceso": radicado.llave_proceso,
                     "despacho": radicado.despacho or "",
                     "departamento": radicado.departamento or "",
@@ -424,6 +503,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
                     }],
                     "categoria": radicado.categoria,
                     "telegram_chat_id": telegram_chat_id,
+                    "email": user_email,
                 })
         else:
             radicado.notificado = True
@@ -441,8 +521,9 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
             .order_by(Actuacion.id_reg_actuacion.asc())
             .all()
         )
-        if user_email:
-            acumuladas.setdefault(user_email, []).append({
+        if tiene_canal:
+            radicado.notificacion_pendiente = True
+            acumuladas.setdefault(llave_acumulada, []).append({
                 "llave_proceso": radicado.llave_proceso,
                 "despacho": radicado.despacho or "",
                 "departamento": radicado.departamento or "",
@@ -460,6 +541,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
                 ],
                 "categoria": radicado.categoria,
                 "telegram_chat_id": telegram_chat_id,
+                "email": user_email,
             })
 
     radicado.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -470,13 +552,106 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
         db.commit()
 
 
+def _ejecutar_lote(pendientes: list[Proceso]) -> tuple[list[dict], list[str]]:
+    """Consulta Rama en paralelo con circuit breaker.
+
+    Si hay _MAX_FALLOS_CONSECUTIVOS_RAMA radicados seguidos que fallan, se
+    considera que Rama esta inestable, se deja de consultar y el resto se marca
+    como saltado para que el lote responda rapido en vez de colgarse.
+    """
+    datos_remotos: list[dict] = []
+    saltados_rama: list[str] = []
+    por_ejecutar = list(pendientes)
+    racha_fallos = 0
+
+    with ThreadPoolExecutor(max_workers=_PARALELISMO) as executor:
+        futuros = {}
+        while por_ejecutar or futuros:
+            while len(futuros) < _PARALELISMO and por_ejecutar:
+                radicado = por_ejecutar.pop(0)
+                futuros[executor.submit(_fetch_radicado_remoto, radicado)] = radicado
+                time.sleep(0.3)
+
+            if not futuros:
+                break
+
+            terminados, _ = wait(futuros, return_when=FIRST_COMPLETED)
+            for futuro in terminados:
+                radicado = futuros.pop(futuro)
+                try:
+                    datos = futuro.result()
+                except Exception as exc:
+                    datos = {
+                        "status": "error",
+                        "llave_proceso": radicado.llave_proceso,
+                        "error": f"{type(exc).__name__}: {exc}",
+                        "paso": "worker",
+                    }
+                datos_remotos.append(datos)
+                if datos["status"] == "error":
+                    racha_fallos += 1
+                else:
+                    racha_fallos = 0
+
+            if racha_fallos >= _MAX_FALLOS_CONSECUTIVOS_RAMA and por_ejecutar:
+                saltados_rama.extend(r.llave_proceso for r in por_ejecutar)
+                por_ejecutar = []
+                logger.warning(
+                    "Circuit breaker: %d fallos consecutivos a Rama. %d radicados saltados del lote.",
+                    racha_fallos, len(saltados_rama),
+                )
+
+    return datos_remotos, saltados_rama
+
+
+def _aplicar_resultado(db: Session, datos: dict, pendientes: list[Proceso], nuevos: list,
+                       actualizados: list, emails_enviados: list, errores_rama: list,
+                       errores_app: list, acumuladas: dict, privados: list):
+    """Aplica un resultado remoto (ok / error / private / no_data) a la BD."""
+    radicado = next((r for r in pendientes if r.llave_proceso == datos["llave_proceso"]), None)
+
+    if datos["status"] == "ok":
+        if radicado is not None:
+            try:
+                _aplicar_datos_remotos(db, radicado, datos, nuevos, actualizados, emails_enviados, errores_app, acumuladas)
+            except OperationalError as exc:
+                logger.warning("Error BD en radicado %s: %s. Reintentando...", radicado.llave_proceso, exc)
+                db.rollback()
+                try:
+                    _aplicar_datos_remotos(db, radicado, datos, nuevos, actualizados, emails_enviados, errores_app, acumuladas)
+                except OperationalError as exc2:
+                    logger.warning("Error BD persistente en radicado %s: %s", radicado.llave_proceso, exc2)
+                    db.rollback()
+                    errores_app.append({
+                        "radicado": radicado.llave_proceso,
+                        "error": str(exc2),
+                        "paso": "base_de_datos",
+                        "origen": "app",
+                    })
+    elif datos["status"] == "error":
+        errores_rama.append({
+            "radicado": datos["llave_proceso"],
+            "error": datos.get("error", "unknown"),
+            "paso": datos.get("paso", "remoto"),
+            "origen": "rama",
+        })
+    elif datos["status"] == "private":
+        privados.append(datos["llave_proceso"])
+        if radicado is not None:
+            radicado.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None)
+            radicado.fallos_consecutivos = 0
+            db.commit()
+
+
 def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
     nuevos: list = []
     actualizados: list = []
     emails_enviados: list = []
     ignorados: list = []
-    errores: list = []
+    errores_rama: list = []
+    errores_app: list = []
     saltados: list = []
+    saltados_rama: list = []
     privados: list = []
     acumuladas: dict[str, list[dict]] = {}
 
@@ -492,41 +667,32 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
     usuarios_afectados = len({r.user_id for r in radicados if re.fullmatch(r"\d{23}", r.llave_proceso or "")})
     pendientes = [r for r in radicados if r.llave_proceso not in ignorados and r.llave_proceso not in saltados]
 
-    datos_remotos: list[dict] = []
-    with ThreadPoolExecutor(max_workers=_PARALELISMO) as executor:
-        futuros = {}
-        for r in pendientes:
-            futuros[executor.submit(_fetch_radicado_remoto, r)] = r
-            time.sleep(0.3)
-
-        for futuro in as_completed(futuros):
-            datos_remotos.append(futuro.result())
-
+    # Ronda 1: lote principal con circuit breaker
+    datos_remotos, saltados_rama = _ejecutar_lote(pendientes)
     for datos in datos_remotos:
-        radicado = next((r for r in pendientes if r.llave_proceso == datos["llave_proceso"]), None)
-        if datos["status"] == "ok":
-            if radicado is not None:
-                try:
-                    _aplicar_datos_remotos(db, radicado, datos, nuevos, actualizados, emails_enviados, errores, acumuladas)
-                except OperationalError as exc:
-                    logger.warning("Error BD en radicado %s: %s. Reintentando...", radicado.llave_proceso, exc)
-                    db.rollback()
-                    try:
-                        _aplicar_datos_remotos(db, radicado, datos, nuevos, actualizados, emails_enviados, errores, acumuladas)
-                    except OperationalError as exc2:
-                        logger.warning("Error BD persistente en radicado %s: %s", radicado.llave_proceso, exc2)
-                        db.rollback()
-                        errores.append({"radicado": radicado.llave_proceso, "error": str(exc2), "paso": "base_de_datos"})
-        elif datos["status"] == "error":
-            errores.append({"radicado": datos["llave_proceso"], "error": datos.get("error", "unknown"), "paso": datos.get("paso", "remoto")})
-        elif datos["status"] == "private":
-            privados.append(datos["llave_proceso"])
-            if radicado is not None:
-                radicado.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None)
-                radicado.fallos_consecutivos = 0
-                db.commit()
+        _aplicar_resultado(db, datos, pendientes, nuevos, actualizados, emails_enviados,
+                           errores_rama, errores_app, acumuladas, privados)
 
-    _enviar_notificaciones_acumuladas(acumuladas, emails_enviados)
+    # Ronda 2: reintento en el mismo ciclo de los que fallaron por Rama (errores transitorios)
+    if errores_rama and rama_health_check():
+        pendientes_retry = [r for r in pendientes if r.llave_proceso in {e["radicado"] for e in errores_rama}]
+        errores_rama = []
+        datos_retry, saltados_retry = _ejecutar_lote(pendientes_retry)
+        saltados_rama.extend(saltados_retry)
+        for datos in datos_retry:
+            _aplicar_resultado(db, datos, pendientes, nuevos, actualizados, emails_enviados,
+                               errores_rama, errores_app, acumuladas, privados)
+    elif errores_rama:
+        logger.warning("Rama sigue sin responder; se omitio el reintento del lote.")
+
+    errores = errores_rama + errores_app
+    entregadas = _enviar_notificaciones_acumuladas(acumuladas, emails_enviados)
+    if entregadas:
+        db.query(Proceso).filter(Proceso.llave_proceso.in_(list(entregadas))).update(
+            {Proceso.notificacion_pendiente: False}, synchronize_session=False
+        )
+        db.commit()
+    reenviadas = _reenviar_notificaciones_pendientes(db)
 
     return {
         "total_consultados": len(radicados),
@@ -538,6 +704,11 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
         "radicados_ignorados": ignorados,
         "radicados_saltados_frecuencia": saltados,
         "radicados_privados": privados,
+        "radicados_saltados_rama": saltados_rama,
+        "errores_rama": len(errores_rama),
+        "errores_app": len(errores_app),
+        "rama_estable": not errores_rama and not saltados_rama,
         "radicados_error_consulta": errores,
         "usuarios_afectados": usuarios_afectados,
+        "notificaciones_reenviadas": reenviadas,
     }
