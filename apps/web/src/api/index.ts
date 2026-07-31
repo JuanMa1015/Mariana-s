@@ -25,7 +25,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos 
         await _esperar(espera)
         continue
       }
-      throw new Error("Error de conexión. Revisa tu internet.")
+      throw new Error("Error de conexión. Revisa tu internet.", { cause: err })
     }
 
     if (res.status === 401) {

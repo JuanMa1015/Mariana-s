@@ -6,7 +6,7 @@ import { BrowserRouter } from 'react-router-dom'
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
-  return { ...actual as any, useNavigate: () => mockNavigate }
+  return { ...(actual as typeof import('react-router-dom')), useNavigate: () => mockNavigate }
 })
 
 const mockGetProcesos = vi.fn()
@@ -21,12 +21,12 @@ vi.mock('./api', () => ({
   postSync: mockPostSync,
   postAddRadicado: mockPostAddRadicado,
   getProceso: mockGetProceso,
-}) as any)
+}))
 
 const toastImpl = { loading: vi.fn(() => 'toast-id'), success: vi.fn(), error: vi.fn() }
 vi.mock('react-hot-toast', () => ({ default: toastImpl }))
 
-vi.mock('./api/cache', () => ({ getCache: (() => null) as any, setCache: (() => {}) as any, removeCache: (() => {}) as any }))
+vi.mock('./api/cache', () => ({ getCache: () => null, setCache: () => {}, removeCache: () => {} }))
 
 beforeEach(() => {
   vi.clearAllMocks()

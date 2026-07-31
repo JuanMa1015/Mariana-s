@@ -1,22 +1,14 @@
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { loginUser } from "../api"
 import { Link, useNavigate } from "react-router-dom"
 import toast from "react-hot-toast"
 
 export default function Login() {
-  const [credential, setCredential] = useState("")
+  const [credential, setCredential] = useState(() => localStorage.getItem("rememberedEmail") ?? "")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
-  const [rememberMe, setRememberMe] = useState(false)
+  const [rememberMe, setRememberMe] = useState(() => Boolean(localStorage.getItem("rememberedEmail")))
   const navigate = useNavigate()
-
-  useEffect(() => {
-    const remembered = localStorage.getItem("rememberedEmail")
-    if (remembered) {
-      setCredential(remembered)
-      setRememberMe(true)
-    }
-  }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,8 +24,8 @@ export default function Login() {
       }
       toast.success("¡Bienvenido!", { id: loadingToast })
       navigate("/")
-    } catch (err: any) {
-      toast.error(err.message || "Error al iniciar sesión", { id: loadingToast })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al iniciar sesión", { id: loadingToast })
     }
   }
 

@@ -4,10 +4,20 @@ import type { Proceso } from "../types"
 import toast from "react-hot-toast"
 import { deleteProceso, updateProceso } from "../api"
 
+interface FilaData {
+  procesos: Proceso[]
+  abierto: string | null
+  toggleExpand: (llave: string) => void
+  onOpenDetalle: (llaveProceso: string) => void
+  handleCopy: (e: React.MouseEvent, llave: string) => void
+  handleDelete: (e: React.MouseEvent, llave: string) => void
+  abrirEditor: (llave: string) => void
+}
+
 interface ListChildProps {
   index: number
   style: CSSProperties
-  data: any
+  data: FilaData
 }
 
 const useContainerHeight = (ref: React.RefObject<HTMLDivElement | null>) => {
@@ -302,8 +312,8 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
                 await deleteProceso(llave)
                 toast.success("Radicado eliminado", { id: loadingToast })
                 if (onDelete) onDelete(llave)
-              } catch (err: any) {
-                toast.error(err.message || "Error al eliminar", { id: loadingToast })
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Error al eliminar", { id: loadingToast })
               }
             }}
           >Sí, eliminar</button>
@@ -340,8 +350,8 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
       toast.success("Radicado actualizado", { id: loading })
       setEditando(null)
       if (onDelete) onDelete(editando)
-    } catch (err: any) {
-      toast.error(err.message || "Error al actualizar", { id: loading })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al actualizar", { id: loading })
     }
   }
 

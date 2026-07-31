@@ -215,8 +215,8 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
       await updateProceso(detalle.llave_proceso, { notificado: true })
       toast.success("Marcado como leído")
       if (onActualizado) onActualizado()
-    } catch (err: any) {
-      toast.error(err.message || "Error al marcar como leído")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al marcar como leído")
     } finally {
       setMarcando(false)
     }

@@ -19,8 +19,8 @@ export default function Register() {
       if (data.username) localStorage.setItem("username", data.username)
       toast.success("¡Cuenta creada con éxito!", { id: loadingToast })
       navigate("/")
-    } catch (err: any) {
-      toast.error(err.message || "Error al registrarse", { id: loadingToast })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Error al registrarse", { id: loadingToast })
     }
   }
 

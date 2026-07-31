@@ -12,12 +12,12 @@ vi.mock("react-router-dom", async () => {
   return { ...actual, useNavigate: () => mockNavigate }
 })
 
-const mockToast = { loading: vi.fn((..._: any[]) => "tid"), success: vi.fn((..._: any[]) => {}), error: vi.fn((..._: any[]) => {}) }
+const mockToast = { loading: vi.fn(() => "tid"), success: vi.fn(), error: vi.fn() }
 vi.mock("react-hot-toast", () => ({
   default: {
-    loading: (...a: any[]) => mockToast.loading(...a),
-    success: (...a: any[]) => mockToast.success(...a),
-    error: (...a: any[]) => mockToast.error(...a),
+    loading: mockToast.loading,
+    success: mockToast.success,
+    error: mockToast.error,
   },
 }))
 

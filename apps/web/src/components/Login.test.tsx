@@ -7,18 +7,24 @@ import Login from './Login'
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
-  return { ...actual as any, useNavigate: () => mockNavigate }
+  return { ...(actual as typeof import('react-router-dom')), useNavigate: () => mockNavigate }
 })
 
 const mockLoginUser = vi.fn()
-vi.mock('../api', () => ({ loginUser: (...args: any[]) => mockLoginUser(...args) }))
+vi.mock('../api', () => ({
+  loginUser: (payload: { credential: string; password: string }) => mockLoginUser(payload),
+}))
 
-const mockToast = { loading: vi.fn((..._: any[]) => 'toast-id'), success: vi.fn((..._: any[]) => {}), error: vi.fn((..._: any[]) => {}) }
+const mockToast = {
+  loading: vi.fn<(message: string, opts?: object) => string>(() => 'toast-id'),
+  success: vi.fn<(message: string, opts?: object) => void>(() => {}),
+  error: vi.fn<(message: string, opts?: object) => void>(() => {}),
+}
 vi.mock('react-hot-toast', () => ({
   default: {
-    loading: (...a: any[]) => mockToast.loading(...a),
-    success: (...a: any[]) => mockToast.success(...a),
-    error: (...a: any[]) => mockToast.error(...a),
+    loading: (message: string, opts?: object) => mockToast.loading(message, opts),
+    success: (message: string, opts?: object) => mockToast.success(message, opts),
+    error: (message: string, opts?: object) => mockToast.error(message, opts),
   },
 }))
 

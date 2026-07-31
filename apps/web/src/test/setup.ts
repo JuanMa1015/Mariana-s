@@ -5,4 +5,4 @@ class ResizeObserverMock {
   unobserve() {}
   disconnect() {}
 }
-window.ResizeObserver = ResizeObserverMock as any
+window.ResizeObserver = ResizeObserverMock as unknown as typeof ResizeObserver

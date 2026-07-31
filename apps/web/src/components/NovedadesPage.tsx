@@ -139,10 +139,11 @@ export default function NovedadesPage() {
   const limit = 25
 
   useEffect(() => {
-    setLoading(true)
+    let active = true
     getNovedadesDetalle(skip, limit)
-      .then(setData)
-      .finally(() => setLoading(false))
+      .then((d) => { if (active) setData(d) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
   }, [skip])
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / limit)) : 1
@@ -246,7 +247,7 @@ export default function NovedadesPage() {
                   {marcando ? "Marcando..." : "Marcar todo como leido"}
                 </button>
                 <button
-                  onClick={() => setSkip((s) => Math.max(0, s - limit))}
+                  onClick={() => { setLoading(true); setSkip((s) => Math.max(0, s - limit)) }}
                   disabled={skip === 0}
                   className="rounded-lg border border-violet-200 px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
@@ -256,7 +257,7 @@ export default function NovedadesPage() {
                   Pág. {currentPage} de {totalPages}
                 </span>
                 <button
-                  onClick={() => setSkip((s) => s + limit)}
+                  onClick={() => { setLoading(true); setSkip((s) => s + limit) }}
                   disabled={!data || skip + limit >= data.total}
                   className="rounded-lg border border-violet-200 px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >

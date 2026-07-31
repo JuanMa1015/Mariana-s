@@ -1,13 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
+import type { ReactNode } from "react"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
 vi.mock("../api", () => ({ deleteProceso: vi.fn(), updateProceso: vi.fn() }))
 
-const toastFn = vi.fn(() => "toast-id") as any
-toastFn.loading = vi.fn(() => "tid")
-toastFn.success = vi.fn()
-toastFn.error = vi.fn()
-toastFn.dismiss = vi.fn()
+type ToastArgs = { id: string; visible: boolean; type: string }
+type ToastRender = (t: ToastArgs) => ReactNode
+const toastFn = Object.assign(vi.fn<(content: ToastRender, opts?: object) => string>(() => "toast-id"), {
+  loading: vi.fn(() => "tid"),
+  success: vi.fn(),
+  error: vi.fn(),
+  dismiss: vi.fn(),
+})
 vi.mock("react-hot-toast", () => ({ default: toastFn }))
 
 const PROCESOS_MOCK = [

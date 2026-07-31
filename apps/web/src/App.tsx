@@ -20,6 +20,13 @@ function tiempoRelativo(fecha: string | null | undefined): string {
   return new Date(t).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })
 }
 
+function fetchProcesosNovedades(skip: number, limit: number, categoria?: string, q?: string) {
+  return Promise.all([
+    getProcesos(undefined, undefined, skip, limit, categoria, q),
+    getNovedades(),
+  ])
+}
+
 export default function App() {
   const navigate = useNavigate()
   const username = localStorage.getItem("username") || localStorage.getItem("email")?.split("@")[0] || "Mariana"
@@ -30,19 +37,23 @@ export default function App() {
     if (h < 18) return "Buenas tardes"
     return "Buenas noches"
   }, [])
-  const [procesos, setProcesos] = useState<ListaProcesos | null>(null)
-  const [loadingLista, setLoadingLista] = useState(false)
-  const [novedades, setNovedades] = useState<ListaNovedades | null>(null)
-  const [newRadicado, setNewRadicado] = useState({ llave_proceso: "", categoria: "General" })
-  const [detalle, setDetalle] = useState<DetalleProceso | null>(null)
-  const [loadingDetalle, setLoadingDetalle] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [syncResult, setSyncResult] = useState<ResultadoSync | null>(null)
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(25)
   const [filtroCategoria, setFiltroCategoria] = useState("")
   const [busqueda, setBusqueda] = useState("")
   const [apiOffline, setApiOffline] = useState(false)
+
+  const cacheKey = `lista:${page}:${limit}:${filtroCategoria || ""}:${busqueda || ""}`
+
+  const [procesos, setProcesos] = useState<ListaProcesos | null>(() => getCache<ListaProcesos>(cacheKey))
+  const [novedades, setNovedades] = useState<ListaNovedades | null>(() => getCache<ListaNovedades>("novedades"))
+  const [newRadicado, setNewRadicado] = useState({ llave_proceso: "", categoria: "General" })
+  const [detalle, setDetalle] = useState<{ llave: string; data: DetalleProceso | null } | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<ResultadoSync | null>(null)
+
+  const [loadedKey, setLoadedKey] = useState<string | null>(() => (getCache<ListaProcesos>(cacheKey) ? cacheKey : null))
+  const loadingLista = loadedKey !== cacheKey
 
   const ultimaSync = useMemo(() => {
     let mejor: string | null = null
@@ -76,54 +87,51 @@ export default function App() {
   const fetchingRef = useRef(false)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const cacheKey = `lista:${page}:${limit}:${filtroCategoria || ""}:${busqueda || ""}`
-
   const cargarLista = useCallback(async (forceFresh = false) => {
     if (fetchingRef.current && !forceFresh) return
     fetchingRef.current = true
 
-    if (!forceFresh) {
-      const cachedP = getCache<ListaProcesos>(cacheKey)
-      const cachedN = getCache<ListaNovedades>("novedades")
-      if (cachedP && cachedN) {
-        setProcesos(cachedP)
-        setNovedades(cachedN)
-      }
-    }
-
-    if (!forceFresh && getCache<ListaProcesos>(cacheKey)) {
-      setLoadingLista(false)
-    } else {
-      setLoadingLista(true)
-    }
-
     const skip = (page - 1) * limit
     try {
-      const [p, n] = await Promise.all([
-        getProcesos(undefined, undefined, skip, limit, filtroCategoria || undefined, busqueda || undefined),
-        getNovedades(),
-      ])
+      const [p, n] = await fetchProcesosNovedades(skip, limit, filtroCategoria || undefined, busqueda || undefined)
       setProcesos(p)
       setNovedades(n)
+      setLoadedKey(cacheKey)
       setCache(cacheKey, p)
       setCache("novedades", n)
     } catch {
       /* keep showing cached data on error */
     } finally {
-      setLoadingLista(false)
       fetchingRef.current = false
     }
   }, [page, limit, filtroCategoria, busqueda, cacheKey])
 
   useEffect(() => {
-    cargarLista()
-  }, [cargarLista])
+    let active = true
+    const skip = (page - 1) * limit
+    fetchProcesosNovedades(skip, limit, filtroCategoria || undefined, busqueda || undefined)
+      .then(([p, n]) => {
+        if (!active) return
+        setProcesos(p)
+        setNovedades(n)
+        setLoadedKey(cacheKey)
+        setCache(cacheKey, p)
+        setCache("novedades", n)
+      })
+      .catch(() => {
+        /* keep showing cached data on error */
+      })
+    return () => { active = false }
+  }, [page, limit, filtroCategoria, busqueda, cacheKey])
+
+  const currentDetalle = detalle && detalle.llave === llaveProceso ? detalle.data : null
+  const loadingDetalle = esDetalle && currentDetalle === null
 
   useEffect(() => {
     if (!esDetalle || !llaveProceso) return
-    setLoadingDetalle(true)
-    setDetalle(null)
-    getProceso(llaveProceso).then(setDetalle).finally(() => setLoadingDetalle(false))
+    getProceso(llaveProceso)
+      .then((d) => setDetalle({ llave: llaveProceso, data: d }))
+      .catch(() => setDetalle({ llave: llaveProceso, data: null }))
   }, [esDetalle, llaveProceso])
 
   const abrirDetalle = (llave: string) => {
@@ -172,7 +180,7 @@ export default function App() {
       removeCache(cacheKey)
       removeCache("novedades")
       await cargarLista(true)
-    } catch (err: any) {
+    } catch (err) {
       captureException(err)
       toast.error("Error al sincronizar. Intenta de nuevo.", { id: loadingToast })
     } finally {
@@ -255,8 +263,8 @@ export default function App() {
                   <p className="text-sm font-medium">Cargando proceso...</p>
                 </div>
               </div>
-            ) : detalle ? (
-              <DetalleView detalle={detalle} onVolver={volverLista} onActualizado={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista(true) }} />
+            ) : currentDetalle ? (
+              <DetalleView detalle={currentDetalle} onVolver={volverLista} onActualizado={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista(true) }} />
             ) : (
               <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
                 No se encontró el radicado solicitado.
@@ -370,9 +378,9 @@ export default function App() {
                   } else {
                     toast.error(res.detail || res.message || 'Error al agregar', { id: loadingToast })
                   }
-                } catch (err: any) {
+                } catch (err) {
                   captureException(err)
-                  toast.error(err.message, { id: loadingToast })
+                  toast.error(err instanceof Error ? err.message : "Error al agregar", { id: loadingToast })
                 }
               }}
               className="rounded-2xl border border-violet-500 bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-95"
