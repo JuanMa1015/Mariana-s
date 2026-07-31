@@ -1,4 +1,5 @@
 import logging
+import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -146,6 +147,7 @@ def health():
 
     return {
         "status": "ok" if db_ok else "degradado",
+        "version": os.environ.get("RENDER_GIT_COMMIT", "").lower() or "dev",
         "base_de_datos": {"ok": db_ok, "error": db_error},
         "rama_judicial": {"ok": rama_ok},
         "scheduler": scheduler,

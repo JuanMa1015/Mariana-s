@@ -1,0 +1,50 @@
+name: Verificar despliegue en produccion
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/api/**"
+      - "infra/docker/**"
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        env:
+          TARGET_SHA: ${{ github.sha }}
+          API_URL: ${{ secrets.API_URL }}
+        with:
+          script: |
+            const target = process.env.TARGET_SHA.toLowerCase();
+            const apiUrl = (process.env.API_URL || "https://mariana-s.onrender.com").replace(/\/$/, "");
+            if (process.env.API_URL === undefined || process.env.API_URL === "") {
+              core.warning("No hay secret.API_URL configurado; usando URL por defecto.");
+            }
+            core.info(`Esperando a que la API despliegue el commit ${target}`);
+            const deadline = Date.now() + 10 * 60 * 1000;
+            let last = null;
+            while (Date.now() < deadline) {
+              try {
+                const res = await fetch(`${apiUrl}/health`);
+                const data = await res.json();
+                last = data;
+                if (res.ok && String(data.version || "").toLowerCase() === target) {
+                  core.notice(`OK: ${apiUrl} corre el commit ${target}`);
+                  break;
+                }
+                core.info(`Version actual: ${data.version || "(sin campo version)"} - reintentando...`);
+              } catch (err) {
+                core.info(`API no disponible aun: ${err.message}`);
+              }
+              await new Promise((r) => setTimeout(r, 20000));
+            }
+            if (!last || String(last.version || "").toLowerCase() !== target) {
+              const deployed = last ? (last.version || "desconocida") : "sin respuesta";
+              core.setFailed(
+                `Render NO desplego el commit ${target}. Version detectada: ${deployed}. ` +
+                `Revisa Render > Eventos: activa Auto-Deploy o haz Manual Deploy del commit mas reciente.`
+              );
+            }
