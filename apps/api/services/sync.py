@@ -5,7 +5,7 @@ from concurrent.futures import ThreadPoolExecutor, FIRST_COMPLETED, wait
 from datetime import datetime, timezone, timedelta
 
 import httpx
-from sqlalchemy import func, text
+from sqlalchemy import func
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
