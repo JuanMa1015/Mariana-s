@@ -24,7 +24,7 @@ jobs:
               core.warning("No hay secret.API_URL configurado; usando URL por defecto.");
             }
             core.info(`Esperando a que la API despliegue el commit ${target}`);
-            const deadline = Date.now() + 10 * 60 * 1000;
+            const deadline = Date.now() + 25 * 60 * 1000;
             let last = null;
             while (Date.now() < deadline) {
               try {
