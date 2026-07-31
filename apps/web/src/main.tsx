@@ -3,23 +3,18 @@ import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
-import * as Sentry from '@sentry/react'
 import './index.css'
 import Login from './components/Login.tsx'
 import Register from './components/Register.tsx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
 
 import { getMe } from './api'
+import { initSentry } from './sentry'
 
 const App = lazy(() => import('./App.tsx'))
 const NovedadesPage = lazy(() => import('./components/NovedadesPage.tsx'))
 
-if (import.meta.env.VITE_SENTRY_DSN) {
-  Sentry.init({
-    dsn: import.meta.env.VITE_SENTRY_DSN,
-    tracesSampleRate: 0.1,
-  })
-}
+initSentry()
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const [ok, setOk] = useState<boolean | null>(null)

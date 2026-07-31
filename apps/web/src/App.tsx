@@ -2,11 +2,11 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync, logoutUser } from "./api"
 import { getCache, setCache, removeCache } from "./api/cache"
 import toast from "react-hot-toast"
-import * as Sentry from "@sentry/react"
 import type { DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync } from "./types"
 import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
 import { useNavigate } from "react-router-dom"
+import { captureException } from "./sentry"
 
 const FRASES: string[] = [
   "La justicia es la constante y perpetua voluntad de dar a cada uno su derecho. — Ulpiano",
@@ -166,7 +166,7 @@ export default function App() {
       removeCache("novedades")
       await cargarLista(true)
     } catch (err: any) {
-      Sentry.captureException(err)
+      captureException(err)
       toast.error("Error al sincronizar. Intenta de nuevo.", { id: loadingToast })
     } finally {
       setSyncing(false)
@@ -337,7 +337,7 @@ export default function App() {
                     toast.error(res.detail || res.message || 'Error al agregar', { id: loadingToast })
                   }
                 } catch (err: any) {
-                  Sentry.captureException(err)
+                  captureException(err)
                   toast.error(err.message, { id: loadingToast })
                 }
               }}

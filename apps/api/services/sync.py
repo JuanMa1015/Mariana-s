@@ -382,14 +382,6 @@ def sincronizar_radicados_lote(db: Session, lote: int = 25, user_id: int | None 
     return _sincronizar_lista(db, radicados)
 
 
-def sincronizar_radicados(db: Session, user_id: int | None = None) -> dict:
-    query = db.query(Proceso)
-    if user_id is not None:
-        query = query.filter(Proceso.user_id == user_id)
-    radicados = query.order_by(Proceso.id.asc()).all()
-    return _sincronizar_lista(db, radicados)
-
-
 def _fetch_radicado_remoto(radicado: Proceso) -> dict:
     """Solo llama APIs externas (Rama Judicial). Sin session BD. Ejecutado en worker thread."""
     if not re.fullmatch(r"\d{23}", radicado.llave_proceso or ""):

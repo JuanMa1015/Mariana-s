@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from models.database import get_db
 from models.actuacion import Actuacion
 from models.proceso import Proceso
-from services.sync import sincronizar_radicados, sincronizar_radicados_lote
+from services.sync import sincronizar_radicados_lote, _upsert_actuacion, _serializar_texto
 from fastapi.responses import StreamingResponse
 from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, buscar_actuaciones, descargar_documento, rama_health_check
 from services.auth import get_current_user, oauth2_scheme
@@ -359,29 +359,6 @@ def _sincronizar_radicado_actuaciones(db, proceso):
     except Exception as exc:
         logger.warning("Sync falló para %s: %s", proceso.llave_proceso, exc)
         db.rollback()
-
-
-def _serializar_texto(valor: str | None) -> str | None:
-    valor_normalizado = (valor or "").strip()
-    return valor_normalizado or None
-
-
-def _upsert_actuacion(db, proceso, remota):
-    existente = db.query(Actuacion).filter(Actuacion.proceso_id == proceso.id, Actuacion.id_reg_actuacion == remota.id_reg_actuacion).first()
-    if existente is None:
-        existente = Actuacion(proceso_id=proceso.id, id_reg_actuacion=remota.id_reg_actuacion)
-        db.add(existente)
-    existente.cons_actuacion = remota.cons_actuacion
-    existente.fecha_actuacion = remota.fecha_actuacion
-    existente.actuacion = remota.actuacion
-    existente.anotacion = remota.anotacion
-    existente.fecha_inicial = remota.fecha_inicial
-    existente.fecha_final = remota.fecha_final
-    existente.fecha_registro = remota.fecha_registro
-    existente.cod_regla = remota.cod_regla
-    existente.con_documentos = bool(remota.con_documentos)
-    existente.cant = remota.cant
-    return existente
 
 
 @router.get("/{llave_proceso}")

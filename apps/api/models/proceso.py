@@ -10,6 +10,9 @@ class Proceso(Base):
         Index("ix_procesos_user_id", "user_id"),
         Index("ix_procesos_user_id_notificado", "user_id", "notificado"),
         Index("ix_procesos_user_id_categoria", "user_id", "categoria"),
+        Index("ix_procesos_ultima_sincronizacion", "ultima_sincronizacion"),
+        Index("ix_procesos_fecha_ultima_actuacion", "fecha_ultima_actuacion"),
+        Index("ix_procesos_notificacion_pendiente", "notificacion_pendiente"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
