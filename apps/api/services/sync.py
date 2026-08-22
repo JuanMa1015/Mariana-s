@@ -24,13 +24,32 @@ from scraper.rama_client import (
 )
 from services.notifications import notificar_cambio_radicado
 from services.fechas import parsear_fecha
-from config import APP_URL
+from config import APP_URL, TELEGRAM_BOT_TOKEN
 
 logger = logging.getLogger(__name__)
 
 _COLOMBIA_TZ = timezone(timedelta(hours=-5))
 _PARALELISMO = 3
 _MAX_FALLOS_CONSECUTIVOS_RAMA = 3
+
+
+def _notificacion_entregada(res: dict, tiene_email: bool, tiene_telegram: bool) -> bool:
+    """Una novedad cuenta como entregada SOLO si todos los canales que el
+    usuario tiene configurados tuvieron exito.
+
+    Antes bastaba con que Telegram funcionara para dar por entregada la
+    notificacion: cuando SendGrid fallaba, el email se perdia para siempre
+    porque se limpiaba la marca de pendiente. Ahora un fallo del correo
+    mantiene la novedad pendiente y el backoff la reintenta (el usuario
+    puede recibir Telegram duplicado en los reintentos; es mejor que
+    perder el correo).
+    """
+    ok = True
+    if tiene_email:
+        ok = ok and res.get("email", False)
+    if tiene_telegram:
+        ok = ok and res.get("telegram", False)
+    return ok
 
 
 def _normalizar_texto(valor: str | None) -> str:
@@ -248,6 +267,7 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
         email = notifs[0].get("email")
         destinatarios = [email] if email else None
         chat_id = notifs[0].get("telegram_chat_id")
+        tiene_telegram_canal = bool(chat_id) and bool(TELEGRAM_BOT_TOKEN)
         if len(notifs) > 3:
             from services.email_templates import template_resumen
             asunto, cuerpo_html = template_resumen(notifs)
@@ -266,7 +286,7 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                 custom_cuerpo=cuerpo_html,
                 telegram_chat_id=chat_id,
             )
-            if res.get("email") or res.get("telegram"):
+            if _notificacion_entregada(res, bool(destinatarios), tiene_telegram_canal):
                 emails_enviados.append(f"resumen_{llave_grupo}")
                 entregadas.update(n["proceso_id"] for n in notifs if n.get("proceso_id") is not None)
             time.sleep(0.5)
@@ -288,7 +308,7 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                     telegram_chat_id=n.get("telegram_chat_id"),
                     actuaciones=actuaciones,
                 )
-                if res.get("email") or res.get("telegram"):
+                if _notificacion_entregada(res, bool(destinatarios), tiene_telegram_canal):
                     emails_enviados.append(n["llave_proceso"])
                     if n.get("proceso_id") is not None:
                         entregadas.add(n["proceso_id"])
@@ -358,7 +378,8 @@ def _reenviar_notificaciones_pendientes(db: Session) -> list[str]:
 
         radicado.intentos_notificacion = intentos + 1
         radicado.ultima_notificacion_intento = ahora
-        if res.get("email") or res.get("telegram"):
+        tiene_telegram_canal = bool(telegram_chat_id) and bool(TELEGRAM_BOT_TOKEN)
+        if _notificacion_entregada(res, bool(user_email), tiene_telegram_canal):
             radicado.notificacion_pendiente = False
             radicado.intentos_notificacion = 0
             reenviadas.append(radicado.llave_proceso)

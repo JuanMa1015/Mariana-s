@@ -153,6 +153,25 @@ async def test_test_email_sin_credenciales_reporta_false(client):
     assert body["destinatarios"] == ["test@example.com"]
 
 
+@pytest.mark.asyncio
+async def test_test_email_con_sendgrid_ok_reporta_true(client):
+    """Regression: el endpoint llamaba a los enviadores con 3 argumentos
+    (faltaba cuerpo_texto) y siempre reportaba fallo."""
+    with patch.object(admin_router, "API_TOKEN", "secreto"), patch(
+        "config.SENDGRID_API_KEY", "SG.key"
+    ), patch("config.SMTP_HOST", ""), patch(
+        "services.notifications._enviar_sendgrid", return_value=True
+    ) as m_sg:
+        resp = await client.get("/test-email", headers=_auth("secreto"))
+
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["email_enviado"] is True
+    assert body["resultados"]["sendgrid"]["ok"] is True
+    m_sg.assert_called_once()
+    assert len(m_sg.call_args.args) == 4
+
+
 # ---------- test-notificacion ----------
 
 @pytest.mark.asyncio

@@ -6,6 +6,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, selectinload
 from models.database import get_db
 from models.actuacion import Actuacion
@@ -184,7 +185,14 @@ def sync_lote(current_user: Optional[User] = Depends(_auth_for_sync), db: Sessio
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="API_TOKEN no configurado")
     if not _check_rama_con_alerta():
         return {"mensaje": "Rama Judicial no responde, se omite sync", "total_consultados": 0}
-    resultado = sincronizar_radicados_lote(db, lote=25)
+    try:
+        resultado = sincronizar_radicados_lote(db, lote=25)
+    except OperationalError as exc:
+        # Neon suelta conexiones de forma transitoria; un reintento inmediato
+        # evita que un drop puntual tumbe el ciclo horario completo (500).
+        logger.warning("OperationalError en sync-lote (%s); rollback y reintento unico", exc)
+        db.rollback()
+        resultado = sincronizar_radicados_lote(db, lote=25)
     return resultado
 
 
