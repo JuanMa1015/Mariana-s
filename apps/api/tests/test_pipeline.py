@@ -128,6 +128,34 @@ async def test_enviar_notificaciones_con_telegram():
 
 
 @pytest.mark.asyncio
+async def test_email_fallido_no_marca_entregada_aunque_telegram_funcione():
+    """Regression: antes bastaba telegram=True para dar por entregada la
+    notificacion y el correo fallido se perdia sin reintento."""
+    from services.sync import _enviar_notificaciones_acumuladas
+
+    acumuladas = {
+        "test@example.com": [
+            {"llave_proceso": "p1", "despacho": "D", "departamento": "Dep",
+             "fecha_ultima_actuacion": "2024-06-10", "sujetos_procesales": "",
+             "actuacion": "A", "anotacion": "An", "fecha_registro": "2024-06-10",
+             "con_documentos": False, "categoria": "General",
+             "telegram_chat_id": "12345", "email": "test@example.com"},
+        ]
+    }
+    emails = []
+
+    with (
+        patch("services.sync.notificar_cambio_radicado", return_value={"email": False, "telegram": True}),
+        patch("services.sync.TELEGRAM_BOT_TOKEN", "tok"),
+        patch("services.sync.time.sleep"),
+    ):
+        entregadas = _enviar_notificaciones_acumuladas(acumuladas, emails)
+
+    assert emails == []
+    assert entregadas == set()
+
+
+@pytest.mark.asyncio
 async def test_fetch_actuaciones_multi_raise_si_uno_falla():
     from services.sync import _fetch_actuaciones_multi
     from scraper.rama_client import ResultadoActuaciones
@@ -192,6 +220,53 @@ async def test_reenviar_notificaciones_pendientes_exitoso(db, test_user):
     db.commit()
 
     with patch("services.sync.notificar_cambio_radicado", return_value={"email": True, "telegram": False}):
+        reenviadas = _reenviar_notificaciones_pendientes(db)
+
+    assert reenviadas == [RADICADO]
+    db.refresh(p)
+    assert p.notificacion_pendiente is False
+    assert p.intentos_notificacion == 0
+
+
+@pytest.mark.asyncio
+async def test_reenviar_email_fallido_telegram_ok_mantiene_pendiente(db, test_user):
+    """Con email+telegram configurados, solo telegram OK debe dejar la
+    novedad pendiente para reintentar el correo; cuando ambos canales
+    funcionan, se limpia."""
+    from services.sync import _reenviar_notificaciones_pendientes
+    from models.proceso import Proceso
+
+    test_user.telegram_chat_id = "12345"
+    db.commit()
+    p = Proceso(
+        llave_proceso=RADICADO,
+        user_id=test_user.id,
+        notificado=False,
+        notificacion_pendiente=True,
+        intentos_notificacion=0,
+        ultima_notificacion_intento=None,
+    )
+    db.add(p)
+    db.commit()
+
+    with (
+        patch("services.sync.notificar_cambio_radicado", return_value={"email": False, "telegram": True}),
+        patch("services.sync.TELEGRAM_BOT_TOKEN", "tok"),
+    ):
+        reenviadas = _reenviar_notificaciones_pendientes(db)
+
+    assert reenviadas == []
+    db.refresh(p)
+    assert p.notificacion_pendiente is True
+    assert p.intentos_notificacion == 1
+
+    # Sale del cooldown y en el reintento ambos canales tienen exito
+    p.ultima_notificacion_intento = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=4)
+    db.commit()
+    with (
+        patch("services.sync.notificar_cambio_radicado", return_value={"email": True, "telegram": True}),
+        patch("services.sync.TELEGRAM_BOT_TOKEN", "tok"),
+    ):
         reenviadas = _reenviar_notificaciones_pendientes(db)
 
     assert reenviadas == [RADICADO]

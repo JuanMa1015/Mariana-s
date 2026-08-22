@@ -142,6 +142,13 @@ def notificar_cambio_radicado(
             logger.warning("SendGrid falló, reintentando con SMTP para %s", destinatarios)
             exito = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
 
+        if not exito and not SENDGRID_API_KEY and not SMTP_HOST:
+            logger.error(
+                "Email para %s NO enviado: ni SENDGRID_API_KEY ni SMTP_HOST estan "
+                "configurados en el entorno (Telegram funciona de forma independiente).",
+                llave_proceso,
+            )
+
         # Nota: si el envio falla NO se reenvia a los destinatarios por defecto
         # (EMAIL_TO): la novedad queda como pendiente y se reintenta despues
         # para el destinatario original. Nunca se filtran datos de un usuario

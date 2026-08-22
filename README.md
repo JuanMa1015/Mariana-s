@@ -103,6 +103,16 @@ Ante fallos consecutivos de Rama Judicial, cada radicado aplica backoff progresi
 - **Correo electronico**: SendGrid con fallback a SMTP directo. Plantillas HTML profesionales con soporte para clientes de correo.
 - **Telegram**: Bot que envia mensajes con el mismo contenido del correo. Cada usuario registra su propio chat_id.
 
+Una novedad solo se marca como entregada cuando TODOS los canales configurados del usuario tuvieron exito; si el correo falla, la novedad queda pendiente y se reintenta con backoff (1, 3, 6, 12 y 24 horas, maximo 5 intentos).
+
+### Diagnostico de correos que no llegan
+
+1. Verifica la config con el endpoint admin: `curl -H "Authorization: Bearer $API_TOKEN" "$API_URL/test-email"`.
+2. En SendGrid, revisa que `EMAIL_FROM` (o `SMTP_USER`) sea un **Sender Identity verificado**; si no, SendGrid rechaza cada envio con 403.
+3. Revisa spam/promociones: con IP compartida de SendGrid es habitual.
+4. El plan gratuito de SendGrid limita a 100 correos/dia.
+5. Los logs de Render muestran `SendGrid -> ... | status=...` por envio, y un error explicito si falta `SENDGRID_API_KEY`.
+
 ## Vinculacion de Telegram
 
 Para conectar un usuario a Telegram:

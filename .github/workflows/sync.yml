@@ -20,16 +20,16 @@ jobs:
             exit 1
           fi
 
-      - name: Wake up server (max 3 min)
+      - name: Wake up server (max 5 min)
         run: |
           echo "Esperando a que el servidor responda..."
-          for i in $(seq 1 18); do
+          for i in $(seq 1 30); do
             RESP=$(curl -sS -o /dev/null -w "%{http_code}" "${{ secrets.API_URL }}/health" 2>&1)
             if [ "$RESP" = "200" ]; then
               echo "Servidor listo"
               exit 0
             fi
-            echo "Intento $i/18 - respuesta $RESP, esperando 10s..."
+            echo "Intento $i/30 - respuesta $RESP, esperando 10s..."
             sleep 10
           done
           echo "El servidor no respondio a tiempo"
@@ -42,12 +42,25 @@ jobs:
         run: |
           echo "Sincronizando lote de 25 radicados..."
 
-          RESULT=$(curl -s -w "\n%{http_code}" \
-            --retry 3 --retry-delay 30 --retry-all-errors \
-            -X POST "${API_URL}/procesos/sync-lote" \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${API_TOKEN}" \
-            --max-time 600)
+          sync_call() {
+            curl -s -w "\n%{http_code}" \
+              --retry 3 --retry-delay 30 --retry-all-errors \
+              -X POST "${API_URL}/procesos/sync-lote" \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer ${API_TOKEN}" \
+              --max-time 600
+          }
+
+          # Nota: los flags de retry de curl no cubren respuestas HTTP 5xx
+          # (sin --fail curl las considera exito). Se maneja aqui abajo.
+          RESULT=$(sync_call || true)
+          HTTP_CODE=$(echo "$RESULT" | tail -1)
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "Primer intento fallo con HTTP '$HTTP_CODE'; esperando 60s y reintentando una vez..."
+            sleep 60
+            RESULT=$(sync_call || true)
+          fi
 
           HTTP_CODE=$(echo "$RESULT" | tail -1)
           BODY=$(echo "$RESULT" | sed '$d')

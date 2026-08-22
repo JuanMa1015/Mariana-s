@@ -146,17 +146,18 @@ def test_email(_: None = Depends(requiere_api_token)):
         return {"email_enviado": False, "error": "Sin destinatarios"}
 
     asunto = "TEST - Mariana's"
-    cuerpo = "Correo de prueba desde Mariana's."
+    cuerpo_html = "<p>Correo de prueba desde Mariana's.</p>"
+    cuerpo_texto = "Correo de prueba desde Mariana's."
     resultados = {}
 
     if SENDGRID_API_KEY:
-        sg_ok = _enviar_sendgrid(destinatarios, asunto, cuerpo)
+        sg_ok = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
         resultados["sendgrid"] = {"ok": sg_ok, "api_key_set": True}
     else:
         resultados["sendgrid"] = {"ok": False, "api_key_set": False}
 
     if SMTP_HOST:
-        smtp_ok = _enviar_smtp(destinatarios, asunto, cuerpo)
+        smtp_ok = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
         resultados["smtp"] = {"ok": smtp_ok}
     else:
         resultados["smtp"] = {"ok": False, "smtp_host_set": False}
