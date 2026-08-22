@@ -6,6 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 from config import EMAIL_FROM, EMAIL_TO, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USE_TLS, SMTP_USER, APP_URL, SENDGRID_API_KEY
+from services.fechas import fecha_corta
 
 logger = logging.getLogger(__name__)
 
@@ -67,11 +68,11 @@ def notificar_cambio_radicado(
     llave_proceso: str,
     despacho: str,
     departamento: str,
-    fecha_ultima_actuacion: str | None,
+    fecha_ultima_actuacion,
     sujetos_procesales: str,
     actuacion: str | None = None,
     anotacion: str | None = None,
-    fecha_registro: str | None = None,
+    fecha_registro=None,
     con_documentos: bool | None = None,
     categoria: str | None = None,
     destinatarios: list[str] | None = None,
@@ -112,10 +113,10 @@ def notificar_cambio_radicado(
             if actuaciones:
                 lines = []
                 for act in actuaciones:
-                    lines.append(f"  - {act.get('fecha_actuacion','N/D')[:10]}: {act.get('actuacion','N/D')}")
+                    lines.append(f"  - {fecha_corta(act.get('fecha_actuacion'))}: {act.get('actuacion','N/D')}")
                 actuaciones_texto = "\n".join(lines)
             else:
-                actuaciones_texto = f"  Actuacion: {actuacion or 'N/D'}\n  Anotacion: {anotacion or 'N/D'}\n  Fecha registro: {fecha_registro or 'N/D'}\n  Documentos: {'Si' if con_documentos else 'No'}"
+                actuaciones_texto = f"  Actuacion: {actuacion or 'N/D'}\n  Anotacion: {anotacion or 'N/D'}\n  Fecha registro: {fecha_corta(fecha_registro)}\n  Documentos: {'Si' if con_documentos else 'No'}"
             cuerpo_texto = (
                 f"MARIANA'S — Monitor Judicial\n\n"
                 f"Se detectaron nuevas actuaciones en el proceso:\n\n"
@@ -123,7 +124,7 @@ def notificar_cambio_radicado(
                 f"  Categoria:    {categoria or 'General'}\n"
                 f"  Despacho:     {despacho}\n"
                 f"  Departamento: {departamento}\n"
-                f"  Ultima act.:  {fecha_ultima_actuacion or 'N/D'}\n\n"
+                f"  Ultima act.:  {fecha_corta(fecha_ultima_actuacion)}\n\n"
                 f"Nuevas actuaciones:\n"
                 f"{actuaciones_texto}\n\n"
                 f"Sujetos procesales:\n"
@@ -134,9 +135,6 @@ def notificar_cambio_radicado(
                 f"Ver en Mariana's: {APP_URL}\n"
             )
 
-        default_destinatarios = [correo.strip() for correo in re.split(r"[\s,]+", EMAIL_TO) if correo.strip()]
-        using_defaults = set(destinatarios) == set(default_destinatarios)
-
         if SENDGRID_API_KEY:
             exito = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
 
@@ -144,15 +142,10 @@ def notificar_cambio_radicado(
             logger.warning("SendGrid falló, reintentando con SMTP para %s", destinatarios)
             exito = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
 
-        if not exito and not using_defaults and default_destinatarios:
-            logger.warning(
-                "Fallo envío a %s, reintentando con destinatarios por defecto: %s",
-                destinatarios, default_destinatarios,
-            )
-            if SENDGRID_API_KEY:
-                exito = _enviar_sendgrid(default_destinatarios, asunto, cuerpo_html, cuerpo_texto)
-            if not exito and SMTP_HOST:
-                exito = _enviar_smtp(default_destinatarios, asunto, cuerpo_html, cuerpo_texto)
+        # Nota: si el envio falla NO se reenvia a los destinatarios por defecto
+        # (EMAIL_TO): la novedad queda como pendiente y se reintenta despues
+        # para el destinatario original. Nunca se filtran datos de un usuario
+        # a otro buzón.
     else:
         logger.info("Correo no configurado; se omite email para %s", llave_proceso)
 

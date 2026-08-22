@@ -73,8 +73,23 @@ export interface ResultadoSync {
   radicados_error_consulta?: { radicado: string; error: string; origen?: string }[]
 }
 
+export interface SyncIniciado {
+  iniciado: boolean
+  mensaje?: string
+  en_curso: boolean
+}
+
+export interface SyncEstado {
+  en_curso: boolean
+  resultado: ResultadoSync | null
+  error: string | null
+}
+
 export interface DetalleProceso extends Proceso {
   actuaciones?: Actuacion[]
+  total_actuaciones?: number
+  skip?: number
+  limit?: number
 }
 
 export interface NovedadDetalle {

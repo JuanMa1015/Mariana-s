@@ -3,6 +3,7 @@ import logging
 import httpx
 
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+from services.fechas import fecha_corta
 
 logger = logging.getLogger(__name__)
 
@@ -13,12 +14,12 @@ def _mensaje_texto(
     llave_proceso: str,
     despacho: str,
     departamento: str,
-    fecha_ultima_actuacion: str | None,
+    fecha_ultima_actuacion,
     actuacion: str | None = None,
     anotacion: str | None = None,
     categoria: str | None = None,
     sujetos_procesales: str = "",
-    fecha_registro: str | None = None,
+    fecha_registro=None,
     con_documentos: bool | None = None,
     actuaciones: list[dict] | None = None,
 ) -> str:
@@ -31,9 +32,9 @@ def _mensaje_texto(
             label = ">> " if i == 0 else "   "
             docs = "Si" if act.get("con_documentos") else "No"
             lines.append(
-                f"{label}{(act.get('fecha_actuacion') or 'N/D')[:10]} — {act.get('actuacion') or 'N/D'}\n"
+                f"{label}{fecha_corta(act.get('fecha_actuacion'))} — {act.get('actuacion') or 'N/D'}\n"
                 f"   Anotacion: {act.get('anotacion') or 'N/D'}\n"
-                f"   Registro: {(act.get('fecha_registro') or 'N/D')[:10]} | Docs: {docs}"
+                f"   Registro: {fecha_corta(act.get('fecha_registro'))} | Docs: {docs}"
             )
         actuaciones_texto = "\n\n".join(lines)
     else:
@@ -41,7 +42,7 @@ def _mensaje_texto(
         actuaciones_texto = (
             f"*Actuacion:* {actuacion or 'N/D'}\n"
             f"*Anotacion:* {anotacion or 'N/D'}\n"
-            f"*Fecha registro:* {fecha_registro or 'N/D'}\n"
+            f"*Fecha registro:* {fecha_corta(fecha_registro)}\n"
             f"*Documentos:* {docs}"
         )
 
@@ -50,7 +51,7 @@ def _mensaje_texto(
         f"\n"
         f"`{llave_proceso}`\n"
         f"{despacho or '-'} | {departamento or '-'}\n"
-        f"Ultima actuacion: {fecha_ultima_actuacion or 'N/D'}\n"
+        f"Ultima actuacion: {fecha_corta(fecha_ultima_actuacion)}\n"
         f"\n"
         f"{actuaciones_texto}\n"
         f"\n"
@@ -62,11 +63,11 @@ def notificar_telegram(
     llave_proceso: str,
     despacho: str,
     departamento: str,
-    fecha_ultima_actuacion: str | None,
+    fecha_ultima_actuacion,
     sujetos_procesales: str = "",
     actuacion: str | None = None,
     anotacion: str | None = None,
-    fecha_registro: str | None = None,
+    fecha_registro=None,
     con_documentos: bool | None = None,
     categoria: str | None = None,
     custom_mensaje: str | None = None,

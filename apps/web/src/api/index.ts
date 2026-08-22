@@ -98,8 +98,12 @@ export async function getProcesos(despacho?: string, departamento?: string, skip
   return res.json()
 }
 
-export async function getProceso(llaveProceso: string) {
-  const res = await fetchWithAuth(`${BASE_URL}/procesos/${llaveProceso}`)
+export async function getProceso(llaveProceso: string, skip?: number, limit?: number) {
+  const params = new URLSearchParams()
+  if (skip !== undefined) params.append("skip", String(skip))
+  if (limit !== undefined) params.append("limit", String(limit))
+  const qs = params.toString()
+  const res = await fetchWithAuth(`${BASE_URL}/procesos/${llaveProceso}${qs ? `?${qs}` : ""}`)
   if (!res.ok) throw new Error((await res.json()).detail || "Error fetching")
   return res.json()
 }
@@ -111,6 +115,11 @@ export async function getNovedades() {
 
 export async function postSync() {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/sync`, { method: "POST" })
+  return res.json()
+}
+
+export async function getSyncEstado() {
+  const res = await fetchWithAuth(`${BASE_URL}/procesos/sync/estado`)
   return res.json()
 }
 

@@ -12,6 +12,7 @@ vi.mock('react-router-dom', async () => {
 const mockGetProcesos = vi.fn()
 const mockGetNovedades = vi.fn()
 const mockPostSync = vi.fn()
+const mockGetSyncEstado = vi.fn()
 const mockPostAddRadicado = vi.fn()
 const mockGetProceso = vi.fn()
 
@@ -19,11 +20,12 @@ vi.mock('./api', () => ({
   getProcesos: mockGetProcesos,
   getNovedades: mockGetNovedades,
   postSync: mockPostSync,
+  getSyncEstado: mockGetSyncEstado,
   postAddRadicado: mockPostAddRadicado,
   getProceso: mockGetProceso,
 }))
 
-const toastImpl = { loading: vi.fn(() => 'toast-id'), success: vi.fn(), error: vi.fn() }
+const toastImpl = { loading: vi.fn(() => 'toast-id'), success: vi.fn(), error: vi.fn(), info: vi.fn() }
 vi.mock('react-hot-toast', () => ({ default: toastImpl }))
 
 vi.mock('./api/cache', () => ({ getCache: () => null, setCache: () => {}, removeCache: () => {} }))

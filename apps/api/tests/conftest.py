@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 os.environ["DATABASE_URL"] = "sqlite://"
-os.environ["JWT_SECRET"] = "test-secret"
+os.environ["SECRET_KEY"] = "test-secret-clave-suficientemente-larga-para-hmac-sha256"
 os.environ["ACCESS_TOKEN_EXPIRE_MINUTES"] = "30"
 os.environ["SENDGRID_API_KEY"] = ""
 os.environ["SMTP_HOST"] = ""
@@ -39,7 +39,11 @@ TEST_SESSION_LOCAL = sessionmaker(bind=TEST_ENGINE)
 @pytest.fixture(autouse=True)
 def setup_db():
     from scraper.cache import clear_cache
+    import routers.procesos as procesos_router
+
     clear_cache()
+    with procesos_router._sync_estado_lock:
+        procesos_router._sync_estado.clear()
     Base.metadata.create_all(bind=TEST_ENGINE)
     yield
     Base.metadata.drop_all(bind=TEST_ENGINE)

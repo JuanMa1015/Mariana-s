@@ -17,7 +17,7 @@ scripts/        Scripts de administracion y migracion
 
 - FastAPI con autenticacion JWT
 - SQLAlchemy como ORM con PostgreSQL (Neon)
-- Sincronizacion programada con APScheduler (cada 1 hora)
+- Sincronizacion por lotes disparada cada hora desde GitHub Actions (cron) y boton manual en la app
 - Cola de prioridad con backoff progresivo ante fallos
 - Logging estructurado con request_id
 - Prueba de conectividad previa a cada lote de sincronizacion
@@ -44,7 +44,7 @@ Copiar `apps/api/.env.example` a `apps/api/.env` y configurar:
 | Variable | Descripcion |
 |---|---|
 | `DATABASE_URL` | Conexion a PostgreSQL |
-| `JWT_SECRET` | Clave secreta para tokens JWT |
+| `SECRET_KEY` | Clave secreta para tokens JWT (alias retrocompatible: `JWT_SECRET`) |
 | `SENDGRID_API_KEY` | API key de SendGrid (opcional) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` | Fallback SMTP (opcional) |
 | `EMAIL_TO` | Correo por defecto para notificaciones |
@@ -63,6 +63,21 @@ pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
 
+Para ejecutar los tests instala ademas el lock de desarrollo (incluye runtime + pytest):
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+Las dependencias estan fijadas con [pip-tools](https://github.com/jazzband/pip-tools): edita `requirements.in` (o `requirements-dev.in`) y regenera el lock correspondiente:
+
+```bash
+pip install pip-tools
+pip-compile requirements.in -o requirements.txt          # solo runtime
+pip-compile requirements-dev.in -o requirements-dev.txt  # runtime + tests
+```
+
 ### Frontend
 
 ```bash
@@ -79,9 +94,9 @@ docker compose -f infra/docker/docker-compose.yml up --build -d
 
 ## Sincronizacion
 
-El sistema consulta la Rama Judicial en lotes de 25 radicados por ciclo, cada 1 hora. La frecuencia de sincronizacion de cada radicado se ajusta segun su antiguedad.
+El sistema consulta la Rama Judicial en lotes de 25 radicados por ciclo, cada 1 hora, disparado por el workflow `sync.yml` de GitHub Actions (que despierta el servidor y llama a `/procesos/sync-lote`). Tambien puedes sincronizar manualmente con el boton "Sincronizar" de la app. La frecuencia de sincronizacion de cada radicado se ajusta segun su antiguedad.
 
-Ante fallos consecutivos, el sistema aplica backoff progresivo (1, 3, 7, 15 dias) antes de reintentar automaticamente.
+Ante fallos consecutivos de Rama Judicial, cada radicado aplica backoff progresivo (1, 3, 7 y 15 dias) antes de reintentar automaticamente; un envio exitoso reinicia el contador.
 
 ## Canales de notificacion
 

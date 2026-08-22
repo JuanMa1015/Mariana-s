@@ -18,7 +18,7 @@ class DocumentoActuacion(Base):
     nombre = Column(String, nullable=False)
     descripcion = Column(Text)
     tipo = Column(String)
-    fecha_carga = Column(String)
+    fecha_carga = Column(DateTime)
     creado_en = Column(DateTime, server_default=func.now())
 
     actuacion_rel = relationship("Actuacion", back_populates="documentos")

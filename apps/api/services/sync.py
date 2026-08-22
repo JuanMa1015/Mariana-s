@@ -23,6 +23,7 @@ from scraper.rama_client import (
     rama_health_check,
 )
 from services.notifications import notificar_cambio_radicado
+from services.fechas import parsear_fecha
 from config import APP_URL
 
 logger = logging.getLogger(__name__)
@@ -58,31 +59,26 @@ def _serializar_texto(valor: str | None) -> str | None:
     return valor_normalizado or None
 
 
-def _es_reciente(fecha_str: str | None, dias: int = 5) -> bool:
-    if not fecha_str:
+def _es_reciente(valor, dias: int = 5) -> bool:
+    fecha = parsear_fecha(valor)
+    if fecha is None:
         return False
-    try:
-        fecha = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
-        hoy_colombia = datetime.now(_COLOMBIA_TZ).date()
-        diff = abs((hoy_colombia - fecha).days)
-        return diff <= dias
-    except (ValueError, IndexError):
-        return False
+    hoy_colombia = datetime.now(_COLOMBIA_TZ).date()
+    diff = abs((hoy_colombia - fecha.date()).days)
+    return diff <= dias
 
 
-def _calcular_dias_sin_cambios(fecha_str: str | None) -> int:
-    if not fecha_str:
+def _calcular_dias_sin_cambios(valor) -> int:
+    fecha = parsear_fecha(valor)
+    if fecha is None:
         return 999
-    try:
-        fecha = datetime.strptime(fecha_str[:10], "%Y-%m-%d").date()
-        hoy_colombia = datetime.now(_COLOMBIA_TZ).date()
-        diff = (hoy_colombia - fecha).days
-        return max(0, diff)
-    except (ValueError, IndexError):
-        return 999
+    hoy_colombia = datetime.now(_COLOMBIA_TZ).date()
+    diff = (hoy_colombia - fecha.date()).days
+    return max(0, diff)
 
 
 def _backoff_dias(proceso: Proceso) -> int:
+    """Backoff progresivo ante fallos de Rama: 1, 3, 7 y luego 15 dias."""
     fallos = proceso.fallos_consecutivos or 0
     if fallos == 0:
         return 0
@@ -92,7 +88,7 @@ def _backoff_dias(proceso: Proceso) -> int:
         return 3
     if fallos == 3:
         return 7
-    return 7
+    return 15
 
 
 def _debe_sincronizar(proceso: Proceso) -> bool:
@@ -126,12 +122,19 @@ def _actualizar_campos_proceso(proceso: Proceso, resumen, detalle) -> bool:
             setattr(proceso, field_name, normalized)
             changed = True
 
+    def set_campo_fecha(field_name: str, value):
+        nonlocal changed
+        nuevo = parsear_fecha(value)
+        if nuevo and nuevo != getattr(proceso, field_name, None):
+            setattr(proceso, field_name, nuevo)
+            changed = True
+
     set_if_changed("despacho", detalle.despacho or resumen.despacho)
     set_if_changed("departamento", resumen.departamento)
     set_if_changed("sujetos_procesales", resumen.sujetos_procesales)
     set_if_changed("tipo_proceso", detalle.tipo_proceso or resumen.tipo_proceso)
     set_if_changed("clase_proceso", detalle.clase_proceso or resumen.clase_proceso)
-    set_if_changed("fecha_proceso", detalle.fecha_proceso or resumen.fecha_proceso)
+    set_campo_fecha("fecha_proceso", detalle.fecha_proceso or resumen.fecha_proceso)
 
     if proceso.es_privado != detalle.es_privado:
         proceso.es_privado = detalle.es_privado
@@ -152,12 +155,12 @@ def _upsert_actuacion(db: Session, proceso_db: Proceso, actuacion_remota) -> Act
         db.add(existente)
 
     existente.cons_actuacion = actuacion_remota.cons_actuacion
-    existente.fecha_actuacion = _serializar_texto(actuacion_remota.fecha_actuacion)
+    existente.fecha_actuacion = parsear_fecha(actuacion_remota.fecha_actuacion)
     existente.actuacion = _serializar_texto(actuacion_remota.actuacion)
     existente.anotacion = _serializar_texto(actuacion_remota.anotacion)
-    existente.fecha_inicial = _serializar_texto(actuacion_remota.fecha_inicial)
-    existente.fecha_final = _serializar_texto(actuacion_remota.fecha_final)
-    existente.fecha_registro = _serializar_texto(actuacion_remota.fecha_registro)
+    existente.fecha_inicial = parsear_fecha(actuacion_remota.fecha_inicial)
+    existente.fecha_final = parsear_fecha(actuacion_remota.fecha_final)
+    existente.fecha_registro = parsear_fecha(actuacion_remota.fecha_registro)
     existente.cod_regla = _serializar_texto(actuacion_remota.cod_regla)
     existente.con_documentos = bool(actuacion_remota.con_documentos)
     existente.cant = actuacion_remota.cant
@@ -190,7 +193,7 @@ def _upsert_documento(db: Session, actuacion_db: Actuacion, documento_remoto) ->
     existente.nombre = documento_remoto.nombre
     existente.descripcion = documento_remoto.descripcion
     existente.tipo = documento_remoto.tipo
-    existente.fecha_carga = documento_remoto.fecha_carga
+    existente.fecha_carga = parsear_fecha(documento_remoto.fecha_carga)
 
     return existente
 
@@ -233,8 +236,14 @@ def _fetch_actuaciones_multi(ids_proceso: list[int]) -> dict:
 
 
 
-def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list) -> set[str]:
-    entregadas: set[str] = set()
+def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list) -> set[int]:
+    """Envia notificaciones agrupadas por destinatario.
+
+    Retorna el conjunto de proceso_id cuya notificacion fue efectivamente
+    entregada (fila exacta, segura en escenarios multiusuario donde dos
+    usuarios siguen el mismo radicado).
+    """
+    entregadas: set[int] = set()
     for llave_grupo, notifs in acumuladas.items():
         email = notifs[0].get("email")
         destinatarios = [email] if email else None
@@ -259,7 +268,7 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
             )
             if res.get("email") or res.get("telegram"):
                 emails_enviados.append(f"resumen_{llave_grupo}")
-                entregadas.update(n["llave_proceso"] for n in notifs)
+                entregadas.update(n["proceso_id"] for n in notifs if n.get("proceso_id") is not None)
             time.sleep(0.5)
         else:
             for n in notifs:
@@ -281,7 +290,8 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                 )
                 if res.get("email") or res.get("telegram"):
                     emails_enviados.append(n["llave_proceso"])
-                    entregadas.add(n["llave_proceso"])
+                    if n.get("proceso_id") is not None:
+                        entregadas.add(n["proceso_id"])
                 time.sleep(0.5)
     return entregadas
 
@@ -453,7 +463,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
 
     latest_remote = _latest_actuacion(actuaciones_remotas)
     if latest_remote is not None:
-        radicado.fecha_ultima_actuacion = _serializar_texto(latest_remote.fecha_actuacion)
+        radicado.fecha_ultima_actuacion = parsear_fecha(latest_remote.fecha_actuacion)
 
     for actuacion_remota in actuaciones_remotas:
         actuacion_db = _upsert_actuacion(db, radicado, actuacion_remota)
@@ -481,6 +491,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
             if tiene_canal:
                 radicado.notificacion_pendiente = True
                 acumuladas.setdefault(llave_acumulada, []).append({
+                    "proceso_id": radicado.id,
                     "llave_proceso": radicado.llave_proceso,
                     "despacho": radicado.despacho or "",
                     "departamento": radicado.departamento or "",
@@ -516,6 +527,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
         if tiene_canal:
             radicado.notificacion_pendiente = True
             acumuladas.setdefault(llave_acumulada, []).append({
+                "proceso_id": radicado.id,
                 "llave_proceso": radicado.llave_proceso,
                 "despacho": radicado.despacho or "",
                 "departamento": radicado.departamento or "",
@@ -627,6 +639,10 @@ def _aplicar_resultado(db: Session, datos: dict, pendientes: list[Proceso], nuev
             "paso": datos.get("paso", "remoto"),
             "origen": "rama",
         })
+        if radicado is not None:
+            # Contabiliza el fallo para que el backoff progresivo entre en accion
+            radicado.fallos_consecutivos = (radicado.fallos_consecutivos or 0) + 1
+            db.commit()
     elif datos["status"] == "private":
         privados.append(datos["llave_proceso"])
         if radicado is not None:
@@ -680,7 +696,8 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
     errores = errores_rama + errores_app
     entregadas = _enviar_notificaciones_acumuladas(acumuladas, emails_enviados)
     if entregadas:
-        db.query(Proceso).filter(Proceso.llave_proceso.in_(list(entregadas))).update(
+        # Filtrar por id de fila: dos usuarios pueden seguir el mismo radicado
+        db.query(Proceso).filter(Proceso.id.in_(list(entregadas))).update(
             {Proceso.notificacion_pendiente: False}, synchronize_session=False
         )
         db.commit()

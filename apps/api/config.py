@@ -11,14 +11,25 @@ SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
 EMAIL_FROM = os.getenv("EMAIL_FROM", SMTP_USER)
 EMAIL_TO = os.getenv("EMAIL_TO", "")
 
-SECRET_KEY = os.getenv("SECRET_KEY", "")
+# Acepta ambos nombres por retrocompatibilidad; el canonico es SECRET_KEY
+SECRET_KEY = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET") or ""
+_CLAVE_INSEGURA_DEFAULT = "insecure_dev_key_change_in_production"
 if not SECRET_KEY:
     import warnings
     warnings.warn(
         "SECRET_KEY no configurado. Usando clave insegura para desarrollo. "
         "Configura SECRET_KEY en .env para produccion."
     )
-    SECRET_KEY = "insecure_dev_key_change_in_production"
+    SECRET_KEY = _CLAVE_INSEGURA_DEFAULT
+
+# En produccion (Render o ENVIRONMENT=production) no arrancar con clave debil
+_EN_PRODUCCION = bool(os.getenv("RENDER_EXTERNAL_URL")) or os.getenv("ENVIRONMENT", "").lower() in {"production", "prod"}
+if _EN_PRODUCCION and (not os.getenv("SECRET_KEY") and not os.getenv("JWT_SECRET")):
+    raise RuntimeError(
+        "SECRET_KEY/JWT_SECRET no configurado y el entorno parece produccion. "
+        "Configura SECRET_KEY en las variables de entorno antes de desplegar."
+    )
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 

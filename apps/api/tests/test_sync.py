@@ -150,4 +150,82 @@ async def test_backoff_dias():
     assert _backoff_dias(p3) == 7
 
     p4 = Proceso(fallos_consecutivos=5)
-    assert _backoff_dias(p4) == 7
+    assert _backoff_dias(p4) == 15
+
+
+@pytest.mark.asyncio
+async def test_fallo_incrementa_fallos_consecutivos(db, test_user):
+    from services.sync import _aplicar_resultado
+    from models.proceso import Proceso
+
+    radicado = "9" * 23
+    p = Proceso(llave_proceso=radicado, user_id=test_user.id, fallos_consecutivos=2)
+    db.add(p)
+    db.commit()
+
+    datos = {
+        "status": "error",
+        "llave_proceso": radicado,
+        "error": "TimeoutError: rama",
+        "paso": "buscar_por_radicado",
+    }
+    errores_rama = []
+    _aplicar_resultado(db, datos, [p], [], [], [], errores_rama, [], {}, [])
+
+    assert len(errores_rama) == 1
+    db.refresh(p)
+    assert p.fallos_consecutivos == 3
+
+
+@pytest.mark.asyncio
+async def test_exito_resetea_fallos_consecutivos(db, test_user):
+    from services.sync import _aplicar_datos_remotos
+    from models.proceso import Proceso
+
+    radicado = "8" * 23
+    p = Proceso(llave_proceso=radicado, user_id=test_user.id, notificado=True, fallos_consecutivos=4)
+    db.add(p)
+    db.commit()
+
+    act = MagicMock()
+    act.id_reg_actuacion = 10
+    act.cons_actuacion = 1
+    act.fecha_actuacion = "2024-06-10"
+    act.actuacion = "A"
+    act.anotacion = None
+    act.fecha_inicial = None
+    act.fecha_final = None
+    act.fecha_registro = "2024-06-10"
+    act.cod_regla = None
+    act.con_documentos = False
+    act.cant = 0
+
+    datos = {
+        "status": "ok",
+        "resumen": _make_proceso_remoto(numero_radicacion=radicado),
+        "detalle": _make_detalle(llave_proceso=radicado),
+        "actuaciones": [act],
+        "documentos_por_actuacion": {},
+    }
+
+    with patch("services.sync._es_reciente", return_value=False):
+        _aplicar_datos_remotos(db, p, datos, [], [], [], [], {})
+
+    db.refresh(p)
+    assert p.fallos_consecutivos == 0
+
+
+@pytest.mark.asyncio
+async def test_debe_sincronizar_respeta_backoff():
+    from services.sync import _debe_sincronizar
+    from models.proceso import Proceso
+
+    ahora = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Fallo hace 12h con backoff de 1 dia -> NO sincronizar
+    p = Proceso(fallos_consecutivos=1, ultima_sincronizacion=ahora - timedelta(hours=12))
+    assert _debe_sincronizar(p) is False
+
+    # Fallo hace 2 dias con backoff de 1 dia -> sincronizar
+    p2 = Proceso(fallos_consecutivos=1, ultima_sincronizacion=ahora - timedelta(days=2))
+    assert _debe_sincronizar(p2) is True

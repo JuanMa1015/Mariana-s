@@ -1,0 +1,12 @@
+#
+# Dependencias de desarrollo/tests (incluye las de runtime).
+# Lock generado con pip-tools:
+#   pip install pip-tools
+#   pip-compile requirements-dev.in
+#
+
+-r requirements.txt
+
+pytest
+pytest-asyncio
+pytest-cov

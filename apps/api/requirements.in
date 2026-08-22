@@ -1,0 +1,21 @@
+#
+# Dependencias directas de la aplicacion (runtime).
+# Lock generado con pip-tools:
+#   pip install pip-tools
+#   pip-compile requirements.in -o requirements.txt
+#
+
+fastapi
+uvicorn
+SQLAlchemy
+psycopg2-binary
+pydantic
+email-validator
+python-dotenv
+httpx
+bcrypt
+PyJWT
+sendgrid
+sentry-sdk
+alembic
+slowapi

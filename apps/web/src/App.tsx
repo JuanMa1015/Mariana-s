@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync, logoutUser } from "./api"
+import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync, getSyncEstado, logoutUser } from "./api"
 import { getCache, setCache, removeCache } from "./api/cache"
 import toast from "react-hot-toast"
-import type { DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync } from "./types"
+import type { DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync, SyncEstado, SyncIniciado } from "./types"
 import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
 import { useNavigate, useParams } from "react-router-dom"
@@ -40,8 +40,15 @@ export default function App() {
   const [page, setPage] = useState(1)
   const [limit, setLimit] = useState(25)
   const [filtroCategoria, setFiltroCategoria] = useState("")
+  const [busquedaInput, setBusquedaInput] = useState("")
   const [busqueda, setBusqueda] = useState("")
   const [apiOffline, setApiOffline] = useState(false)
+
+  // Debounce de la busqueda: dispara la peticion 300ms despues de dejar de escribir
+  useEffect(() => {
+    const t = setTimeout(() => setBusqueda(busquedaInput), 300)
+    return () => clearTimeout(t)
+  }, [busquedaInput])
 
   const cacheKey = `lista:${page}:${limit}:${filtroCategoria || ""}:${busqueda || ""}`
 
@@ -84,16 +91,17 @@ export default function App() {
   const { llaveProceso } = useParams()
 
   const esDetalle = Boolean(llaveProceso)
-  const fetchingRef = useRef(false)
+  const fetchSeq = useRef(0)
   const searchRef = useRef<HTMLInputElement>(null)
 
-  const cargarLista = useCallback(async (forceFresh = false) => {
-    if (fetchingRef.current && !forceFresh) return
-    fetchingRef.current = true
-
+  // Unica via de carga: ignora respuestas obsoletas si una peticion mas nueva
+  // ya fue emitida (evita condiciones de carrera sin bloquear recargas).
+  const cargarLista = useCallback(async () => {
+    const seq = ++fetchSeq.current
     const skip = (page - 1) * limit
     try {
       const [p, n] = await fetchProcesosNovedades(skip, limit, filtroCategoria || undefined, busqueda || undefined)
+      if (seq !== fetchSeq.current) return
       setProcesos(p)
       setNovedades(n)
       setLoadedKey(cacheKey)
@@ -101,28 +109,13 @@ export default function App() {
       setCache("novedades", n)
     } catch {
       /* keep showing cached data on error */
-    } finally {
-      fetchingRef.current = false
     }
   }, [page, limit, filtroCategoria, busqueda, cacheKey])
 
   useEffect(() => {
-    let active = true
-    const skip = (page - 1) * limit
-    fetchProcesosNovedades(skip, limit, filtroCategoria || undefined, busqueda || undefined)
-      .then(([p, n]) => {
-        if (!active) return
-        setProcesos(p)
-        setNovedades(n)
-        setLoadedKey(cacheKey)
-        setCache(cacheKey, p)
-        setCache("novedades", n)
-      })
-      .catch(() => {
-        /* keep showing cached data on error */
-      })
-    return () => { active = false }
-  }, [page, limit, filtroCategoria, busqueda, cacheKey])
+    // Se difiere a microtask para no disparar un render en cascada sincrono
+    void Promise.resolve().then(() => cargarLista())
+  }, [cargarLista])
 
   const currentDetalle = detalle && detalle.llave === llaveProceso ? detalle.data : null
   const loadingDetalle = esDetalle && currentDetalle === null
@@ -171,15 +164,38 @@ export default function App() {
     setSyncResult(null)
     const loadingToast = toast.loading("Sincronizando con Rama Judicial...")
     try {
-      const result = await postSync()
-      setSyncResult(result)
-      toast.success(
-        `Sincronización completa: ${result.nuevos} nuevos, ${result.actualizados} actualizados, ${result.total_consultados} consultados`,
-        { id: loadingToast, duration: 5000 },
-      )
-      removeCache(cacheKey)
-      removeCache("novedades")
-      await cargarLista(true)
+      const inicio: SyncIniciado = await postSync()
+      if (!inicio.iniciado) {
+        toast(inicio.mensaje || "Ya hay una sincronización en curso", { id: loadingToast })
+        return
+      }
+      // El sync corre en segundo plano en el backend; consultamos su estado.
+      const MAX_INTENTOS = 75 // ~5 min con intervalo de 4s
+      for (let i = 0; i < MAX_INTENTOS; i++) {
+        await new Promise((r) => setTimeout(r, 4000))
+        const estado: SyncEstado = await getSyncEstado()
+        if (estado.en_curso) continue
+        if (estado.error || !estado.resultado) {
+          captureException(estado.error || "sync sin resultado")
+          toast.error(estado.error || "Error al sincronizar. Intenta de nuevo.", { id: loadingToast })
+          return
+        }
+        const result: ResultadoSync = estado.resultado
+        setSyncResult(result)
+        toast.success(
+          `Sincronización completa: ${result.nuevos} nuevos, ${result.actualizados} actualizados, ${result.total_consultados} consultados`,
+          { id: loadingToast, duration: 5000 },
+        )
+        removeCache(cacheKey)
+        removeCache("novedades")
+        await cargarLista()
+        return
+      }
+      toast("La sincronización sigue en curso; los datos aparecerán al terminar.", {
+        id: loadingToast,
+        duration: 6000,
+        icon: "⏳",
+      })
     } catch (err) {
       captureException(err)
       toast.error("Error al sincronizar. Intenta de nuevo.", { id: loadingToast })
@@ -264,7 +280,7 @@ export default function App() {
                 </div>
               </div>
             ) : currentDetalle ? (
-              <DetalleView detalle={currentDetalle} onVolver={volverLista} onActualizado={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista(true) }} />
+              <DetalleView detalle={currentDetalle} onVolver={volverLista} onActualizado={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista() }} />
             ) : (
               <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
                 No se encontró el radicado solicitado.
@@ -373,7 +389,7 @@ export default function App() {
                     setNewRadicado({ llave_proceso: "", categoria: "Trabajo" })
                     removeCache(cacheKey)
                     removeCache("novedades")
-                    await cargarLista(true)
+                    await cargarLista()
                     toast.success("Radicado agregado exitosamente", { id: loadingToast })
                   } else {
                     toast.error(res.detail || res.message || 'Error al agregar', { id: loadingToast })
@@ -424,8 +440,8 @@ export default function App() {
               aria-label="Buscar por radicado, parte o juzgado"
               title="Buscar (atajo: /)"
               placeholder="Buscar por radicado, parte o juzgado..."
-              value={busqueda}
-              onChange={(e) => { setBusqueda(e.target.value); setPage(1) }}
+              value={busquedaInput}
+              onChange={(e) => { setBusquedaInput(e.target.value); setPage(1) }}
               className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-2 text-sm outline-none transition placeholder:text-violet-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100 sm:w-80"
             />
           </div>
@@ -443,7 +459,7 @@ export default function App() {
                 ))}
               </div>
             ) : procesos ? (
-              <TablaProcesos procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista(true) }} />
+              <TablaProcesos procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista() }} />
             ) : null}
           </div>
         </section>

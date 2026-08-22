@@ -1,3 +1,5 @@
+from services.fechas import fecha_corta
+
 APP_URL = "https://mariana-app-nu.vercel.app"
 RAMA_JUDICIAL_URL = "https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion"
 
@@ -14,11 +16,11 @@ def template_novedad(
     llave_proceso: str,
     despacho: str,
     departamento: str,
-    fecha_ultima_actuacion: str | None,
+    fecha_ultima_actuacion,
     sujetos_procesales: str,
     actuacion: str | None = None,
     anotacion: str | None = None,
-    fecha_registro: str | None = None,
+    fecha_registro=None,
     con_documentos: bool | None = None,
     categoria: str | None = None,
     actuaciones: list[dict] | None = None,
@@ -45,10 +47,10 @@ def template_novedad(
 <tr><td style="padding:12px">
 {label_html}
 <table width="100%" cellpadding="0" cellspacing="0">
-<tr><td style="padding:4px 0;vertical-align:top;width:90px"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Fecha</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{(act.get('fecha_actuacion') or 'N/D')[:10]}</span></td></tr>
+<tr><td style="padding:4px 0;vertical-align:top;width:90px"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Fecha</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{fecha_corta(act.get('fecha_actuacion'))}</span></td></tr>
 <tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Actuacion</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{act.get('actuacion') or 'N/D'}</span></td></tr>
 <tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Anotacion</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{act.get('anotacion') or 'N/D'}</span></td></tr>
-<tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Registro</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{(act.get('fecha_registro') or 'N/D')[:10]}</span></td></tr>
+<tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Registro</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{fecha_corta(act.get('fecha_registro'))}</span></td></tr>
 <tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Docs</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{docs}</span></td></tr>
 </table>
 </td></tr>
@@ -63,7 +65,7 @@ def template_novedad(
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr><td style="padding:6px 0;vertical-align:top;width:100px"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Actuacion</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{actuacion or "N/D"}</span></td></tr>
 <tr><td style="padding:6px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Anotacion</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{anotacion or "N/D"}</span></td></tr>
-<tr><td style="padding:6px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Fecha registro</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{fecha_registro or "N/D"}</span></td></tr>
+<tr><td style="padding:6px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Fecha registro</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{fecha_corta(fecha_registro)}</span></td></tr>
 <tr><td style="padding:6px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Documentos</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{docs}</span></td></tr>
 </table>
 </td></tr>
@@ -93,7 +95,7 @@ def template_novedad(
 <tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Radicado</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;font-weight:600;color:#1e293b;font-family:monospace;letter-spacing:0.08em">{llave_proceso}</span></td></tr>
 <tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Despacho</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;color:#334155">{despacho or "—"}</span></td></tr>
 <tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Departamento</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;color:#334155">{departamento or "—"}</span></td></tr>
-<tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Ultima actuacion</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;color:#334155">{fecha_ultima_actuacion or "N/D"}</span></td></tr>
+<tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Ultima actuacion</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;color:#334155">{fecha_corta(fecha_ultima_actuacion)}</span></td></tr>
 </table>
 </td></tr>
 </table>

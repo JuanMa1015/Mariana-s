@@ -1,6 +1,6 @@
 import { useState } from "react"
 import toast from "react-hot-toast"
-import { updateProceso } from "../api"
+import { getProceso, updateProceso } from "../api"
 import type { Actuacion, DetalleProceso, DocumentoActuacion } from "../types"
 
 interface Props {
@@ -203,6 +203,18 @@ const ActuacionCard = ({ actuacion, isLatest }: { actuacion: Actuacion; isLatest
 // ── Main component ──────────────────────────────────────────────────────────────
 export default function DetalleView({ detalle, onVolver, onActualizado }: Props) {
   const [marcando, setMarcando] = useState(false)
+  // Paginas adicionales de actuaciones cargadas con "Cargar mas"
+  const [extras, setExtras] = useState<Actuacion[]>([])
+  const [cargandoMas, setCargandoMas] = useState(false)
+
+  // Ajuste de estado durante render: al cambiar de proceso se reinician
+  // las paginas extras cargadas (patron recomendado en lugar de useEffect).
+  const [llaveRenderizada, setLlaveRenderizada] = useState(detalle.llave_proceso)
+  if (llaveRenderizada !== detalle.llave_proceso) {
+    setLlaveRenderizada(detalle.llave_proceso)
+    setExtras([])
+    setCargandoMas(false)
+  }
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(detalle.llave_proceso)
@@ -222,7 +234,23 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
     }
   }
 
-  const actuaciones = detalle.actuaciones ?? []
+  const actuacionesBase = detalle.actuaciones ?? []
+  const actuaciones = [...actuacionesBase, ...extras]
+  const cargadas = actuaciones.length
+  const total = detalle.total_actuaciones
+  const hayMas = typeof total === "number" && total > cargadas
+
+  const cargarMas = async () => {
+    setCargandoMas(true)
+    try {
+      const siguiente = await getProceso(detalle.llave_proceso, cargadas)
+      setExtras((prev) => [...prev, ...(siguiente.actuaciones ?? [])])
+    } catch {
+      toast.error("No se pudieron cargar más actuaciones")
+    } finally {
+      setCargandoMas(false)
+    }
+  }
 
   const fechaUltima = formatearHora(detalle.fecha_ultima_actuacion)
   const fechaCreado = formatearHora(detalle.creado_en)
@@ -365,7 +393,9 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
             <h3 className="mt-1 text-lg font-semibold text-slate-800">Historial del proceso</h3>
           </div>
           <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
-            {actuaciones.length} registro{actuaciones.length !== 1 ? "s" : ""}
+            {typeof total === "number" && total !== cargadas
+              ? `${cargadas} de ${total} registros`
+              : `${cargadas} registro${cargadas !== 1 ? "s" : ""}`}
           </span>
         </div>
 
@@ -384,6 +414,26 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
             <IconDocument />
             <p className="text-sm">No se encontraron actuaciones en Rama Judicial.</p>
             <p className="text-xs">Verifica que el radicado sea correcto o intenta más tarde.</p>
+          </div>
+        )}
+
+        {hayMas && (
+          <div className="mt-4 flex justify-center no-print">
+            <button
+              type="button"
+              onClick={cargarMas}
+              disabled={cargandoMas}
+              className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 active:scale-95 disabled:opacity-50"
+            >
+              {cargandoMas ? (
+                <>
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-600" aria-hidden="true" />
+                  Cargando...
+                </>
+              ) : (
+                `Cargar más (${(total ?? 0) - cargadas} restantes)`
+              )}
+            </button>
           </div>
         )}
       </div>

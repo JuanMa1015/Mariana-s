@@ -1,20 +1,19 @@
 import logging
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Depends, HTTPException, status
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from slowapi.middleware import SlowAPIMiddleware
 from services.limiter import limiter
 from slowapi.errors import RateLimitExceeded
 from models import init_db
-from services.scheduler import iniciar_scheduler, obtener_estado_scheduler
 from services.keepalive import Keepalive
 from services.logging_config import configurar_logging, set_request_id, get_request_id
 from routers.procesos import router as procesos_router
 from routers.auth import router as auth_router
-from config import SENTRY_DSN, API_TOKEN, CORS_ORIGINS
+from routers.admin import router as admin_router
+from config import SENTRY_DSN, CORS_ORIGINS
 
 if SENTRY_DSN:
     import sentry_sdk
@@ -42,28 +41,32 @@ async def lifespan(app: FastAPI):
                 _time.sleep(2 ** intento)
             else:
                 logger.error("No se pudo conectar a la BD tras 3 intentos. Continuando...")
-    scheduler = iniciar_scheduler(intervalo_horas=1)
     keepalive = Keepalive()
     keepalive.iniciar()
     yield
     keepalive.detener()
-    scheduler.shutdown()
 
 app = FastAPI(title="Mariana's - Monitor Judicial", lifespan=lifespan)
 app.state.limiter = limiter
 
 
+def _cors_headers_para(origin: str) -> dict:
+    """Headers CORS para respuestas de error, tolerando CORS_ORIGINS vacio."""
+    permitido = origin if origin in CORS_ORIGINS else (CORS_ORIGINS[0] if CORS_ORIGINS else None)
+    if not permitido:
+        return {}
+    return {
+        "Access-Control-Allow-Origin": permitido,
+        "Access-Control-Allow-Credentials": "true",
+    }
+
+
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
-    origin = request.headers.get("origin", "")
-    acao = origin if origin in CORS_ORIGINS else CORS_ORIGINS[0]
     return JSONResponse(
         status_code=429,
         content={"detail": "Demasiadas solicitudes. Intenta de nuevo en un minuto."},
-        headers={
-            "Access-Control-Allow-Origin": acao,
-            "Access-Control-Allow-Credentials": "true",
-        },
+        headers=_cors_headers_para(request.headers.get("origin", "")),
     )
 
 
@@ -76,15 +79,10 @@ async def global_exception_handler(request: Request, exc: Exception):
     else:
         detail = "Error interno del servidor"
         status_code = 500
-    origin = request.headers.get("origin", "")
-    acao = origin if origin in CORS_ORIGINS else CORS_ORIGINS[0]
     return JSONResponse(
         status_code=status_code,
         content={"detail": detail},
-        headers={
-            "Access-Control-Allow-Origin": acao,
-            "Access-Control-Allow-Credentials": "true",
-        },
+        headers=_cors_headers_para(request.headers.get("origin", "")),
     )
 
 
@@ -140,10 +138,14 @@ async def csrf_origin_middleware(request: Request, call_next):
 
 
 @app.get("/health")
-def health():
+def health(deep: bool = False):
+    """Health check ligero (solo BD) para polls frecuentes.
+
+    Con ?deep=true incluye ademas un check real contra Rama Judicial
+    (puede tardar varios segundos; usar con moderacion).
+    """
     from models.database import SessionLocal
     from sqlalchemy import text
-    from scraper.rama_client import rama_health_check
 
     db_ok = False
     db_error = None
@@ -155,238 +157,20 @@ def health():
     except Exception as exc:
         db_error = f"{type(exc).__name__}: {exc}"
 
-    rama_ok = rama_health_check()
-    scheduler = obtener_estado_scheduler()
-
-    return {
+    payload = {
         "status": "ok" if db_ok else "degradado",
         "version": os.environ.get("RENDER_GIT_COMMIT", "").lower() or "dev",
         "base_de_datos": {"ok": db_ok, "error": db_error},
-        "rama_judicial": {"ok": rama_ok},
-        "scheduler": scheduler,
+        # El sync por lotes se dispara externamente (GitHub Actions, cron horario)
+        "sync_disparador": "github-actions",
     }
+    if deep:
+        from scraper.rama_client import rama_health_check
 
+        payload["rama_judicial"] = {"ok": rama_health_check()}
+    return payload
 
-def _debug_auth(request: Request):
-    if not API_TOKEN:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="API_TOKEN no configurado")
-    auth_header = request.headers.get("authorization", "")
-    if auth_header.lower().startswith("bearer "):
-        token_value = auth_header.split(" ", 1)[1]
-        if token_value == API_TOKEN:
-            return None
-    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
-
-
-@app.get("/test-notificacion")
-def test_notificacion(_: None = Depends(_debug_auth), llave_proceso: str = ""):
-    from models.database import SessionLocal
-    from models.actuacion import Actuacion
-    from models.proceso import Proceso
-    from services.notifications import notificar_cambio_radicado
-
-    db = SessionLocal()
-    try:
-        query = db.query(Proceso)
-        if llave_proceso:
-            query = query.filter(Proceso.llave_proceso == llave_proceso)
-        proceso = query.order_by(Proceso.id.desc()).first()
-        if not proceso:
-            return {"error": "No hay procesos en la DB"}
-
-        ultima = (
-            db.query(Actuacion)
-            .filter(Actuacion.proceso_id == proceso.id)
-            .order_by(Actuacion.fecha_actuacion.desc().nullslast(), Actuacion.id_reg_actuacion.desc())
-            .first()
-        )
-        res = notificar_cambio_radicado(
-            llave_proceso=proceso.llave_proceso,
-            despacho=proceso.despacho or "",
-            departamento=proceso.departamento or "",
-            fecha_ultima_actuacion=proceso.fecha_ultima_actuacion,
-            sujetos_procesales=proceso.sujetos_procesales or "",
-            actuacion=ultima.actuacion if ultima else None,
-            anotacion=ultima.anotacion if ultima else None,
-            fecha_registro=ultima.fecha_registro if ultima else None,
-            con_documentos=ultima.con_documentos if ultima else False,
-            categoria=proceso.categoria,
-        )
-        return {
-            "email_enviado": res.get("email"),
-            "telegram_enviado": res.get("telegram"),
-            "radicado": proceso.llave_proceso,
-            "actuacion": ultima.actuacion if ultima else "N/A",
-        }
-    finally:
-        db.close()
-
-
-@app.get("/marcar-leido")
-def marcar_leido(llave_proceso: str, _: None = Depends(_debug_auth)):
-    from models.database import SessionLocal
-    from models.proceso import Proceso
-
-    db = SessionLocal()
-    try:
-        proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
-        if not proceso:
-            return {"ok": False, "error": "No encontrado"}
-        proceso.notificado = True
-        db.commit()
-        return {"ok": True, "llave_proceso": llave_proceso}
-    finally:
-        db.close()
-
-
-@app.get("/resetear-radicado")
-def resetear_radicado(llave_proceso: str, _: None = Depends(_debug_auth)):
-    from models.database import SessionLocal
-    from models.actuacion import Actuacion
-    from models.documento_actuacion import DocumentoActuacion
-    from models.proceso import Proceso
-
-    db = SessionLocal()
-    try:
-        proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
-        if not proceso:
-            return {"ok": False, "error": "No encontrado"}
-        docs = db.query(DocumentoActuacion).join(Actuacion).filter(Actuacion.proceso_id == proceso.id).all()
-        for d in docs:
-            db.delete(d)
-        acts = db.query(Actuacion).filter(Actuacion.proceso_id == proceso.id).all()
-        for a in acts:
-            db.delete(a)
-        proceso.notificado = True
-        proceso.fecha_ultima_actuacion = None
-        db.commit()
-        return {"ok": True, "llave_proceso": llave_proceso, "actuaciones_borradas": len(acts), "documentos_borrados": len(docs)}
-    finally:
-        db.close()
-
-
-@app.post("/resetear-todos")
-def resetear_todos(_: None = Depends(_debug_auth)):
-    from models.database import SessionLocal
-    from models.actuacion import Actuacion
-    from models.documento_actuacion import DocumentoActuacion
-    from models.proceso import Proceso
-
-    db = SessionLocal()
-    try:
-        procesos = db.query(Proceso).all()
-        total_acts = 0
-        total_docs = 0
-        for proceso in procesos:
-            docs = db.query(DocumentoActuacion).join(Actuacion).filter(Actuacion.proceso_id == proceso.id).all()
-            for d in docs:
-                db.delete(d)
-            total_docs += len(docs)
-            acts = db.query(Actuacion).filter(Actuacion.proceso_id == proceso.id).all()
-            for a in acts:
-                db.delete(a)
-            total_acts += len(acts)
-            proceso.notificado = True
-            proceso.tipo_novedad = "nuevo"
-            proceso.fecha_ultima_actuacion = None
-        db.commit()
-        return {
-            "ok": True,
-            "total_radicados": len(procesos),
-            "actuaciones_borradas": total_acts,
-            "documentos_borrados": total_docs,
-        }
-    finally:
-        db.close()
-
-
-@app.get("/test-email")
-def test_email(_: None = Depends(_debug_auth)):
-    from config import EMAIL_TO as CFG_EMAIL_TO, SENDGRID_API_KEY, SMTP_HOST
-    from services.notifications import _enviar_smtp, _enviar_sendgrid
-
-    destinatarios = [c.strip() for c in CFG_EMAIL_TO.replace(",", " ").split() if c.strip()]
-    if not destinatarios:
-        return {"email_enviado": False, "error": "Sin destinatarios"}
-
-    asunto = "TEST - Mariana's"
-    cuerpo = "Correo de prueba desde Mariana's."
-    resultados = {}
-
-    if SENDGRID_API_KEY:
-        sg_ok = _enviar_sendgrid(destinatarios, asunto, cuerpo)
-        resultados["sendgrid"] = {"ok": sg_ok, "api_key_set": True}
-    else:
-        resultados["sendgrid"] = {"ok": False, "api_key_set": False}
-
-    if SMTP_HOST:
-        smtp_ok = _enviar_smtp(destinatarios, asunto, cuerpo)
-        resultados["smtp"] = {"ok": smtp_ok}
-    else:
-        resultados["smtp"] = {"ok": False, "smtp_host_set": False}
-
-    primary_ok = resultados.get("sendgrid", {}).get("ok", False) or resultados.get("smtp", {}).get("ok", False)
-    return {
-        "resultados": resultados,
-        "email_enviado": primary_ok,
-        "destinatarios": destinatarios,
-    }
 
 app.include_router(auth_router)
 app.include_router(procesos_router)
-
-
-@app.get("/admin/telegram-listar")
-def admin_telegram_listar(_: None = Depends(_debug_auth), test: str = ""):
-    import httpx
-    from config import TELEGRAM_BOT_TOKEN
-
-    if not TELEGRAM_BOT_TOKEN:
-        return {"error": "TELEGRAM_BOT_TOKEN no configurado"}
-
-    if test:
-        texto = "ESTO ES UNA PRUEBA - SAPA. No es un cambio real en tus radicados. Si recibes esto, significa que las notificaciones por Telegram te estan llegando correctamente."
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        resp = httpx.post(url, json={"chat_id": int(test), "text": texto}, timeout=10)
-        return {"ok": resp.json().get("ok", False), "chat_id": int(test)}
-
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/getUpdates"
-    resp = httpx.get(url, timeout=10)
-    data = resp.json()
-    if not data.get("ok") or not data.get("result"):
-        return {"usuarios": []}
-    vistos = set()
-    usuarios = []
-    for update in data["result"]:
-        msg = update.get("message", {})
-        chat = msg.get("chat", {})
-        chat_id = chat.get("id")
-        first_name = chat.get("first_name", "")
-        username = chat.get("username", "")
-        text = msg.get("text", "")
-        if chat_id and chat_id not in vistos:
-            vistos.add(chat_id)
-            usuarios.append({"chat_id": chat_id, "nombre": first_name, "user": username or "", "ultimo_mensaje": text or ""})
-    return {"usuarios": usuarios}
-
-
-class VincularTelegramPayload(BaseModel):
-    chat_id: str
-    email: str
-
-
-@app.post("/admin/telegram-vincular")
-def admin_telegram_vincular(payload: VincularTelegramPayload, _: None = Depends(_debug_auth)):
-    from models.database import SessionLocal
-    from models.user import User
-
-    db = SessionLocal()
-    try:
-        user = db.query(User).filter(User.email == payload.email).first()
-        if not user:
-            return {"ok": False, "error": "Usuario no encontrado"}
-        user.telegram_chat_id = payload.chat_id
-        db.commit()
-        return {"ok": True, "chat_id": payload.chat_id, "email": payload.email}
-    finally:
-        db.close()
+app.include_router(admin_router)
