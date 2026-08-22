@@ -42,7 +42,6 @@ export default function App() {
   const [filtroCategoria, setFiltroCategoria] = useState("")
   const [busquedaInput, setBusquedaInput] = useState("")
   const [busqueda, setBusqueda] = useState("")
-  const [apiOffline, setApiOffline] = useState(false)
 
   // Debounce de la busqueda: dispara la peticion 300ms despues de dejar de escribir
   useEffect(() => {
@@ -77,19 +76,7 @@ export default function App() {
     return mejor
   }, [procesos])
 
-  useEffect(() => {
-    const check = () => {
-      fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/health`, { signal: AbortSignal.timeout(5000) })
-        .then((r) => setApiOffline(!r.ok))
-        .catch(() => setApiOffline(true))
-    }
-    check()
-    const id = setInterval(check, 30000)
-    return () => clearInterval(id)
-  }, [])
-
   const { llaveProceso } = useParams()
-
   const esDetalle = Boolean(llaveProceso)
   const fetchSeq = useRef(0)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -116,6 +103,48 @@ export default function App() {
     // Se difiere a microtask para no disparar un render en cascada sincrono
     void Promise.resolve().then(() => cargarLista())
   }, [cargarLista])
+
+  // ── Estado de conexion ────────────────────────────────────────────────────────
+  // Render (plan gratuito) apaga el servicio tras ~15 min de inactividad y
+  // despertarlo toma 30-60s. En vez de asustar con "API no disponible",
+  // se distinguen tres estados con lenguaje cotidiano para los usuarios.
+  type EstadoConexion = "ok" | "conectando" | "sin_conexion"
+  const [estadoConexion, setEstadoConexion] = useState<EstadoConexion>("ok")
+  const fallosSeguidos = useRef(0)
+  const estadoPrevio = useRef<EstadoConexion>("ok")
+  // Ultima version de cargarLista accesible sin recrear verificarConexion
+  const cargarListaRef = useRef(cargarLista)
+  useEffect(() => {
+    cargarListaRef.current = cargarLista
+  }, [cargarLista])
+
+  const verificarConexion = useCallback(async () => {
+    try {
+      const r = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/health`, {
+        signal: AbortSignal.timeout(5000),
+      })
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      fallosSeguidos.current = 0
+      estadoPrevio.current = "ok"
+      setEstadoConexion((prev) => {
+        // Al recuperar la conexion se recarga la lista una sola vez
+        if (prev !== "ok") void Promise.resolve().then(() => cargarListaRef.current())
+        return "ok"
+      })
+    } catch {
+      fallosSeguidos.current += 1
+      const nuevo: EstadoConexion = fallosSeguidos.current >= 4 ? "sin_conexion" : "conectando"
+      estadoPrevio.current = nuevo
+      setEstadoConexion(nuevo)
+    }
+  }, [])
+
+  useEffect(() => {
+    void verificarConexion()
+    const id = setInterval(verificarConexion, 15000)
+    return () => clearInterval(id)
+  }, [verificarConexion])
+
 
   const currentDetalle = detalle && detalle.llave === llaveProceso ? detalle.data : null
   const loadingDetalle = esDetalle && currentDetalle === null
@@ -262,9 +291,23 @@ export default function App() {
       </header>
 
       <main className="mx-auto flex w-full max-w-none flex-1 min-h-0 flex-col gap-3 px-4 py-4 sm:px-5 sm:py-5">
-        {apiOffline && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-sm no-print">
-            <span className="font-semibold">API no disponible:</span> los datos pueden estar desactualizados. Intenta recargar la pagina.
+        {estadoConexion === "conectando" && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm no-print">
+            Conectando con la aplicación… si acabas de entrar, puede tardar unos segundos. En un momento verás tus procesos.
+          </div>
+        )}
+        {estadoConexion === "sin_conexion" && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm no-print">
+            <span>
+              No hay conexión en este momento. <strong>Tranquilo, tus procesos no se han perdido:</strong> estás viendo los datos tal como quedaron en tu última visita. Seguimos reconectando automáticamente.
+            </span>
+            <button
+              type="button"
+              onClick={verificarConexion}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-100"
+            >
+              Reintentar ahora
+            </button>
           </div>
         )}
         {esDetalle ? (
