@@ -113,5 +113,7 @@ export interface NovedadesDetalle {
   total: number
   skip: number
   limit: number
+  /** Tope de reintentos del aviso; viene del backend para no duplicar el valor. */
+  intentos_max_aviso?: number
   novedades: NovedadDetalle[]
 }

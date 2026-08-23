@@ -342,7 +342,9 @@ async def test_novedades_detalle_incluye_info_de_aviso(client, auth_headers, tes
 
     response = await client.get(f"{PREFIX}/novedades-detalle", headers=auth_headers)
     assert response.status_code == 200
-    item = response.json()["novedades"][0]
+    body = response.json()
+    assert body["intentos_max_aviso"] == 5
+    item = body["novedades"][0]
     assert item["canales_notificados"] == "email+telegram"
     assert item["notificacion_pendiente"] is False
     assert item["intentos_notificacion"] == 2

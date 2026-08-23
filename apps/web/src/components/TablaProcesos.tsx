@@ -3,6 +3,7 @@ import { VariableSizeList } from "react-window"
 import type { Proceso } from "../types"
 import toast from "react-hot-toast"
 import { deleteProceso, updateProceso } from "../api"
+import { formatearFechaCorta } from "../utils/fechas"
 
 interface FilaData {
   procesos: Proceso[]
@@ -138,7 +139,7 @@ function Row({ index, style, data }: ListChildProps) {
               </td>
               <td className="px-5 py-4 align-middle">
                 {p.fecha_ultima_actuacion ? (
-                  <><p className="text-sm font-semibold text-slate-800">{new Date(p.fecha_ultima_actuacion).toLocaleDateString("es-CO")}</p><p className="text-[11px] text-slate-500 mt-0.5">Último cambio</p></>
+                  <><p className="text-sm font-semibold text-slate-800">{formatearFechaCorta(p.fecha_ultima_actuacion)}</p><p className="text-[11px] text-slate-500 mt-0.5">Último cambio</p></>
                 ) : <span className="text-xs text-slate-500 italic">Sin actualización</span>}
               </td>
               <td className="px-5 py-4 align-middle">
@@ -256,7 +257,7 @@ function Row({ index, style, data }: ListChildProps) {
             </td>
             <td className="px-5 py-4 align-middle">
               {p.fecha_ultima_actuacion ? (
-                <><p className="text-sm font-semibold text-slate-800">{new Date(p.fecha_ultima_actuacion).toLocaleDateString("es-CO")}</p><p className="text-[11px] text-slate-500 mt-0.5">Último cambio</p></>
+                <><p className="text-sm font-semibold text-slate-800">{formatearFechaCorta(p.fecha_ultima_actuacion)}</p><p className="text-[11px] text-slate-500 mt-0.5">Último cambio</p></>
               ) : <span className="text-xs text-slate-500 italic">Sin actualización</span>}
             </td>
             <td className="px-5 py-4 align-middle">

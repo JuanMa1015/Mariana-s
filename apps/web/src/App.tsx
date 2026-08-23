@@ -7,6 +7,7 @@ import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
 import { useNavigate, useParams } from "react-router-dom"
 import { captureException } from "./sentry"
+import { formatearFechaCorta } from "./utils/fechas"
 
 function tiempoRelativo(fecha: string | null | undefined): string {
   if (!fecha) return "Aún sin sincronizar"
@@ -17,7 +18,7 @@ function tiempoRelativo(fecha: string | null | undefined): string {
   if (min < 60) return `hace ${min} min`
   const horas = Math.floor(min / 60)
   if (horas < 24) return `hace ${horas} hora${horas !== 1 ? "s" : ""}`
-  return new Date(t).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" })
+  return formatearFechaCorta(fecha) ?? "Aún sin sincronizar"
 }
 
 function fetchProcesosNovedades(skip: number, limit: number, categoria?: string, q?: string) {
