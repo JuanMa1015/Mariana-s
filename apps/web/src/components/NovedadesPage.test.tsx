@@ -21,6 +21,9 @@ const NOVEDADES_MOCK = {
       sujetos_procesales: "DEMANDANTE: Pérez\nDEMANDADO: Empresa SAS",
       fecha_ultima_actuacion: "2026-06-15T10:00:00Z",
       tipo_novedad: "actualizacion",
+      canales_notificados: "email+telegram",
+      notificacion_pendiente: false,
+      intentos_notificacion: 0,
       actuaciones: [
         {
           id_reg_actuacion: 1,
@@ -44,6 +47,9 @@ const NOVEDADES_MOCK = {
       sujetos_procesales: "DEMANDANTE: Otro",
       fecha_ultima_actuacion: "2026-06-14T08:00:00Z",
       tipo_novedad: "nuevo",
+      canales_notificados: null,
+      notificacion_pendiente: true,
+      intentos_notificacion: 2,
       actuaciones: [],
     },
   ],
@@ -102,5 +108,37 @@ describe("NovedadesPage", () => {
     })
     fireEvent.click(screen.getByText(/volver/i))
     expect(mockNavigate).toHaveBeenCalledWith("/")
+  })
+
+  it("muestra por que canales fue avisado cada radicado", async () => {
+    vi.mocked((await import("../api")).getNovedadesDetalle).mockResolvedValue({
+      total: 3,
+      novedades: [
+        { ...NOVEDADES_MOCK.novedades[0], canales_notificados: "email+telegram" },
+        { ...NOVEDADES_MOCK.novedades[1], notificacion_pendiente: false, canales_notificados: "telegram" },
+        { ...NOVEDADES_MOCK.novedades[1], llave_proceso: "05001500300520230010000", notificacion_pendiente: true, intentos_notificacion: 2, canales_notificados: null },
+      ],
+    })
+    const { default: NovedadesPage } = await import("./NovedadesPage")
+    render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
+    await waitFor(() => {
+      expect(screen.getByText(/avisado: correo y telegram/i)).toBeInTheDocument()
+      expect(screen.getByText(/avisado: telegram/i)).toBeInTheDocument()
+      expect(screen.getByText(/sin avisar · reintento 2/i)).toBeInTheDocument()
+    })
+  })
+
+  it("muestra 'sin aviso' cuando la novedad no tiene registro de envio", async () => {
+    vi.mocked((await import("../api")).getNovedadesDetalle).mockResolvedValue({
+      total: 1,
+      novedades: [
+        { ...NOVEDADES_MOCK.novedades[0], canales_notificados: null, notificacion_pendiente: false, intentos_notificacion: 0 },
+      ],
+    })
+    const { default: NovedadesPage } = await import("./NovedadesPage")
+    render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
+    await waitFor(() => {
+      expect(screen.getByText(/sin aviso/i)).toBeInTheDocument()
+    })
   })
 })

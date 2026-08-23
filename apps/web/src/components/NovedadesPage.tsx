@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { getNovedadesDetalle, marcarTodoLeido } from "../api"
 import toast from "react-hot-toast"
-import type { NovedadesDetalle, Actuacion } from "../types"
+import type { NovedadesDetalle, NovedadDetalle, Actuacion } from "../types"
 import { useNavigate } from "react-router-dom"
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
@@ -126,6 +126,30 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
       </table>
     </div>
   )
+}
+
+function InsigniaAviso({ novedad }: { novedad: NovedadDetalle }) {
+  const base = "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+  if (novedad.notificacion_pendiente) {
+    const reintentos = (novedad.intentos_notificacion ?? 0) > 0
+      ? ` · reintento ${novedad.intentos_notificacion}`
+      : ""
+    return (
+      <span className={`${base} bg-amber-100 text-amber-700`} title="Estamos intentando enviar el aviso a tus canales">
+        Sin avisar{reintentos}
+      </span>
+    )
+  }
+  switch (novedad.canales_notificados) {
+    case "email+telegram":
+      return <span className={`${base} bg-emerald-100 text-emerald-700`}>Avisado: Correo y Telegram</span>
+    case "email":
+      return <span className={`${base} bg-emerald-100 text-emerald-700`}>Avisado: Correo</span>
+    case "telegram":
+      return <span className={`${base} bg-emerald-100 text-emerald-700`}>Avisado: Telegram</span>
+    default:
+      return <span className={`${base} bg-slate-100 text-slate-500`} title="Esta novedad no tiene aviso registrado">Sin aviso</span>
+  }
 }
 
 export default function NovedadesPage() {
@@ -306,6 +330,8 @@ export default function NovedadesPage() {
                           {nov.categoria}
                         </span>
                       )}
+
+                      <InsigniaAviso novedad={nov} />
 
                       <span className="hidden min-w-0 flex-1 truncate text-xs text-slate-500 sm:block">
                         {nov.despacho}

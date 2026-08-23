@@ -322,3 +322,44 @@ async def test_sync_estado_sin_historial(client, auth_headers):
 async def test_sync_manual_requiere_auth(client):
     response = await client.post(f"{PREFIX}/sync")
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_novedades_detalle_incluye_info_de_aviso(client, auth_headers, test_user, db):
+    from models.proceso import Proceso
+
+    p = Proceso(
+        llave_proceso=RADICADO_VALIDO,
+        user_id=test_user.id,
+        notificado=False,
+        tipo_novedad="actualizacion",
+        canales_notificados="email+telegram",
+        notificacion_pendiente=False,
+        intentos_notificacion=2,
+    )
+    db.add(p)
+    db.commit()
+
+    response = await client.get(f"{PREFIX}/novedades-detalle", headers=auth_headers)
+    assert response.status_code == 200
+    item = response.json()["novedades"][0]
+    assert item["canales_notificados"] == "email+telegram"
+    assert item["notificacion_pendiente"] is False
+    assert item["intentos_notificacion"] == 2
+
+
+@pytest.mark.asyncio
+async def test_novedades_detalle_sin_aviso_registrado(client, auth_headers, test_user, db):
+    """Radicado sin canales configurados: campos presentes y en None/0."""
+    from models.proceso import Proceso
+
+    p = Proceso(llave_proceso=RADICADO_VALIDO, user_id=test_user.id, notificado=False)
+    db.add(p)
+    db.commit()
+
+    response = await client.get(f"{PREFIX}/novedades-detalle", headers=auth_headers)
+    assert response.status_code == 200
+    item = response.json()["novedades"][0]
+    assert item["canales_notificados"] is None
+    assert item["notificacion_pendiente"] is False
+    assert item["intentos_notificacion"] == 0

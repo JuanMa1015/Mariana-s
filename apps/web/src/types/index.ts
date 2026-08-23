@@ -102,6 +102,10 @@ export interface NovedadDetalle {
   tipo_novedad?: string | null
   tipo_proceso?: string | null
   clase_proceso?: string | null
+  /** Canales por los que se entrego el aviso: "email", "telegram" o "email+telegram". */
+  canales_notificados?: string | null
+  notificacion_pendiente?: boolean
+  intentos_notificacion?: number
   actuaciones: Actuacion[]
 }
 
