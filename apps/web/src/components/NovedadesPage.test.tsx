@@ -122,13 +122,13 @@ describe("NovedadesPage", () => {
     const { default: NovedadesPage } = await import("./NovedadesPage")
     render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
     await waitFor(() => {
-      expect(screen.getByText(/avisado: correo y telegram/i)).toBeInTheDocument()
-      expect(screen.getByText(/avisado: telegram/i)).toBeInTheDocument()
-      expect(screen.getByText(/sin avisar · reintento 2/i)).toBeInTheDocument()
+      expect(screen.getByText(/correo y telegram/i)).toBeInTheDocument()
+      expect(screen.getByText(/^telegram$/i)).toBeInTheDocument()
+      expect(screen.getByText(/^sin avisar/i)).toBeInTheDocument()
     })
   })
 
-  it("muestra 'sin aviso' cuando la novedad no tiene registro de envio", async () => {
+  it("no muestra insignia cuando la novedad no tiene registro de envio (legacy)", async () => {
     vi.mocked((await import("../api")).getNovedadesDetalle).mockResolvedValue({
       total: 1,
       novedades: [
@@ -138,7 +138,33 @@ describe("NovedadesPage", () => {
     const { default: NovedadesPage } = await import("./NovedadesPage")
     render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
     await waitFor(() => {
-      expect(screen.getByText(/sin aviso/i)).toBeInTheDocument()
+      expect(screen.getByText(/05001310301720240048000/)).toBeInTheDocument()
+    })
+    expect(screen.queryByText(/sin aviso/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/avisado/i)).not.toBeInTheDocument()
+  })
+
+  it("avisa cuando se agotaron los reintentos del aviso", async () => {
+    vi.mocked((await import("../api")).getNovedadesDetalle).mockResolvedValue({
+      total: 1,
+      novedades: [
+        { ...NOVEDADES_MOCK.novedades[0], canales_notificados: null, notificacion_pendiente: true, intentos_notificacion: 5 },
+      ],
+    })
+    const { default: NovedadesPage } = await import("./NovedadesPage")
+    render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
+    await waitFor(() => {
+      expect(screen.getByText(/no se pudo avisar/i)).toBeInTheDocument()
+    })
+  })
+
+  it("muestra error en vez de 'todo al dia' cuando la carga falla", async () => {
+    vi.mocked((await import("../api")).getNovedadesDetalle).mockRejectedValue(new Error("red caida"))
+    const { default: NovedadesPage } = await import("./NovedadesPage")
+    render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
+    await waitFor(() => {
+      expect(screen.getByText(/no se pudieron cargar las novedades/i)).toBeInTheDocument()
+      expect(screen.queryByText(/todo al día/i)).not.toBeInTheDocument()
     })
   })
 })
