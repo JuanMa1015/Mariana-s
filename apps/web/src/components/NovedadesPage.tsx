@@ -1,10 +1,8 @@
 import { useState, useEffect } from "react"
-import { getNovedadesDetalle, marcarTodoLeido } from "../api"
+import { getNovedadesDetalle, marcarTodoLeido, descargarDocumento } from "../api"
 import toast from "react-hot-toast"
 import type { NovedadesDetalle, NovedadDetalle, Actuacion } from "../types"
 import { useNavigate } from "react-router-dom"
-
-const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
 function formatearFecha(iso: string | null | undefined): string {
   if (!iso) return "—"
@@ -15,24 +13,12 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
   const [open, setOpen] = useState(false)
   if (!documentos?.length) return <span className="text-slate-400">—</span>
 
-  const descargarDocumento = (id: number, nombre: string) => async (e: React.MouseEvent) => {
+  const descargarDocumentoClick = (id: number, nombre: string) => async (e: React.MouseEvent) => {
     e.stopPropagation()
     try {
-      const res = await fetch(`${BASE_URL}/procesos/documento/${id}`, {
-        credentials: "include",
-      })
-      if (!res.ok) throw new Error("Error al descargar")
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = nombre
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      await descargarDocumento(id, nombre)
     } catch {
-      window.alert("No se pudo descargar el documento")
+      toast.error("No se pudo descargar el documento")
     }
   }
 
@@ -64,7 +50,7 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
                       {doc.fecha_carga && <p className="mt-0.5 text-[10px] text-slate-400">{formatearFecha(doc.fecha_carga)}</p>}
                     </div>
                     <button
-                      onClick={descargarDocumento(doc.id_reg_documento, doc.nombre)}
+                      onClick={descargarDocumentoClick(doc.id_reg_documento, doc.nombre)}
                       aria-label={`Descargar ${doc.nombre}`}
                       className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-sky-600 shadow-sm ring-1 ring-sky-200 transition hover:bg-sky-50"
                     >
@@ -128,27 +114,51 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
   )
 }
 
+// Coincide con _INTENTOS_MAX_NOTIFICACION en apps/api/services/sync.py
+const INTENTOS_MAX_AVISO = 5
+
 function InsigniaAviso({ novedad }: { novedad: NovedadDetalle }) {
   const base = "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+
   if (novedad.notificacion_pendiente) {
-    const reintentos = (novedad.intentos_notificacion ?? 0) > 0
-      ? ` · reintento ${novedad.intentos_notificacion}`
-      : ""
+    const intentos = novedad.intentos_notificacion ?? 0
+    if (intentos >= INTENTOS_MAX_AVISO) {
+      return (
+        <span className={`${base} bg-rose-100 text-rose-700`} title="Agotamos los reintentos del aviso; la novedad sigue visible aquí">
+          No se pudo avisar
+        </span>
+      )
+    }
     return (
       <span className={`${base} bg-amber-100 text-amber-700`} title="Estamos intentando enviar el aviso a tus canales">
-        Sin avisar{reintentos}
+        Sin avisar<span className="hidden sm:inline">{intentos > 0 ? ` · reintento ${intentos}` : ""}</span>
       </span>
     )
   }
+
   switch (novedad.canales_notificados) {
     case "email+telegram":
-      return <span className={`${base} bg-emerald-100 text-emerald-700`}>Avisado: Correo y Telegram</span>
+      return (
+        <span className={`${base} bg-emerald-100 text-emerald-700`} title="El aviso llegó por correo y por Telegram">
+          Avisado<span className="hidden sm:inline">: Correo y Telegram</span>
+        </span>
+      )
     case "email":
-      return <span className={`${base} bg-emerald-100 text-emerald-700`}>Avisado: Correo</span>
+      return (
+        <span className={`${base} bg-emerald-100 text-emerald-700`} title="El aviso llegó por correo">
+          Correo<span className="hidden sm:inline"> avisado</span>
+        </span>
+      )
     case "telegram":
-      return <span className={`${base} bg-emerald-100 text-emerald-700`}>Avisado: Telegram</span>
+      return (
+        <span className={`${base} bg-emerald-100 text-emerald-700`} title="El aviso llegó por Telegram">
+          Telegram<span className="hidden sm:inline"> avisado</span>
+        </span>
+      )
     default:
-      return <span className={`${base} bg-slate-100 text-slate-500`} title="Esta novedad no tiene aviso registrado">Sin aviso</span>
+      // Novedades anteriores al registro de canales: sin dato confiable,
+      // mejor no mostrar nada que mostrar algo equivocado.
+      return null
   }
 }
 
@@ -156,19 +166,30 @@ export default function NovedadesPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<NovedadesDetalle | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [marcando, setMarcando] = useState(false)
   const [skip, setSkip] = useState(0)
+  const [reloadKey, setReloadKey] = useState(0)
 
   const limit = 25
 
   useEffect(() => {
     let active = true
     getNovedadesDetalle(skip, limit)
-      .then((d) => { if (active) setData(d) })
+      .then((d) => {
+        if (!active) return
+        setError(false)
+        setData(d)
+      })
+      .catch(() => {
+        if (!active) return
+        setError(true)
+        toast.error("No se pudieron cargar las novedades")
+      })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
-  }, [skip])
+  }, [skip, reloadKey])
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / limit)) : 1
   const currentPage = Math.floor(skip / limit) + 1
@@ -189,9 +210,15 @@ export default function NovedadesPage() {
               try {
                 const res = await marcarTodoLeido()
                 toast.success(`${res.marcados} proceso${res.marcados !== 1 ? "s" : ""} marcado${res.marcados !== 1 ? "s" : ""} como leido${res.marcados !== 1 ? "s" : ""}`)
-                setSkip(0)
                 setExpanded(new Set())
-                getNovedadesDetalle(0, limit).then(setData)
+                if (skip === 0) {
+                  // Ya estamos en la primera pagina: recargar manualmente
+                  getNovedadesDetalle(0, limit).then(setData).catch(() => setError(true))
+                } else {
+                  // Volver a la primera pagina; el useEffect recarga solo
+                  setLoading(true)
+                  setSkip(0)
+                }
               } catch {
                 toast.error("Error al marcar como leido")
               } finally {
@@ -249,6 +276,19 @@ export default function NovedadesPage() {
               <p className="text-sm font-medium">Cargando novedades...</p>
             </div>
           </div>
+        ) : error ? (
+          <div className="flex flex-1 items-center justify-center">
+            <div className="rounded-3xl border border-rose-200 bg-rose-50 p-8 text-center text-sm">
+              <p className="font-semibold text-rose-700">No se pudieron cargar las novedades</p>
+              <p className="mt-1 text-rose-600">Revisa tu conexión e intenta de nuevo.</p>
+              <button
+                onClick={() => { setLoading(true); setReloadKey((k) => k + 1) }}
+                className="mt-4 rounded-full border border-rose-200 bg-white px-4 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+              >
+                Reintentar
+              </button>
+            </div>
+          </div>
         ) : !data?.novedades?.length ? (
           <div className="flex flex-1 items-center justify-center">
             <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-8 text-center text-sm">
@@ -302,7 +342,7 @@ export default function NovedadesPage() {
                   >
                     <button
                       onClick={() => toggleExpand(nov.llave_proceso)}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-left sm:px-5"
+                      className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left sm:px-5"
                     >
                       <svg
                         className={`h-4 w-4 shrink-0 text-violet-400 transition ${isOpen ? "rotate-90" : ""}`}

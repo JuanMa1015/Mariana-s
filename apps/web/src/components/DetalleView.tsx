@@ -1,6 +1,6 @@
 import { useState } from "react"
 import toast from "react-hot-toast"
-import { getProceso, updateProceso } from "../api"
+import { getProceso, updateProceso, descargarDocumento } from "../api"
 import type { Actuacion, DetalleProceso, DocumentoActuacion } from "../types"
 
 interface Props {
@@ -100,19 +100,7 @@ const DocumentosList = ({ docs }: { docs: DocumentoActuacion[] }) => {
 
   const descargar = async (id: number, nombre: string) => {
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/procesos/documento/${id}`, {
-        credentials: "include",
-      })
-      if (!res.ok) throw new Error("Error al descargar")
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = nombre
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
+      await descargarDocumento(id, nombre)
     } catch {
       toast.error("No se pudo descargar el documento")
     }
