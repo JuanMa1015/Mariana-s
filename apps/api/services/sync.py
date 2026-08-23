@@ -335,7 +335,7 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
     return entregadas
 
 
-_INTENTOS_MAX_NOTIFICACION = 5
+INTENTOS_MAX_NOTIFICACION = 5
 _BACKOFF_NOTIFICACION_HORAS = [1, 3, 6, 12, 24]
 
 
@@ -351,10 +351,10 @@ def _reenviar_notificaciones_pendientes(db: Session) -> list[str]:
 
     for radicado in pendientes:
         intentos = radicado.intentos_notificacion or 0
-        if intentos >= _INTENTOS_MAX_NOTIFICACION:
+        if intentos >= INTENTOS_MAX_NOTIFICACION:
             logger.warning(
                 "Notificacion de %s alcanzó el máximo de %d intentos; queda visible en la app",
-                radicado.llave_proceso, _INTENTOS_MAX_NOTIFICACION,
+                radicado.llave_proceso, INTENTOS_MAX_NOTIFICACION,
             )
             continue
         espera_h = _backoff_notificacion_horas(intentos)

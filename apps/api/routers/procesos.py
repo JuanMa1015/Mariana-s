@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from models.database import get_db
 from models.actuacion import Actuacion
 from models.proceso import Proceso
-from services.sync import sincronizar_radicados_lote, _serializar_texto
+from services.sync import sincronizar_radicados_lote, _serializar_texto, INTENTOS_MAX_NOTIFICACION
 from fastapi.responses import StreamingResponse
 from scraper.rama_client import buscar_por_radicado, buscar_detalle_proceso, descargar_documento, rama_health_check
 from services.auth import get_current_user, oauth2_scheme
@@ -376,6 +376,8 @@ def novedades_detalle(
         "total": total,
         "skip": skip,
         "limit": limit,
+        # Para que el frontend sepa cuando dejar de decir "reintentando"
+        "intentos_max_aviso": INTENTOS_MAX_NOTIFICACION,
         "novedades": [
             {
                 "llave_proceso": p.llave_proceso,

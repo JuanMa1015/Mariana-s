@@ -147,6 +147,7 @@ describe("NovedadesPage", () => {
   it("avisa cuando se agotaron los reintentos del aviso", async () => {
     vi.mocked((await import("../api")).getNovedadesDetalle).mockResolvedValue({
       total: 1,
+      intentos_max_aviso: 5,
       novedades: [
         { ...NOVEDADES_MOCK.novedades[0], canales_notificados: null, notificacion_pendiente: true, intentos_notificacion: 5 },
       ],
@@ -155,6 +156,23 @@ describe("NovedadesPage", () => {
     render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
     await waitFor(() => {
       expect(screen.getByText(/no se pudo avisar/i)).toBeInTheDocument()
+    })
+  })
+
+  it("respeta el tope de reintentos que viene del backend", async () => {
+    // Tope custom (2): con 2 intentos ya debe mostrar el estado agotado
+    vi.mocked((await import("../api")).getNovedadesDetalle).mockResolvedValue({
+      total: 1,
+      intentos_max_aviso: 2,
+      novedades: [
+        { ...NOVEDADES_MOCK.novedades[0], canales_notificados: null, notificacion_pendiente: true, intentos_notificacion: 2 },
+      ],
+    })
+    const { default: NovedadesPage } = await import("./NovedadesPage")
+    render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
+    await waitFor(() => {
+      expect(screen.getByText(/no se pudo avisar/i)).toBeInTheDocument()
+      expect(screen.queryByText(/sin avisar/i)).not.toBeInTheDocument()
     })
   })
 

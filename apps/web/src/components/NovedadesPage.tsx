@@ -1,13 +1,9 @@
 import { useState, useEffect } from "react"
 import { getNovedadesDetalle, marcarTodoLeido, descargarDocumento } from "../api"
+import { formatearFechaCorta } from "../utils/fechas"
 import toast from "react-hot-toast"
 import type { NovedadesDetalle, NovedadDetalle, Actuacion } from "../types"
 import { useNavigate } from "react-router-dom"
-
-function formatearFecha(iso: string | null | undefined): string {
-  if (!iso) return "—"
-  return iso.slice(0, 10)
-}
 
 function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"] }) {
   const [open, setOpen] = useState(false)
@@ -47,7 +43,7 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-sky-800 truncate">{doc.nombre}</p>
                       {doc.descripcion && <p className="mt-0.5 text-slate-500">{doc.descripcion}</p>}
-                      {doc.fecha_carga && <p className="mt-0.5 text-[10px] text-slate-400">{formatearFecha(doc.fecha_carga)}</p>}
+                      {doc.fecha_carga && <p className="mt-0.5 text-[10px] text-slate-400">{formatearFechaCorta(doc.fecha_carga) ?? "—"}</p>}
                     </div>
                     <button
                       onClick={descargarDocumentoClick(doc.id_reg_documento, doc.nombre)}
@@ -92,7 +88,7 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
                 {i === 0 && (
                   <span className="mr-1.5 inline-block rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-700">Última</span>
                 )}
-                {formatearFecha(a.fecha_actuacion)}
+                {formatearFechaCorta(a.fecha_actuacion) ?? "—"}
               </td>
               <td className="px-3 py-2.5 font-medium text-slate-800">{a.actuacion}</td>
               <td className="max-w-xs px-3 py-2.5 text-slate-600">
@@ -100,9 +96,9 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
                   <span className="line-clamp-3" title={a.anotacion}>{a.anotacion}</span>
                 ) : "—"}
               </td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFecha(a.fecha_inicial)}</td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFecha(a.fecha_final)}</td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFecha(a.fecha_registro)}</td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFechaCorta(a.fecha_inicial) ?? "—"}</td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFechaCorta(a.fecha_final) ?? "—"}</td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFechaCorta(a.fecha_registro) ?? "—"}</td>
               <td className="px-3 py-2.5 text-center">
                 <DocumentosPopover documentos={a.documentos} />
               </td>
@@ -114,15 +110,12 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
   )
 }
 
-// Coincide con _INTENTOS_MAX_NOTIFICACION en apps/api/services/sync.py
-const INTENTOS_MAX_AVISO = 5
-
-function InsigniaAviso({ novedad }: { novedad: NovedadDetalle }) {
+function InsigniaAviso({ novedad, intentosMax = 5 }: { novedad: NovedadDetalle; intentosMax?: number }) {
   const base = "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
 
   if (novedad.notificacion_pendiente) {
     const intentos = novedad.intentos_notificacion ?? 0
-    if (intentos >= INTENTOS_MAX_AVISO) {
+    if (intentos >= intentosMax) {
       return (
         <span className={`${base} bg-rose-100 text-rose-700`} title="Agotamos los reintentos del aviso; la novedad sigue visible aquí">
           No se pudo avisar
@@ -371,14 +364,14 @@ export default function NovedadesPage() {
                         </span>
                       )}
 
-                      <InsigniaAviso novedad={nov} />
+                      <InsigniaAviso novedad={nov} intentosMax={data.intentos_max_aviso} />
 
                       <span className="hidden min-w-0 flex-1 truncate text-xs text-slate-500 sm:block">
                         {nov.despacho}
                       </span>
 
                       <span className="ml-auto shrink-0 text-[11px] font-medium text-amber-600">
-                        {formatearFecha(nov.fecha_ultima_actuacion)}
+                        {formatearFechaCorta(nov.fecha_ultima_actuacion) ?? "—"}
                       </span>
 
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">

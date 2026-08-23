@@ -1,6 +1,7 @@
 import { useState } from "react"
 import toast from "react-hot-toast"
 import { getProceso, updateProceso, descargarDocumento } from "../api"
+import { formatearFechaCorta } from "../utils/fechas"
 import type { Actuacion, DetalleProceso, DocumentoActuacion } from "../types"
 
 interface Props {
@@ -10,12 +11,7 @@ interface Props {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function formatearFecha(raw: string | null | undefined): string | null {
-  if (!raw) return null
-  const d = new Date(raw)
-  if (isNaN(d.getTime())) return raw
-  return d.toLocaleDateString("es-CO", { year: "numeric", month: "short", day: "numeric" })
-}
+const formatearFecha = formatearFechaCorta
 
 function formatearHora(raw: string | null | undefined): string | null {
   if (!raw) return null
