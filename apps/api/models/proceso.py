@@ -37,6 +37,9 @@ class Proceso(Base):
     notificacion_pendiente = Column(Boolean, default=False)
     intentos_notificacion = Column(Integer, default=0)
     ultima_notificacion_intento = Column(DateTime, nullable=True)
+    # Canales por los que se entrego el aviso de esta novedad: "email",
+    # "telegram" o "email+telegram". None = sin aviso registrado.
+    canales_notificados = Column(String, nullable=True)
 
     user = relationship("User", back_populates="procesos")
     actuaciones = relationship("Actuacion", back_populates="proceso", cascade="all, delete-orphan")

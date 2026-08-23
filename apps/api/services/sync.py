@@ -52,6 +52,20 @@ def _notificacion_entregada(res: dict, tiene_email: bool, tiene_telegram: bool) 
     return ok
 
 
+def _canales_entregados(res: dict, tiene_email: bool, tiene_telegram: bool) -> str | None:
+    """Cadena con los canales configurados que tuvieron exito, para trazabilidad.
+
+    Retorna "email+telegram", "email" o "telegram". Si el usuario no tiene
+    ningun canal configurado retorna None (no hubo intento de aviso).
+    """
+    canales = []
+    if tiene_email and res.get("email", False):
+        canales.append("email")
+    if tiene_telegram and res.get("telegram", False):
+        canales.append("telegram")
+    return "+".join(canales) if canales else None
+
+
 def _normalizar_texto(valor: str | None) -> str:
     return (valor or "").strip()
 
@@ -255,14 +269,14 @@ def _fetch_actuaciones_multi(ids_proceso: list[int]) -> dict:
 
 
 
-def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list) -> set[int]:
+def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list) -> dict[int, str]:
     """Envia notificaciones agrupadas por destinatario.
 
-    Retorna el conjunto de proceso_id cuya notificacion fue efectivamente
-    entregada (fila exacta, segura en escenarios multiusuario donde dos
-    usuarios siguen el mismo radicado).
+    Retorna un mapa proceso_id -> canales por los que se entrego el aviso
+    ("email+telegram", etc.; fila exacta, segura en escenarios multiusuario
+    donde dos usuarios siguen el mismo radicado).
     """
-    entregadas: set[int] = set()
+    entregadas: dict[int, str] = {}
     for llave_grupo, notifs in acumuladas.items():
         email = notifs[0].get("email")
         destinatarios = [email] if email else None
@@ -288,7 +302,10 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
             )
             if _notificacion_entregada(res, bool(destinatarios), tiene_telegram_canal):
                 emails_enviados.append(f"resumen_{llave_grupo}")
-                entregadas.update(n["proceso_id"] for n in notifs if n.get("proceso_id") is not None)
+                canales = _canales_entregados(res, bool(destinatarios), tiene_telegram_canal) or ""
+                for n in notifs:
+                    if n.get("proceso_id") is not None:
+                        entregadas[n["proceso_id"]] = canales
             time.sleep(0.5)
         else:
             for n in notifs:
@@ -311,7 +328,9 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                 if _notificacion_entregada(res, bool(destinatarios), tiene_telegram_canal):
                     emails_enviados.append(n["llave_proceso"])
                     if n.get("proceso_id") is not None:
-                        entregadas.add(n["proceso_id"])
+                        entregadas[n["proceso_id"]] = (
+                            _canales_entregados(res, bool(destinatarios), tiene_telegram_canal) or ""
+                        )
                 time.sleep(0.5)
     return entregadas
 
@@ -382,6 +401,9 @@ def _reenviar_notificaciones_pendientes(db: Session) -> list[str]:
         if _notificacion_entregada(res, bool(user_email), tiene_telegram_canal):
             radicado.notificacion_pendiente = False
             radicado.intentos_notificacion = 0
+            radicado.canales_notificados = _canales_entregados(
+                res, bool(user_email), tiene_telegram_canal
+            )
             reenviadas.append(radicado.llave_proceso)
         db.commit()
 
@@ -511,6 +533,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
             actualizados.append(radicado.llave_proceso)
             if tiene_canal:
                 radicado.notificacion_pendiente = True
+                radicado.canales_notificados = None
                 acumuladas.setdefault(llave_acumulada, []).append({
                     "proceso_id": radicado.id,
                     "llave_proceso": radicado.llave_proceso,
@@ -547,6 +570,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
         )
         if tiene_canal:
             radicado.notificacion_pendiente = True
+            radicado.canales_notificados = None
             acumuladas.setdefault(llave_acumulada, []).append({
                 "proceso_id": radicado.id,
                 "llave_proceso": radicado.llave_proceso,
@@ -718,9 +742,11 @@ def _sincronizar_lista(db: Session, radicados: list[Proceso]) -> dict:
     entregadas = _enviar_notificaciones_acumuladas(acumuladas, emails_enviados)
     if entregadas:
         # Filtrar por id de fila: dos usuarios pueden seguir el mismo radicado
-        db.query(Proceso).filter(Proceso.id.in_(list(entregadas))).update(
-            {Proceso.notificacion_pendiente: False}, synchronize_session=False
-        )
+        for proceso_id, canales in entregadas.items():
+            db.query(Proceso).filter(Proceso.id == proceso_id).update(
+                {Proceso.notificacion_pendiente: False, Proceso.canales_notificados: canales or None},
+                synchronize_session=False,
+            )
         db.commit()
     reenviadas = _reenviar_notificaciones_pendientes(db)
 

@@ -152,7 +152,7 @@ async def test_email_fallido_no_marca_entregada_aunque_telegram_funcione():
         entregadas = _enviar_notificaciones_acumuladas(acumuladas, emails)
 
     assert emails == []
-    assert entregadas == set()
+    assert entregadas == {}
 
 
 @pytest.mark.asyncio
@@ -226,6 +226,7 @@ async def test_reenviar_notificaciones_pendientes_exitoso(db, test_user):
     db.refresh(p)
     assert p.notificacion_pendiente is False
     assert p.intentos_notificacion == 0
+    assert p.canales_notificados == "email"
 
 
 @pytest.mark.asyncio
@@ -273,6 +274,7 @@ async def test_reenviar_email_fallido_telegram_ok_mantiene_pendiente(db, test_us
     db.refresh(p)
     assert p.notificacion_pendiente is False
     assert p.intentos_notificacion == 0
+    assert p.canales_notificados == "email+telegram"
 
 
 @pytest.mark.asyncio
@@ -408,7 +410,10 @@ async def test_sincronizar_lista_marca_origen_rama(db, test_user):
     assert result["radicados_error_consulta"][0]["origen"] == "rama"
 
 
-# ─── _sincronizar_lista tests ────────────────────────────────────────────────@pytest.mark.asyncio
+# ─── _sincronizar_lista tests ────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
 async def test_sincronizar_lista_con_radicados(test_user, db):
     from services.sync import _sincronizar_lista
     from models.proceso import Proceso
@@ -503,3 +508,95 @@ async def test_debe_sincronizar_sin_cambios_recientes(db):
 
     p.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=12)
     assert _debe_sincronizar(p) is False
+
+
+# ─── Trazabilidad de canales de notificacion ─────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_envio_registra_canales_entregados_por_proceso():
+    """El mapa retornado debe traer proceso_id -> canales con exito."""
+    from services.sync import _enviar_notificaciones_acumuladas
+
+    acumuladas = {
+        "test@example.com": [
+            {"proceso_id": 7, "llave_proceso": "p1", "despacho": "D", "departamento": "Dep",
+             "fecha_ultima_actuacion": "2024-06-10", "sujetos_procesales": "",
+             "actuacion": "A", "anotacion": "An", "fecha_registro": "2024-06-10",
+             "con_documentos": False, "categoria": "General",
+             "telegram_chat_id": "12345", "email": "test@example.com"},
+        ]
+    }
+
+    with (
+        patch("services.sync.notificar_cambio_radicado", return_value={"email": True, "telegram": True}),
+        patch("services.sync.TELEGRAM_BOT_TOKEN", "tok"),
+        patch("services.sync.time.sleep"),
+    ):
+        entregadas = _enviar_notificaciones_acumuladas(acumuladas, [])
+
+    assert entregadas == {7: "email+telegram"}
+
+
+@pytest.mark.asyncio
+async def test_envio_parcial_no_registra_canales():
+    """Con email fallido y telegram OK la novedad no cuenta como entregada
+    y por lo tanto no registra canales (queda pendiente para reintento)."""
+    from services.sync import _enviar_notificaciones_acumuladas
+
+    acumuladas = {
+        "test@example.com": [
+            {"proceso_id": 9, "llave_proceso": "p1", "despacho": "D", "departamento": "Dep",
+             "fecha_ultima_actuacion": "2024-06-10", "sujetos_procesales": "",
+             "actuacion": "A", "anotacion": "An", "fecha_registro": "2024-06-10",
+             "con_documentos": False, "categoria": "General",
+             "telegram_chat_id": "12345", "email": "test@example.com"},
+        ]
+    }
+
+    with (
+        patch("services.sync.notificar_cambio_radicado", return_value={"email": False, "telegram": True}),
+        patch("services.sync.TELEGRAM_BOT_TOKEN", "tok"),
+        patch("services.sync.time.sleep"),
+    ):
+        entregadas = _enviar_notificaciones_acumuladas(acumuladas, [])
+
+    assert entregadas == {}
+
+
+@pytest.mark.asyncio
+async def test_nueva_novedad_limpia_canales_anteriores(db, test_user):
+    """Cuando llega una novedad nueva los canales del aviso anterior deben
+    borrarse: la insignia debe reflejar el estado del aviso ACTUAL."""
+    from services.sync import _aplicar_datos_remotos
+    from models.proceso import Proceso
+
+    test_user.email = "test@example.com"
+    test_user.telegram_chat_id = None
+    db.commit()
+
+    p = Proceso(
+        llave_proceso=RADICADO,
+        user_id=test_user.id,
+        notificado=True,
+        notificacion_pendiente=False,
+        canales_notificados="email",
+    )
+    db.add(p)
+    db.commit()
+
+    datos = {
+        "status": "ok",
+        "resumen": _make_proceso_remoto(),
+        "detalle": _make_detalle(),
+        "actuaciones": [_make_actuacion(id_reg_actuacion=10)],
+        "documentos_por_actuacion": {},
+    }
+    nuevos, actualizados, emails, errores, acumuladas = [], [], [], [], {}
+
+    with patch("services.sync._es_reciente", return_value=True):
+        _aplicar_datos_remotos(db, p, datos, nuevos, actualizados, emails, errores, acumuladas)
+
+    assert p.notificado is False
+    assert p.notificacion_pendiente is True
+    assert p.canales_notificados is None

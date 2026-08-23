@@ -387,6 +387,9 @@ def novedades_detalle(
                 "tipo_novedad": p.tipo_novedad or "nuevo",
                 "tipo_proceso": p.tipo_proceso,
                 "clase_proceso": p.clase_proceso,
+                "canales_notificados": p.canales_notificados,
+                "notificacion_pendiente": bool(p.notificacion_pendiente),
+                "intentos_notificacion": p.intentos_notificacion or 0,
                 "actuaciones": [
                     {
                         "id_reg_actuacion": a.id_reg_actuacion,
