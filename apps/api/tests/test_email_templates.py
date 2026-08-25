@@ -50,6 +50,31 @@ async def test_template_novedad_sujetos_en_lineas_separadas():
 
 
 @pytest.mark.asyncio
+async def test_template_novedad_escapa_html_malicioso():
+    """Datos externos (Rama Judicial) no pueden inyectar HTML en el correo."""
+    from services.email_templates import template_novedad
+
+    html = template_novedad(
+        llave_proceso="05001310301220210012300",
+        despacho='Juzgado <script>alert("x")</script>',
+        departamento="Antioquia",
+        fecha_ultima_actuacion="2024-06-10",
+        sujetos_procesales="<img src=x onerror=alert(1)> | DEMANDANTE",
+        actuacion="<b>Auto admisorio</b>",
+        anotacion=None,
+        fecha_registro="2024-06-10",
+        con_documentos=False,
+        categoria="General",
+    )
+
+    assert "<script>" not in html
+    assert "<img" not in html
+    assert "&lt;script&gt;" in html
+    assert "&lt;img" in html
+    assert "&lt;b&gt;Auto admisorio&lt;/b&gt;" in html
+
+
+@pytest.mark.asyncio
 async def test_template_novedad_sin_sujetos_muestra_default():
     from services.email_templates import template_novedad
 

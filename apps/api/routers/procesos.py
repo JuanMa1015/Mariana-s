@@ -34,8 +34,8 @@ def listar_procesos(
     categoria: str = Query(None),
     notificado: Optional[bool] = Query(None),
     q: str = Query(None),
-    skip: int = 0,
-    limit: int = 10,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(10, ge=1, le=100),
 ):
     query = db.query(Proceso).filter(Proceso.user_id == current_user.id)
 
@@ -147,7 +147,8 @@ def _ejecutar_sync_usuario(user_id: int, lote: int = 50):
 
 
 @router.post("/sync")
-def sync_manual(background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
+@limiter.limit("6/minute")
+def sync_manual(request: Request, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     """Encola la sincronizacion del usuario y responde de inmediato.
 
     Consultar GET /procesos/sync/estado para saber cuando termina y ver
@@ -523,7 +524,8 @@ class UpdateProceso(BaseModel):
 
 
 @router.delete("/{llave_proceso}")
-def delete_proceso(llave_proceso: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@limiter.limit("30/minute")
+def delete_proceso(request: Request, llave_proceso: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
@@ -533,7 +535,8 @@ def delete_proceso(llave_proceso: str, db: Session = Depends(get_db), current_us
 
 
 @router.patch("/{llave_proceso}")
-def update_proceso(llave_proceso: str, payload: UpdateProceso, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@limiter.limit("30/minute")
+def update_proceso(request: Request, llave_proceso: str, payload: UpdateProceso, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso, Proceso.user_id == current_user.id).first()
     if not proceso:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Radicado no encontrado")
@@ -616,7 +619,8 @@ def _check_rama_con_alerta() -> bool:
 
 
 @router.post("/marcar-todo-leido")
-def marcar_todo_leido(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+@limiter.limit("30/minute")
+def marcar_todo_leido(request: Request, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Al leerse en la app, la novedad queda atendida: se detiene cualquier
     # reintento de notificacion pendiente para ese usuario.
     count = db.query(Proceso).filter(Proceso.notificado == False, Proceso.user_id == current_user.id).update(

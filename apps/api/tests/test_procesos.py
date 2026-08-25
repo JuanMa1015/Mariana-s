@@ -14,6 +14,22 @@ async def test_list_procesos_empty(client, auth_headers):
 
 
 @pytest.mark.asyncio
+async def test_list_procesos_paginacion_validada(client, auth_headers):
+    """skip/limit deben validar rango para evitar consultas desmedidas."""
+    resp_limit_cero = await client.get(f"{PREFIX}/?limit=0", headers=auth_headers)
+    assert resp_limit_cero.status_code == 422
+
+    resp_limit_excesivo = await client.get(f"{PREFIX}/?limit=10000", headers=auth_headers)
+    assert resp_limit_excesivo.status_code == 422
+
+    resp_skip_negativo = await client.get(f"{PREFIX}/?skip=-5", headers=auth_headers)
+    assert resp_skip_negativo.status_code == 422
+
+    resp_ok = await client.get(f"{PREFIX}/?skip=0&limit=100", headers=auth_headers)
+    assert resp_ok.status_code == 200
+
+
+@pytest.mark.asyncio
 async def test_add_radicado(client, auth_headers):
     response = await client.post(
         f"{PREFIX}/add",
