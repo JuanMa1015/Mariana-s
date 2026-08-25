@@ -1,4 +1,5 @@
 import logging
+import secrets
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -27,7 +28,9 @@ def requiere_api_token(request: Request):
     if not API_TOKEN:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="API_TOKEN no configurado")
     auth_header = request.headers.get("authorization", "")
-    if auth_header.lower().startswith("bearer ") and auth_header.split(" ", 1)[1] == API_TOKEN:
+    if auth_header.lower().startswith("bearer ") and secrets.compare_digest(
+        auth_header.split(" ", 1)[1].encode("utf-8"), API_TOKEN.encode("utf-8")
+    ):
         return None
     raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
 

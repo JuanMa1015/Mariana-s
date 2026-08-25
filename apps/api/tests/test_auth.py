@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 
 
 @pytest.mark.asyncio
@@ -32,6 +33,61 @@ async def test_register_duplicate_email(client, test_user):
     )
     assert response.status_code == 400
     assert "registrado" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_register_password_filtrada_rechazada(client):
+    import routers.auth as auth_router
+
+    with patch("routers.auth.password_en_filtraciones", return_value=True):
+        response = await client.post(
+            "/auth/register",
+            json={"email": "filtrada@example.com", "password": "password123"},
+        )
+    assert response.status_code == 400
+    assert "filtraciones" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_password_en_filtraciones_detecta_brecha():
+    from services.auth import password_en_filtraciones
+    import hashlib
+    from unittest.mock import MagicMock, patch
+
+    sha1 = hashlib.sha1(b"password123").hexdigest().upper()
+    sufijo = sha1[5:]
+    fake_resp = MagicMock()
+    fake_resp.text = f"{sufijo}:37452\nABCDEF:0"
+    fake_resp.raise_for_status = lambda: None
+
+    with patch("services.auth.HIBP_CHECK_ENABLED", True), \
+         patch("services.auth.httpx.get", return_value=fake_resp):
+        assert password_en_filtraciones("password123") is True
+
+
+@pytest.mark.asyncio
+async def test_password_en_filtraciones_sin_brecha():
+    from services.auth import password_en_filtraciones
+    from unittest.mock import MagicMock, patch
+
+    fake_resp = MagicMock()
+    fake_resp.text = "ZZZZZ:3"
+    fake_resp.raise_for_status = lambda: None
+
+    with patch("services.auth.HIBP_CHECK_ENABLED", True), \
+         patch("services.auth.httpx.get", return_value=fake_resp):
+        assert password_en_filtraciones("clave-unicamente-segura-9x8y") is False
+
+
+@pytest.mark.asyncio
+async def test_password_en_filtraciones_fail_open_sin_red():
+    """Si HIBP no responde, no debe bloquearse el registro."""
+    from services.auth import password_en_filtraciones
+    from unittest.mock import patch
+
+    with patch("services.auth.HIBP_CHECK_ENABLED", True), \
+         patch("services.auth.httpx.get", side_effect=RuntimeError("sin red")):
+        assert password_en_filtraciones("password123") is False
 
 
 @pytest.mark.asyncio
@@ -129,3 +185,34 @@ async def test_clear_telegram_chat_id(client, auth_headers, test_user, db):
     )
     assert response.status_code == 200
     assert response.json()["telegram_chat_id"] is None
+
+
+# ---------- Revocacion de tokens (token_version) ----------
+
+@pytest.mark.asyncio
+async def test_logout_revoca_token(client, test_user, db):
+    from services.auth import create_access_token
+
+    token = create_access_token(data={"sub": test_user.email, "ver": 1})
+    headers = {"Authorization": f"Bearer {token}"}
+
+    me_antes = await client.get("/auth/me", headers=headers)
+    assert me_antes.status_code == 200
+
+    logout = await client.post("/auth/logout", headers=headers)
+    assert logout.status_code == 200
+
+    db.refresh(test_user)
+    assert test_user.token_version == 2
+
+    me_despues = await client.get("/auth/me", headers=headers)
+    assert me_despues.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_token_con_version_distinta_es_rechazado(client, test_user, db):
+    from services.auth import create_access_token
+
+    token = create_access_token(data={"sub": test_user.email, "ver": 99})
+    response = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 401

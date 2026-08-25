@@ -58,6 +58,11 @@ CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _CORS_DEFAULT).spli
 
 # Rama Judicial: verificar SSL
 RAMA_VERIFY_SSL = os.getenv("RAMA_VERIFY_SSL", "true").lower() == "true"
+if _EN_PRODUCCION and not RAMA_VERIFY_SSL:
+    raise RuntimeError(
+        "RAMA_VERIFY_SSL=false no esta permitido en produccion. "
+        "Deshabilitar la verificacion SSL expondria las consultas a Rama Judicial."
+    )
 
 # Base de datos: pool configuration
 DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "10"))

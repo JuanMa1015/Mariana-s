@@ -5,7 +5,15 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from models.database import get_db
 from models.user import User
-from services.auth import verify_password, get_password_hash, create_access_token, get_current_user, set_token_cookie, clear_token_cookie
+from services.auth import (
+    verify_password,
+    get_password_hash,
+    create_access_token,
+    get_current_user,
+    set_token_cookie,
+    clear_token_cookie,
+    password_en_filtraciones,
+)
 from services.limiter import limiter
 from config import ACCESS_TOKEN_EXPIRE_MINUTES
 
@@ -42,6 +50,12 @@ def register_user(user: UserCreate, request: Request, response: Response, db: Se
     if len(user.password) < 8:
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
 
+    if password_en_filtraciones(user.password):
+        raise HTTPException(
+            status_code=400,
+            detail="Esta contraseña aparece en filtraciones conocidas. Por seguridad, elige una diferente.",
+        )
+
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="El correo ya está registrado")
@@ -56,7 +70,8 @@ def register_user(user: UserCreate, request: Request, response: Response, db: Se
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": new_user.email}, expires_delta=access_token_expires
+        data={"sub": new_user.email, "ver": new_user.token_version},
+        expires_delta=access_token_expires,
     )
     set_token_cookie(response, access_token)
 
@@ -86,7 +101,8 @@ def login_user(user: UserLogin, request: Request, response: Response, db: Sessio
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": db_user.email}, expires_delta=access_token_expires
+        data={"sub": db_user.email, "ver": db_user.token_version},
+        expires_delta=access_token_expires,
     )
     set_token_cookie(response, access_token)
 
@@ -121,6 +137,15 @@ def me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/logout")
-def logout(response: Response):
+def logout(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Revoca todos los tokens emitidos para este usuario (todas las sesiones):
+    # los tokens previos traen una "ver" inferior y dejan de ser validos.
+    current_user.token_version = (current_user.token_version or 0) + 1
+    db.add(current_user)
+    db.commit()
     clear_token_cookie(response)
     return {"ok": True}

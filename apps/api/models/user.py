@@ -12,5 +12,7 @@ class User(Base):
     password_hash = Column(String, nullable=False)
     created_at = Column(DateTime, server_default=func.now())
     telegram_chat_id = Column(String, nullable=True)
+    # Se incrementa en logout para invalidar tokens emitidos con versiones previas
+    token_version = Column(Integer, nullable=False, server_default="1", default=1)
 
     procesos = relationship("Proceso", back_populates="user", cascade="all, delete")

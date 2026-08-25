@@ -70,6 +70,22 @@ async def test_add_duplicate_proceso(client, auth_headers, test_user, db):
 
 
 @pytest.mark.asyncio
+async def test_patch_llave_formato_invalido(client, auth_headers, test_user, db):
+    from models.proceso import Proceso
+
+    proceso = Proceso(llave_proceso=RADICADO_VALIDO, user_id=test_user.id)
+    db.add(proceso)
+    db.commit()
+
+    response = await client.patch(
+        f"{PREFIX}/{RADICADO_VALIDO}",
+        json={"llave_proceso": "ABC123"},
+        headers=auth_headers,
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_list_procesos_with_data(client, auth_headers, test_user, db):
     from models.proceso import Proceso
 
