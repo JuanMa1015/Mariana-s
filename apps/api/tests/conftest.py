@@ -14,6 +14,8 @@ os.environ["EMAIL_TO"] = "test@example.com"
 os.environ["TELEGRAM_BOT_TOKEN"] = ""
 os.environ["TELEGRAM_CHAT_ID"] = ""
 os.environ["API_URL"] = ""
+# Sin red en tests: desactiva el chequeo de contrasenas filtradas (HIBP)
+os.environ["HIBP_CHECK"] = "false"
 
 import pytest
 from httpx import ASGITransport, AsyncClient

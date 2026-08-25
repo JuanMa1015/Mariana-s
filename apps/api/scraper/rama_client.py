@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from typing import Optional
 
@@ -38,11 +39,23 @@ __all__ = [
     "buscar_actuaciones",
     "buscar_documentos_actuacion",
     "descargar_documento",
+    "sanear_nombre_archivo",
     "rama_health_check",
 ]
 
 TIMEOUT = httpx.Timeout(120.0, connect=20.0)
 MAX_RETRIES = 5
+
+
+def sanear_nombre_archivo(nombre: str) -> str:
+    """Nombre seguro para usar en headers Content-Disposition.
+
+    Elimina comillas, separadores de ruta, saltos de linea y cualquier
+    caracter fuera de [A-Za-z0-9._- ]. Limita el largo a 120 caracteres.
+    """
+    limpio = re.sub(r"[^A-Za-z0-9._\- ]+", "", nombre or "")
+    limpio = limpio.strip().strip(".").strip()
+    return limpio[:120] or "documento.pdf"
 
 
 def _request_with_retry(client: httpx.Client, method: str, url: str, **kwargs) -> httpx.Response:
@@ -176,8 +189,8 @@ def descargar_documento(id_reg_documento: int) -> tuple[bytes, str]:
         filename = "documento.pdf"
         cd = response.headers.get("content-disposition", "")
         if "filename=" in cd:
-            filename = cd.split("filename=")[-1].strip('" ')
-    return response.content, filename
+            filename = cd.split("filename=")[-1].split(";")[0].strip().strip('"')
+    return response.content, sanear_nombre_archivo(filename)
 
 
 def rama_health_check() -> bool:

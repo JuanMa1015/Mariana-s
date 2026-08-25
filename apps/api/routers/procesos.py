@@ -1,4 +1,5 @@
 import logging
+import secrets
 import threading
 import time as _time
 from datetime import datetime
@@ -110,15 +111,28 @@ def listar_novedades(db: Session = Depends(get_db), current_user: User = Depends
 def _auth_for_sync(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     if API_TOKEN:
         auth_header = request.headers.get("authorization", "")
-        if auth_header.startswith("Bearer "):
-            token_value = auth_header.split(" ", 1)[1]
-            if token_value == API_TOKEN:
-                return None
+        if auth_header.startswith("Bearer ") and secrets.compare_digest(
+            auth_header.split(" ", 1)[1].encode("utf-8"), API_TOKEN.encode("utf-8")
+        ):
+            return None
     return get_current_user(token=token, db=db)
 
 
 _sync_estado: dict[int, dict] = {}
 _sync_estado_lock = threading.Lock()
+_SYNC_ESTADO_MAX = 1000
+
+
+def _guardar_estado_usuario(user_id: int, estado: dict):
+    """Guarda el estado de sync por usuario acotando la memoria del proceso."""
+    with _sync_estado_lock:
+        if len(_sync_estado) >= _SYNC_ESTADO_MAX and user_id not in _sync_estado:
+            terminados = [uid for uid, e in _sync_estado.items() if not e.get("en_curso")]
+            for uid in terminados:
+                _sync_estado.pop(uid, None)
+            while len(_sync_estado) >= _SYNC_ESTADO_MAX:
+                _sync_estado.pop(next(iter(_sync_estado)))
+        _sync_estado[user_id] = estado
 
 
 def _ejecutar_sync_usuario(user_id: int, lote: int = 50):
@@ -128,20 +142,18 @@ def _ejecutar_sync_usuario(user_id: int, lote: int = 50):
     db = SessionLocal()
     try:
         resultado = sincronizar_radicados_lote(db, lote=lote, user_id=user_id)
-        with _sync_estado_lock:
-            _sync_estado[user_id] = {
-                "en_curso": False,
-                "resultado": resultado,
-                "error": None,
-            }
+        _guardar_estado_usuario(user_id, {
+            "en_curso": False,
+            "resultado": resultado,
+            "error": None,
+        })
     except Exception as exc:
         logger.exception("Sync en segundo plano fallo para user_id=%s", user_id)
-        with _sync_estado_lock:
-            _sync_estado[user_id] = {
-                "en_curso": False,
-                "resultado": None,
-                "error": f"{type(exc).__name__}: {exc}",
-            }
+        _guardar_estado_usuario(user_id, {
+            "en_curso": False,
+            "resultado": None,
+            "error": f"{type(exc).__name__}: {exc}",
+        })
     finally:
         db.close()
 
@@ -162,7 +174,7 @@ def sync_manual(request: Request, background_tasks: BackgroundTasks, current_use
                 "mensaje": "Ya hay una sincronizacion en curso",
                 "en_curso": True,
             }
-        _sync_estado[current_user.id] = {"en_curso": True, "resultado": None, "error": None}
+    _guardar_estado_usuario(current_user.id, {"en_curso": True, "resultado": None, "error": None})
     background_tasks.add_task(_ejecutar_sync_usuario, current_user.id)
     return {"iniciado": True, "mensaje": "Sincronizacion iniciada", "en_curso": True}
 
@@ -514,7 +526,7 @@ def obtener_proceso(
 
 
 class UpdateProceso(BaseModel):
-    llave_proceso: Optional[str] = None
+    llave_proceso: Optional[constr(pattern=r"^\d{23}$")] = None
     despacho: Optional[str] = None
     departamento: Optional[str] = None
     sujetos_procesales: Optional[str] = None
