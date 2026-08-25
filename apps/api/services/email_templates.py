@@ -1,7 +1,15 @@
+import html as _html
+from urllib.parse import quote
+
 from services.fechas import fecha_corta
 
 APP_URL = "https://mariana-app-nu.vercel.app"
 RAMA_JUDICIAL_URL = "https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion"
+
+
+def _esc(valor) -> str:
+    """Escapa texto externo (Rama Judicial) para insertarlo en HTML del correo."""
+    return _html.escape(str(valor), quote=True)
 
 
 def _color_categoria(categoria: str | None) -> tuple[str, str]:
@@ -28,10 +36,10 @@ def template_novedad(
     color_fg, color_bg = _color_categoria(categoria)
     partes_sujetos = [p.strip() for p in (sujetos_procesales or "").split("|") if p.strip()]
     sujetos_html = "".join(
-        f'<div style="padding:4px 0;font-size:13px;color:#475569;line-height:1.5">{p}</div>'
+        f'<div style="padding:4px 0;font-size:13px;color:#475569;line-height:1.5">{_esc(p)}</div>'
         for p in partes_sujetos
     ) or '<div style="padding:4px 0;font-size:13px;color:#94a3b8">Sin informacion</div>'
-    link_rama = f'{RAMA_JUDICIAL_URL}?numero={llave_proceso}'
+    link_rama = f'{RAMA_JUDICIAL_URL}?numero={quote(llave_proceso or "", safe="")}'
 
     if actuaciones:
         novedades_rows = ""
@@ -47,10 +55,10 @@ def template_novedad(
 <tr><td style="padding:12px">
 {label_html}
 <table width="100%" cellpadding="0" cellspacing="0">
-<tr><td style="padding:4px 0;vertical-align:top;width:90px"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Fecha</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{fecha_corta(act.get('fecha_actuacion'))}</span></td></tr>
-<tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Actuacion</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{act.get('actuacion') or 'N/D'}</span></td></tr>
-<tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Anotacion</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{act.get('anotacion') or 'N/D'}</span></td></tr>
-<tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Registro</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{fecha_corta(act.get('fecha_registro'))}</span></td></tr>
+<tr><td style="padding:4px 0;vertical-align:top;width:90px"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Fecha</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{_esc(fecha_corta(act.get('fecha_actuacion')))}</span></td></tr>
+<tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Actuacion</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{_esc(act.get('actuacion') or 'N/D')}</span></td></tr>
+<tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Anotacion</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{_esc(act.get('anotacion') or 'N/D')}</span></td></tr>
+<tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Registro</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{_esc(fecha_corta(act.get('fecha_registro')))}</span></td></tr>
 <tr><td style="padding:4px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#64748b">Docs</span></td><td style="padding:4px 0"><span style="font-size:13px;color:#334155">{docs}</span></td></tr>
 </table>
 </td></tr>
@@ -63,9 +71,9 @@ def template_novedad(
 <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:12px;background:#fffbeb;border:1px solid #fde68a">
 <tr><td style="padding:16px">
 <table width="100%" cellpadding="0" cellspacing="0">
-<tr><td style="padding:6px 0;vertical-align:top;width:100px"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Actuacion</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{actuacion or "N/D"}</span></td></tr>
-<tr><td style="padding:6px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Anotacion</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{anotacion or "N/D"}</span></td></tr>
-<tr><td style="padding:6px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Fecha registro</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{fecha_corta(fecha_registro)}</span></td></tr>
+<tr><td style="padding:6px 0;vertical-align:top;width:100px"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Actuacion</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{_esc(actuacion or "N/D")}</span></td></tr>
+<tr><td style="padding:6px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Anotacion</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{_esc(anotacion or "N/D")}</span></td></tr>
+<tr><td style="padding:6px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Fecha registro</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{_esc(fecha_corta(fecha_registro))}</span></td></tr>
 <tr><td style="padding:6px 0;vertical-align:top"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#b45309">Documentos</span></td><td style="padding:6px 0"><span style="font-size:13px;color:#78350f">{docs}</span></td></tr>
 </table>
 </td></tr>
@@ -82,20 +90,20 @@ def template_novedad(
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr>
 <td><span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.2em;color:#a78bfa">Mariana's</span></td>
-<td align="right"><span style="display:inline-block;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;color:{color_fg};background:{color_bg}">{categoria or "General"}</span></td>
+<td align="right"><span style="display:inline-block;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;color:{color_fg};background:{color_bg}">{_esc(categoria or "General")}</span></td>
 </tr>
 </table>
 <h1 style="margin:16px 0 4px;font-size:20px;font-weight:700;color:#1e293b">Se detectaron nuevas actuaciones</h1>
-<p style="margin:0 0 24px;font-size:14px;color:#64748b">En el proceso <strong style="font-family:monospace;letter-spacing:0.08em">{llave_proceso}</strong></p>
+<p style="margin:0 0 24px;font-size:14px;color:#64748b">En el proceso <strong style="font-family:monospace;letter-spacing:0.08em">{_esc(llave_proceso)}</strong></p>
 </td></tr>
 <tr><td style="padding:0 32px">
 <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:12px;background:#f8fafc;border:1px solid #e2e8f0">
 <tr><td style="padding:16px">
 <table width="100%" cellpadding="0" cellspacing="0">
-<tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Radicado</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;font-weight:600;color:#1e293b;font-family:monospace;letter-spacing:0.08em">{llave_proceso}</span></td></tr>
-<tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Despacho</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;color:#334155">{despacho or "—"}</span></td></tr>
-<tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Departamento</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;color:#334155">{departamento or "—"}</span></td></tr>
-<tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Ultima actuacion</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;color:#334155">{fecha_corta(fecha_ultima_actuacion)}</span></td></tr>
+<tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Radicado</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;font-weight:600;color:#1e293b;font-family:monospace;letter-spacing:0.08em">{_esc(llave_proceso)}</span></td></tr>
+<tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Despacho</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;color:#334155">{_esc(despacho or "—")}</span></td></tr>
+<tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Departamento</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;color:#334155">{_esc(departamento or "—")}</span></td></tr>
+<tr><td style="padding:6px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Ultima actuacion</span></td><td style="padding:6px 0;text-align:right"><span style="font-size:13px;color:#334155">{_esc(fecha_corta(fecha_ultima_actuacion))}</span></td></tr>
 </table>
 </td></tr>
 </table>
@@ -112,7 +120,7 @@ def template_novedad(
 <table width="100%" cellpadding="0" cellspacing="0">
 <tr>
 <td><span style="font-size:12px;color:#94a3b8">Mariana's — Monitor Judicial</span></td>
-<td align="right"><a href="{link_rama}" style="font-size:12px;color:#6366f1;text-decoration:underline;margin-right:16px">Consultar en Rama Judicial</a><a href="{APP_URL}" style="display:inline-block;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;color:#ffffff;background:#7c3aed;text-decoration:none">Ver en Mariana's</a></td>
+<td align="right"><a href="{_esc(link_rama)}" style="font-size:12px;color:#6366f1;text-decoration:underline;margin-right:16px">Consultar en Rama Judicial</a><a href="{APP_URL}" style="display:inline-block;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:600;color:#ffffff;background:#7c3aed;text-decoration:none">Ver en Mariana's</a></td>
 </tr>
 </table>
 </td></tr>
@@ -132,10 +140,10 @@ def template_resumen(novedades: list[dict]) -> tuple[str, str]:
 <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:12px;border:1px solid #e2e8f0;background:#ffffff">
 <tr><td style="padding:16px">
 <table width="100%" cellpadding="0" cellspacing="0">
-<tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Radicado</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;font-weight:600;color:#1e293b;font-family:monospace;letter-spacing:0.08em">{n["llave_proceso"]}</span></td></tr>
-<tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Categoría</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:12px;font-weight:600;color:{color_fg}">{n.get("categoria") or "General"}</span></td></tr>
-<tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Despacho</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;color:#334155">{n.get("despacho", "") or "—"}</span></td></tr>
-<tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Actuación</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;color:#334155">{n.get("actuacion") or "N/D"}</span></td></tr>
+<tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Radicado</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;font-weight:600;color:#1e293b;font-family:monospace;letter-spacing:0.08em">{_esc(n["llave_proceso"])}</span></td></tr>
+<tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Categoría</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:12px;font-weight:600;color:{color_fg}">{_esc(n.get("categoria") or "General")}</span></td></tr>
+<tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Despacho</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;color:#334155">{_esc(n.get("despacho", "") or "—")}</span></td></tr>
+<tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Actuación</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;color:#334155">{_esc(n.get("actuacion") or "N/D")}</span></td></tr>
 <tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Documentos</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;color:#334155">{docs}</span></td></tr>
 </table>
 </td></tr>

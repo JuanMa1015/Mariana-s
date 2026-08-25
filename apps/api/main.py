@@ -1,7 +1,8 @@
 import logging
 import os
+import secrets
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.middleware import SlowAPIMiddleware
@@ -13,7 +14,7 @@ from services.logging_config import configurar_logging, set_request_id, get_requ
 from routers.procesos import router as procesos_router
 from routers.auth import router as auth_router
 from routers.admin import router as admin_router
-from config import SENTRY_DSN, CORS_ORIGINS
+from config import SENTRY_DSN, CORS_ORIGINS, API_TOKEN
 
 if SENTRY_DSN:
     import sentry_sdk
@@ -138,33 +139,41 @@ async def csrf_origin_middleware(request: Request, call_next):
 
 
 @app.get("/health")
-def health(deep: bool = False):
+def health(request: Request, deep: bool = False):
     """Health check ligero (solo BD) para polls frecuentes.
 
     Con ?deep=true incluye ademas un check real contra Rama Judicial
-    (puede tardar varios segundos; usar con moderacion).
+    (puede tardar varios segundos; usar con moderacion). Por ser una
+    operacion costosa y publica, exige Authorization: Bearer <API_TOKEN>.
     """
     from models.database import SessionLocal
     from sqlalchemy import text
 
     db_ok = False
-    db_error = None
     try:
         db = SessionLocal()
         db.execute(text("SELECT 1"))
         db_ok = True
         db.close()
     except Exception as exc:
-        db_error = f"{type(exc).__name__}: {exc}"
+        # No exponer el detalle del error de BD en un endpoint publico
+        logger.warning("Health check: fallo de conexion a BD: %s", exc)
 
     payload = {
         "status": "ok" if db_ok else "degradado",
         "version": os.environ.get("RENDER_GIT_COMMIT", "").lower() or "dev",
-        "base_de_datos": {"ok": db_ok, "error": db_error},
+        "base_de_datos": {"ok": db_ok},
         # El sync por lotes se dispara externamente (GitHub Actions, cron horario)
         "sync_disparador": "github-actions",
     }
     if deep:
+        auth_header = request.headers.get("authorization", "")
+        token = auth_header[7:].strip() if auth_header.lower().startswith("bearer ") else ""
+        if not API_TOKEN or not secrets.compare_digest(token, API_TOKEN):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="deep=true requiere API_TOKEN",
+            )
         from scraper.rama_client import rama_health_check
 
         payload["rama_judicial"] = {"ok": rama_health_check()}

@@ -98,7 +98,9 @@ def login_user(user: UserLogin, request: Request, response: Response, db: Sessio
 
 
 @router.patch("/telegram")
+@limiter.limit("10/minute")
 def actualizar_telegram_chat_id(
+    request: Request,
     data: TelegramChatIdUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

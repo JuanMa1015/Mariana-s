@@ -11,6 +11,7 @@ from models.database import get_db
 from models.documento_actuacion import DocumentoActuacion
 from models.proceso import Proceso
 from models.user import User
+from services.limiter import limiter
 
 router = APIRouter(tags=["admin"])
 
@@ -32,7 +33,9 @@ def requiere_api_token(request: Request):
 
 
 @router.get("/test-notificacion")
+@limiter.limit("60/minute")
 def test_notificacion(
+    request: Request,
     llave_proceso: str = "",
     db: Session = Depends(get_db),
     _: None = Depends(requiere_api_token),
@@ -74,7 +77,8 @@ def test_notificacion(
 
 
 @router.get("/marcar-leido")
-def marcar_leido(llave_proceso: str, db: Session = Depends(get_db), _: None = Depends(requiere_api_token)):
+@limiter.limit("60/minute")
+def marcar_leido(request: Request, llave_proceso: str, db: Session = Depends(get_db), _: None = Depends(requiere_api_token)):
     proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
     if not proceso:
         return {"ok": False, "error": "No encontrado"}
@@ -84,7 +88,8 @@ def marcar_leido(llave_proceso: str, db: Session = Depends(get_db), _: None = De
 
 
 @router.get("/resetear-radicado")
-def resetear_radicado(llave_proceso: str, db: Session = Depends(get_db), _: None = Depends(requiere_api_token)):
+@limiter.limit("60/minute")
+def resetear_radicado(request: Request, llave_proceso: str, db: Session = Depends(get_db), _: None = Depends(requiere_api_token)):
     proceso = db.query(Proceso).filter(Proceso.llave_proceso == llave_proceso).first()
     if not proceso:
         return {"ok": False, "error": "No encontrado"}
@@ -113,7 +118,8 @@ def resetear_radicado(llave_proceso: str, db: Session = Depends(get_db), _: None
 
 
 @router.post("/resetear-todos")
-def resetear_todos(db: Session = Depends(get_db), _: None = Depends(requiere_api_token)):
+@limiter.limit("60/minute")
+def resetear_todos(request: Request, db: Session = Depends(get_db), _: None = Depends(requiere_api_token)):
     total_radicados = (
         db.query(Proceso)
         .update(
@@ -137,7 +143,8 @@ def resetear_todos(db: Session = Depends(get_db), _: None = Depends(requiere_api
 
 
 @router.get("/test-email")
-def test_email(_: None = Depends(requiere_api_token)):
+@limiter.limit("60/minute")
+def test_email(request: Request, _: None = Depends(requiere_api_token)):
     from config import EMAIL_TO as CFG_EMAIL_TO, SENDGRID_API_KEY, SMTP_HOST
     from services.notifications import _enviar_smtp, _enviar_sendgrid
 
@@ -171,7 +178,8 @@ def test_email(_: None = Depends(requiere_api_token)):
 
 
 @router.get("/admin/telegram-listar")
-def admin_telegram_listar(_: None = Depends(requiere_api_token), test: str = ""):
+@limiter.limit("60/minute")
+def admin_telegram_listar(request: Request, _: None = Depends(requiere_api_token), test: str = ""):
     if not TELEGRAM_BOT_TOKEN:
         return {"error": "TELEGRAM_BOT_TOKEN no configurado"}
 
@@ -210,7 +218,9 @@ class VincularTelegramPayload(BaseModel):
 
 
 @router.post("/admin/telegram-vincular")
+@limiter.limit("60/minute")
 def admin_telegram_vincular(
+    request: Request,
     payload: VincularTelegramPayload,
     db: Session = Depends(get_db),
     _: None = Depends(requiere_api_token),
