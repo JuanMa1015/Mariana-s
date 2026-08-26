@@ -5,10 +5,61 @@ from email.message import EmailMessage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-from config import EMAIL_FROM, EMAIL_TO, SMTP_HOST, SMTP_PASSWORD, SMTP_PORT, SMTP_USE_TLS, SMTP_USER, APP_URL, SENDGRID_API_KEY
+import httpx
+
+from config import (
+    APP_URL,
+    BREVO_API_KEY,
+    EMAIL_FROM,
+    EMAIL_TO,
+    SENDGRID_API_KEY,
+    SMTP_HOST,
+    SMTP_PASSWORD,
+    SMTP_PORT,
+    SMTP_USE_TLS,
+    SMTP_USER,
+)
 from services.fechas import fecha_corta
 
 logger = logging.getLogger(__name__)
+
+_BREVO_API_URL = "https://api.brevo.com/v3/smtp/email"
+
+
+def _enviar_brevo(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo_texto: str) -> tuple[bool, str | None]:
+    """Envia via API HTTPS de Brevo.
+
+    Es el canal primario porque Render bloquea el SMTP saliente (25/465/587);
+    la API va por 443 y nunca se bloquea. Retorna (ok, detalle_del_error).
+    """
+    if not BREVO_API_KEY:
+        return False, "BREVO_API_KEY no configurada"
+
+    remitente = EMAIL_FROM or SMTP_USER or "noreply@mariana.app"
+    payload = {
+        "sender": {"email": remitente},
+        "to": [{"email": d} for d in destinatarios],
+        "subject": asunto,
+        "textContent": cuerpo_texto,
+        "htmlContent": cuerpo_html,
+    }
+    try:
+        r = httpx.post(
+            _BREVO_API_URL,
+            headers={"api-key": BREVO_API_KEY, "content-type": "application/json", "accept": "application/json"},
+            json=payload,
+            timeout=30,
+        )
+        ok = 200 <= r.status_code < 300
+        if ok:
+            logger.info("Brevo -> %s | status=%s", destinatarios, r.status_code)
+            return True, None
+        detalle = f"HTTP {r.status_code}: {r.text[:200]}"
+        logger.error("Brevo fallo: %s", detalle)
+        return False, detalle
+    except Exception as exc:
+        logger.error("Brevo fallo: %s", exc)
+        return False, f"{type(exc).__name__}: {exc}"
 
 
 def _enviar_sendgrid(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo_texto: str) -> tuple[bool, str | None]:
@@ -157,11 +208,14 @@ def notificar_cambio_radicado(
                 f"Ver en Mariana's: {APP_URL}\n"
             )
 
-        if SENDGRID_API_KEY:
+        if BREVO_API_KEY:
+            exito, _detalle_brevo = _enviar_brevo(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+
+        if not exito and SENDGRID_API_KEY:
             exito, _detalle_sg = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
 
         if not exito and SMTP_HOST:
-            logger.warning("SendGrid falló, reintentando con SMTP para %s", destinatarios)
+            logger.warning("Brevo/SendGrid fallaron, reintentando con SMTP para %s", destinatarios)
             exito, _detalle_smtp = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
 
         if not exito and not SENDGRID_API_KEY and not SMTP_HOST:

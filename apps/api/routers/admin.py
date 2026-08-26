@@ -148,8 +148,8 @@ def resetear_todos(request: Request, db: Session = Depends(get_db), _: None = De
 @router.get("/test-email")
 @limiter.limit("60/minute")
 def test_email(request: Request, _: None = Depends(requiere_api_token)):
-    from config import EMAIL_TO as CFG_EMAIL_TO, SENDGRID_API_KEY, SMTP_HOST
-    from services.notifications import _enviar_smtp, _enviar_sendgrid
+    from config import EMAIL_TO as CFG_EMAIL_TO, BREVO_API_KEY, SENDGRID_API_KEY, SMTP_HOST
+    from services.notifications import _enviar_brevo, _enviar_smtp, _enviar_sendgrid
 
     destinatarios = [c.strip() for c in CFG_EMAIL_TO.replace(",", " ").split() if c.strip()]
     if not destinatarios:
@@ -159,6 +159,12 @@ def test_email(request: Request, _: None = Depends(requiere_api_token)):
     cuerpo_html = "<p>Correo de prueba desde Mariana's.</p>"
     cuerpo_texto = "Correo de prueba desde Mariana's."
     resultados = {}
+
+    if BREVO_API_KEY:
+        b_ok, b_err = _enviar_brevo(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+        resultados["brevo"] = {"ok": b_ok, "api_key_set": True, "error": b_err}
+    else:
+        resultados["brevo"] = {"ok": False, "api_key_set": False, "error": None}
 
     if SENDGRID_API_KEY:
         sg_ok, sg_err = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
@@ -172,7 +178,11 @@ def test_email(request: Request, _: None = Depends(requiere_api_token)):
     else:
         resultados["smtp"] = {"ok": False, "smtp_host_set": False, "error": None}
 
-    primary_ok = resultados.get("sendgrid", {}).get("ok", False) or resultados.get("smtp", {}).get("ok", False)
+    primary_ok = (
+        resultados["brevo"]["ok"]
+        or resultados["sendgrid"]["ok"]
+        or resultados["smtp"]["ok"]
+    )
     return {
         "resultados": resultados,
         "email_enviado": primary_ok,
