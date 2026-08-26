@@ -22,7 +22,7 @@ export function PrivacyPage() {
         <p className="mt-2 text-sm text-slate-500">Última actualización: {FECHA_ACTUALIZACION_LEGAL}</p>
 
         <Seccion titulo="1. Responsable del tratamiento">
-          <p><strong>{RESPONSABLE}</strong> ({UBICACION}), en adelante "Mariana's", es responsable del tratamiento de los datos personales recopilados a través de la plataforma. Contacto para asuntos de privacidad: <a className="font-semibold text-violet-700 hover:underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
+          <p><strong>{NOMBRE_APP}</strong> («Mariana's» u «el servicio»), organización desarrolladora y operadora de la plataforma con presencia en {UBICACION}, actúa como responsable del tratamiento de los datos personales recopilados a través de la plataforma. Contacto para asuntos de privacidad: <a className="font-semibold text-violet-700 hover:underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
         </Seccion>
 
         <Seccion titulo="2. Datos que recopilamos">
