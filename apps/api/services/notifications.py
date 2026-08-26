@@ -42,7 +42,12 @@ def _enviar_sendgrid(destinatarios: list[str], asunto: str, cuerpo_html: str, cu
 
 
 def _enviar_smtp(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo_texto: str) -> tuple[bool, str | None]:
-    """Envia via SMTP. Retorna (ok, detalle_del_error)."""
+    """Envia via SMTP. Retorna (ok, detalle_del_error).
+
+    Algunos proveedores de nube bloquean el 587 saliente hacia servidores de
+    correo; si la conexion por el puerto configurado es inalcanzable se
+    reintenta una vez por 465 (SSL implicito).
+    """
     if not SMTP_HOST:
         return False, "SMTP_HOST no configurado"
 
@@ -53,18 +58,32 @@ def _enviar_smtp(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo
     mensaje.attach(MIMEText(cuerpo_texto, "plain"))
     mensaje.attach(MIMEText(cuerpo_html, "html"))
 
-    try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
-            if SMTP_USE_TLS:
-                server.starttls()
-            if SMTP_USER:
-                server.login(SMTP_USER, SMTP_PASSWORD)
-            server.send_message(mensaje)
-        logger.info("SMTP enviado correctamente")
-        return True, None
-    except Exception as exc:
-        logger.error("SMTP falló: %s", exc)
-        return False, f"{type(exc).__name__}: {exc}"
+    if SMTP_PORT == 465:
+        candidatos = [("ssl", 465)]
+    else:
+        candidatos = [("starttls", SMTP_PORT)]
+        if SMTP_USE_TLS:
+            candidatos.append(("ssl", 465))
+
+    errores: list[str] = []
+    for modo, puerto in candidatos:
+        try:
+            if modo == "ssl":
+                server_ctx = smtplib.SMTP_SSL(SMTP_HOST, puerto, timeout=30)
+            else:
+                server_ctx = smtplib.SMTP(SMTP_HOST, puerto, timeout=30)
+            with server_ctx as server:
+                if modo == "starttls" and SMTP_USE_TLS:
+                    server.starttls()
+                if SMTP_USER:
+                    server.login(SMTP_USER, SMTP_PASSWORD)
+                server.send_message(mensaje)
+            logger.info("SMTP enviado correctamente via %s/%d", modo, puerto)
+            return True, None
+        except Exception as exc:
+            logger.warning("SMTP via %s/%d fallo: %s", modo, puerto, exc)
+            errores.append(f"{modo}/{puerto}: {type(exc).__name__}: {exc}")
+    return False, " | ".join(errores)
 
 
 def notificar_cambio_radicado(
