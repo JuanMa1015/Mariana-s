@@ -11,7 +11,8 @@ from services.fechas import fecha_corta
 logger = logging.getLogger(__name__)
 
 
-def _enviar_sendgrid(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo_texto: str) -> bool:
+def _enviar_sendgrid(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo_texto: str) -> tuple[bool, str | None]:
+    """Envia via SendGrid. Retorna (ok, detalle_del_error)."""
     try:
         from sendgrid import SendGridAPIClient
         from sendgrid.helpers.mail import Mail, Email, To, Content
@@ -32,16 +33,18 @@ def _enviar_sendgrid(destinatarios: list[str], asunto: str, cuerpo_html: str, cu
                 dest, response.status_code, ok,
             )
             if not ok:
-                return False
-        return True
+                cuerpo = getattr(response, "body", b"") or b""
+                return False, f"HTTP {response.status_code}: {cuerpo[:200]}"
+        return True, None
     except Exception as exc:
         logger.error("SendGrid falló: %s", exc)
-        return False
+        return False, f"{type(exc).__name__}: {exc}"
 
 
-def _enviar_smtp(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo_texto: str) -> bool:
+def _enviar_smtp(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo_texto: str) -> tuple[bool, str | None]:
+    """Envia via SMTP. Retorna (ok, detalle_del_error)."""
     if not SMTP_HOST:
-        return False
+        return False, "SMTP_HOST no configurado"
 
     mensaje = MIMEMultipart("alternative")
     mensaje["From"] = EMAIL_FROM or SMTP_USER
@@ -58,10 +61,10 @@ def _enviar_smtp(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo
                 server.login(SMTP_USER, SMTP_PASSWORD)
             server.send_message(mensaje)
         logger.info("SMTP enviado correctamente")
-        return True
+        return True, None
     except Exception as exc:
         logger.error("SMTP falló: %s", exc)
-        return False
+        return False, f"{type(exc).__name__}: {exc}"
 
 
 def notificar_cambio_radicado(
@@ -136,11 +139,11 @@ def notificar_cambio_radicado(
             )
 
         if SENDGRID_API_KEY:
-            exito = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+            exito, _detalle_sg = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
 
         if not exito and SMTP_HOST:
             logger.warning("SendGrid falló, reintentando con SMTP para %s", destinatarios)
-            exito = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+            exito, _detalle_smtp = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
 
         if not exito and not SENDGRID_API_KEY and not SMTP_HOST:
             logger.error(

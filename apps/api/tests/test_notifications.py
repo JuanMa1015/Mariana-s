@@ -36,26 +36,27 @@ async def test_notificar_sujetos_procesales_vacios():
 async def test_enviar_sendgrid_sin_api_key_retorna_false():
     from services.notifications import _enviar_sendgrid
 
-    result = _enviar_sendgrid(
+    ok, _detalle = _enviar_sendgrid(
         destinatarios=["test@example.com"],
         asunto="Test",
         cuerpo_html="<p>Test</p>",
         cuerpo_texto="Test",
     )
-    assert result is False
+    assert ok is False
 
 
 @pytest.mark.asyncio
 async def test_enviar_smtp_sin_host_retorna_false():
     from services.notifications import _enviar_smtp
 
-    result = _enviar_smtp(
+    ok, detalle = _enviar_smtp(
         destinatarios=["test@example.com"],
         asunto="Test",
         cuerpo_html="<p>Test</p>",
         cuerpo_texto="Test",
     )
-    assert result is False
+    assert ok is False
+    assert detalle is not None
 
 
 @pytest.mark.asyncio
@@ -84,7 +85,7 @@ async def test_notificar_con_custom_asunto_cuerpo():
         patch("services.notifications._enviar_sendgrid") as mock_sg,
         patch("services.telegram.notificar_telegram", return_value=False),
     ):
-        mock_sg.return_value = True
+        mock_sg.return_value = (True, None)
         result = notificar_cambio_radicado(
             llave_proceso="test",
             despacho="",

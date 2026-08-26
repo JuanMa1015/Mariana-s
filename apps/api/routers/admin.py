@@ -161,16 +161,16 @@ def test_email(request: Request, _: None = Depends(requiere_api_token)):
     resultados = {}
 
     if SENDGRID_API_KEY:
-        sg_ok = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
-        resultados["sendgrid"] = {"ok": sg_ok, "api_key_set": True}
+        sg_ok, sg_err = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+        resultados["sendgrid"] = {"ok": sg_ok, "api_key_set": True, "error": sg_err}
     else:
-        resultados["sendgrid"] = {"ok": False, "api_key_set": False}
+        resultados["sendgrid"] = {"ok": False, "api_key_set": False, "error": None}
 
     if SMTP_HOST:
-        smtp_ok = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
-        resultados["smtp"] = {"ok": smtp_ok}
+        smtp_ok, smtp_err = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+        resultados["smtp"] = {"ok": smtp_ok, "error": smtp_err}
     else:
-        resultados["smtp"] = {"ok": False, "smtp_host_set": False}
+        resultados["smtp"] = {"ok": False, "smtp_host_set": False, "error": None}
 
     primary_ok = resultados.get("sendgrid", {}).get("ok", False) or resultados.get("smtp", {}).get("ok", False)
     return {

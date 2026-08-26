@@ -160,7 +160,7 @@ async def test_test_email_con_sendgrid_ok_reporta_true(client):
     with patch.object(admin_router, "API_TOKEN", "secreto"), patch(
         "config.SENDGRID_API_KEY", "SG.key"
     ), patch("config.SMTP_HOST", ""), patch(
-        "services.notifications._enviar_sendgrid", return_value=True
+        "services.notifications._enviar_sendgrid", return_value=(True, None)
     ) as m_sg:
         resp = await client.get("/test-email", headers=_auth("secreto"))
 
