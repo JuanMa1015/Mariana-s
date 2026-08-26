@@ -99,7 +99,7 @@ describe("NovedadesPage", () => {
     })
   })
 
-  it("debe mostrar botón volver que navega a /", async () => {
+  it("debe mostrar botón volver que navega a /procesos", async () => {
     vi.mocked((await import("../api")).getNovedadesDetalle).mockResolvedValue({ total: 0, novedades: [] })
     const { default: NovedadesPage } = await import("./NovedadesPage")
     render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
@@ -107,7 +107,7 @@ describe("NovedadesPage", () => {
       expect(screen.getByText(/volver/i)).toBeInTheDocument()
     })
     fireEvent.click(screen.getByText(/volver/i))
-    expect(mockNavigate).toHaveBeenCalledWith("/")
+    expect(mockNavigate).toHaveBeenCalledWith("/procesos")
   })
 
   it("muestra por que canales fue avisado cada radicado", async () => {

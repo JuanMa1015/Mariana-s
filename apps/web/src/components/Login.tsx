@@ -2,16 +2,27 @@ import { useState } from "react"
 import { loginUser } from "../api"
 import { Link, useNavigate } from "react-router-dom"
 import toast from "react-hot-toast"
+import { useTitle } from "../hooks/useTitle"
+
+type ErroresLogin = { credential?: string; password?: string; general?: string }
 
 export default function Login() {
   const [credential, setCredential] = useState(() => localStorage.getItem("rememberedEmail") ?? "")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [rememberMe, setRememberMe] = useState(() => Boolean(localStorage.getItem("rememberedEmail")))
+  const [errores, setErrores] = useState<ErroresLogin>({})
   const navigate = useNavigate()
+  useTitle("Iniciar sesión")
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    const nuevos: ErroresLogin = {}
+    if (!credential.trim()) nuevos.credential = "Ingresa tu correo o nombre de usuario"
+    if (!password) nuevos.password = "Ingresa tu contraseña"
+    setErrores(nuevos)
+    if (Object.keys(nuevos).length > 0) return
+
     const loadingToast = toast.loading("Iniciando sesión...")
     try {
       const data = await loginUser({ credential, password })
@@ -23,11 +34,24 @@ export default function Login() {
         localStorage.removeItem("rememberedEmail")
       }
       toast.success("¡Bienvenido!", { id: loadingToast })
-      navigate("/")
+      navigate("/procesos")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al iniciar sesión", { id: loadingToast })
+      const msg = err instanceof Error ? err.message : "Error al iniciar sesión"
+      setErrores({ general: msg })
+      toast.error(msg, { id: loadingToast })
     }
   }
+
+  const claseInputCredencial = `w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
+    errores.credential
+      ? "border-rose-400 bg-rose-50/50 focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
+      : "border-slate-300 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+  }`
+  const claseInputPassword = `w-full rounded-2xl border pl-4 pr-12 py-3 text-sm outline-none transition ${
+    errores.password
+      ? "border-rose-400 bg-rose-50/50 focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
+      : "border-violet-200 bg-violet-50/30 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+  }`
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[#f5f7fb] text-slate-900 px-4">
@@ -45,10 +69,18 @@ export default function Login() {
               required
               autoComplete="username"
               value={credential}
-              onChange={(e) => setCredential(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+              onChange={(e) => {
+                setCredential(e.target.value)
+                if (errores.credential || errores.general) setErrores({})
+              }}
+              aria-invalid={Boolean(errores.credential)}
+              aria-describedby={errores.credential ? "error-credencial" : undefined}
+              className={claseInputCredencial}
               placeholder="ej: paulacorreaq"
             />
+            {errores.credential && (
+              <p id="error-credencial" role="alert" className="mt-1 text-xs font-medium text-rose-600">{errores.credential}</p>
+            )}
           </div>
           <div>
             <label className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 mb-1 block">Contraseña</label>
@@ -58,8 +90,13 @@ export default function Login() {
                 required
                 autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 pl-4 pr-12 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (errores.password || errores.general) setErrores((prev) => ({ ...prev, password: undefined, general: undefined }))
+                }}
+                aria-invalid={Boolean(errores.password)}
+                aria-describedby={errores.password ? "error-password" : undefined}
+                className={claseInputPassword}
               />
               <button
                 type="button"
@@ -80,7 +117,15 @@ export default function Login() {
                 )}
               </button>
             </div>
+            {errores.password && (
+              <p id="error-password" role="alert" className="mt-1 text-xs font-medium text-rose-600">{errores.password}</p>
+            )}
           </div>
+          {errores.general && (
+            <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+              {errores.general}
+            </p>
+          )}
           <div className="flex items-center gap-2">
             <input
               id="remember"

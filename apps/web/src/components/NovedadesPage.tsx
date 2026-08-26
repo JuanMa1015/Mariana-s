@@ -4,6 +4,7 @@ import { formatearFechaCorta } from "../utils/fechas"
 import toast from "react-hot-toast"
 import type { NovedadesDetalle, NovedadDetalle, Actuacion } from "../types"
 import { useNavigate } from "react-router-dom"
+import { useTitle } from "../hooks/useTitle"
 
 function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"] }) {
   const [open, setOpen] = useState(false)
@@ -156,6 +157,7 @@ function InsigniaAviso({ novedad, intentosMax = 5 }: { novedad: NovedadDetalle; 
 }
 
 export default function NovedadesPage() {
+  useTitle("Novedades")
   const navigate = useNavigate()
   const [data, setData] = useState<NovedadesDetalle | null>(null)
   const [loading, setLoading] = useState(true)
@@ -250,7 +252,7 @@ export default function NovedadesPage() {
             <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">Novedades</h1>
           </div>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/procesos")}
             className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 sm:px-4 sm:py-2 sm:text-sm"
           >
             ← Volver

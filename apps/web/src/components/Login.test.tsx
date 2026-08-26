@@ -91,7 +91,7 @@ it('should call loginUser on submit and navigate', async () => {
   await user.click(screen.getByText('Ingresar'))
 
   expect(mockLoginUser).toHaveBeenCalledWith({ credential: 'test@example.com', password: 'password123' })
-  expect(mockNavigate).toHaveBeenCalledWith('/')
+  expect(mockNavigate).toHaveBeenCalledWith('/procesos')
 })
 
 it('should show error toast on login failure', async () => {

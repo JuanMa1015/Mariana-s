@@ -2,25 +2,39 @@ import { useState } from "react"
 import { registerUser } from "../api"
 import { Link, useNavigate } from "react-router-dom"
 import toast from "react-hot-toast"
+import { useTitle } from "../hooks/useTitle"
+
+type ErroresRegistro = { email?: string; username?: string; password?: string; general?: string }
 
 export default function Register() {
   const [email, setEmail] = useState("")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
+  const [errores, setErrores] = useState<ErroresRegistro>({})
   const navigate = useNavigate()
+  useTitle("Crear cuenta")
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    const nuevos: ErroresRegistro = {}
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) nuevos.email = "Ingresa un correo electrónico válido"
+    if (password.length < 8) nuevos.password = "La contraseña debe tener al menos 8 caracteres"
+    if (/^\d/.test(username)) nuevos.username = "El usuario no puede empezar por número"
+    setErrores(nuevos)
+    if (Object.keys(nuevos).length > 0) return
+
     const loadingToast = toast.loading("Creando cuenta...")
     try {
       const data = await registerUser({ email, username: username || undefined, password })
       localStorage.setItem("email", data.email)
       if (data.username) localStorage.setItem("username", data.username)
       toast.success("¡Cuenta creada con éxito!", { id: loadingToast })
-      navigate("/")
+      navigate("/gracias?nuevo=1")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Error al registrarse", { id: loadingToast })
+      const msg = err instanceof Error ? err.message : "Error al registrarse"
+      setErrores({ general: msg })
+      toast.error(msg, { id: loadingToast })
     }
   }
 
@@ -41,9 +55,21 @@ export default function Register() {
               required
               autoComplete="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+              onChange={(e) => {
+                setEmail(e.target.value)
+                if (errores.email || errores.general) setErrores((prev) => ({ ...prev, email: undefined, general: undefined }))
+              }}
+              aria-invalid={Boolean(errores.email)}
+              aria-describedby={errores.email ? "error-reg-email" : undefined}
+              className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
+                errores.email
+                  ? "border-rose-400 bg-rose-50/50 focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
+                  : "border-slate-300 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+              }`}
             />
+            {errores.email && (
+              <p id="error-reg-email" role="alert" className="mt-1 text-xs font-medium text-rose-600">{errores.email}</p>
+            )}
           </div>
           <div>
             <label htmlFor="reg-username" className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 mb-1 block">Nombre de Usuario</label>
@@ -53,9 +79,16 @@ export default function Register() {
               autoComplete="username"
               value={username}
               onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_]/g, ""))}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+              className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition ${
+                errores.username
+                  ? "border-rose-400 bg-rose-50/50 focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
+                  : "border-slate-300 focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
+              }`}
               placeholder="Opcional — se auto-genera si lo dejas vacío"
             />
+            {errores.username && (
+              <p role="alert" className="mt-1 text-xs font-medium text-rose-600">{errores.username}</p>
+            )}
           </div>
           <div>
             <label htmlFor="reg-password" className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 mb-1 block">Contraseña</label>
@@ -67,8 +100,17 @@ export default function Register() {
                 minLength={8}
                 autoComplete="new-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 pl-4 pr-12 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (errores.password || errores.general) setErrores((prev) => ({ ...prev, password: undefined, general: undefined }))
+                }}
+                aria-invalid={Boolean(errores.password)}
+                aria-describedby={errores.password ? "error-reg-password" : undefined}
+                className={`w-full rounded-2xl border bg-violet-50/30 pl-4 pr-12 py-3 text-sm outline-none transition ${
+                  errores.password
+                    ? "border-rose-400 focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
+                    : "border-violet-200 focus:border-violet-400 focus:ring-4 focus:ring-violet-100"
+                }`}
               />
               <button
                 type="button"
@@ -89,8 +131,17 @@ export default function Register() {
                 )}
               </button>
             </div>
-            <p className="mt-1 text-xs text-slate-500">Mínimo 8 caracteres</p>
+            {errores.password ? (
+              <p id="error-reg-password" role="alert" className="mt-1 text-xs font-medium text-rose-600">{errores.password}</p>
+            ) : (
+              <p className="mt-1 text-xs text-slate-500">Mínimo 8 caracteres</p>
+            )}
           </div>
+          {errores.general && (
+            <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">
+              {errores.general}
+            </p>
+          )}
           <button type="submit" className="mt-2 w-full rounded-2xl border border-violet-500 bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-95 focus-visible:outline-none">
             Registrarse
           </button>
