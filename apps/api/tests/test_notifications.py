@@ -60,6 +60,76 @@ async def test_enviar_smtp_sin_host_retorna_false():
 
 
 @pytest.mark.asyncio
+async def test_enviar_smtp_reintenta_465_cuando_587_inalcanzable():
+    """Si la red bloquea el 587 (p. ej. Render), reintenta por 465 SSL."""
+    from services import notifications as n
+
+    with (
+        patch.object(n, "SMTP_HOST", "smtp.gmail.com"),
+        patch.object(n, "SMTP_PORT", 587),
+        patch.object(n, "SMTP_USE_TLS", True),
+        patch.object(n, "smtplib") as mock_smtplib,
+    ):
+        # Tanto SMTP como SMTP_SSL fallan al conectar
+        mock_smtplib.SMTP.side_effect = OSError(101, "Network is unreachable")
+        mock_smtplib.SMTP_SSL.side_effect = OSError(101, "Network is unreachable")
+
+        ok, detalle = n._enviar_smtp(
+            destinatarios=["test@example.com"],
+            asunto="Test",
+            cuerpo_html="<p>Test</p>",
+            cuerpo_texto="Test",
+        )
+
+    assert ok is False
+    assert "starttls/587" in detalle and "ssl/465" in detalle
+    mock_smtplib.SMTP.assert_called_once()
+    mock_smtplib.SMTP_SSL.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_enviar_smtp_usa_465_directo_cuando_esta_configurado():
+    from services import notifications as n
+
+    sent = {}
+
+    class FakeServer:
+        def __init__(self, host, port, timeout=None):
+            sent["puerto"] = port
+            sent["modo"] = "ssl"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def login(self, u, p):
+            pass
+
+        def send_message(self, m):
+            sent["enviado"] = True
+
+    with (
+        patch.object(n, "SMTP_HOST", "smtp.gmail.com"),
+        patch.object(n, "SMTP_PORT", 465),
+        patch.object(n, "smtplib") as mock_smtplib,
+    ):
+        mock_smtplib.SMTP_SSL.side_effect = FakeServer
+
+        ok, _detalle = n._enviar_smtp(
+            destinatarios=["test@example.com"],
+            asunto="Test",
+            cuerpo_html="<p>Test</p>",
+            cuerpo_texto="Test",
+        )
+
+    assert ok is True
+    assert sent == {"puerto": 465, "modo": "ssl", "enviado": True}
+    mock_smtplib.SMTP.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_notificar_telegram_fallback_sin_token():
     from services.notifications import notificar_cambio_radicado
 
