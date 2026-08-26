@@ -130,6 +130,45 @@ async def test_enviar_smtp_usa_465_directo_cuando_esta_configurado():
 
 
 @pytest.mark.asyncio
+async def test_enviar_brevo_sin_key_retorna_false():
+    from services.notifications import _enviar_brevo
+
+    ok, detalle = _enviar_brevo(
+        destinatarios=["test@example.com"],
+        asunto="Test",
+        cuerpo_html="<p>Test</p>",
+        cuerpo_texto="Test",
+    )
+    assert ok is False
+    assert "no configurada" in detalle
+
+
+@pytest.mark.asyncio
+async def test_brevo_tiene_prioridad_sobre_sendgrid_y_smtp():
+    from services import notifications as n
+
+    with (
+        patch.object(n, "BREVO_API_KEY", "brevo-key"),
+        patch.object(n, "SENDGRID_API_KEY", "sg-key"),
+        patch.object(n, "SMTP_HOST", "smtp.gmail.com"),
+        patch.object(n, "_enviar_brevo", return_value=(True, None)) as mock_b,
+        patch.object(n, "_enviar_sendgrid") as mock_sg,
+        patch("services.telegram.notificar_telegram", return_value=False),
+    ):
+        result = n.notificar_cambio_radicado(
+            llave_proceso="05001310301220210012300",
+            despacho="Juzgado 12",
+            departamento="Antioquia",
+            fecha_ultima_actuacion="2024-06-10",
+            sujetos_procesales="Perez, Juan",
+        )
+
+    assert result["email"] is True
+    mock_b.assert_called_once()
+    mock_sg.assert_not_called()
+
+
+@pytest.mark.asyncio
 async def test_notificar_telegram_fallback_sin_token():
     from services.notifications import notificar_cambio_radicado
 
