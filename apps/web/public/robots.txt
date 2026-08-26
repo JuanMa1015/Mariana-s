@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /procesos
+Disallow: /novedades
+Disallow: /gracias
+
+Sitemap: https://marianas.vercel.app/sitemap.xml

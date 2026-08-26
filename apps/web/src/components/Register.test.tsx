@@ -56,7 +56,7 @@ describe("Register", () => {
     expect((usernameInput as HTMLInputElement).value).toBe("username")
   })
 
-  it("debe enviar el formulario y navegar a / en éxito", async () => {
+  it("debe enviar el formulario y navegar a /gracias en éxito", async () => {
     const { default: Register } = await import("./Register")
     const { registerUser } = await import("../api")
     vi.mocked(registerUser).mockResolvedValue({
@@ -81,7 +81,7 @@ describe("Register", () => {
     expect(localStorage.getItem("email")).toBe("test@example.com")
     expect(localStorage.getItem("username")).toBe("tester")
     expect(mockToast.success).toHaveBeenCalled()
-    expect(mockNavigate).toHaveBeenCalledWith("/")
+    expect(mockNavigate).toHaveBeenCalledWith("/gracias?nuevo=1")
   })
 
   it("debe mostrar error toast cuando el registro falla", async () => {
@@ -91,7 +91,7 @@ describe("Register", () => {
 
     render(<BrowserRouter><Register /></BrowserRouter>)
     fireEvent.change(screen.getByLabelText(/correo electrónico/i), { target: { value: "dup@example.com" } })
-    fireEvent.change(screen.getByLabelText("Contraseña"), { target: { value: "pass123" } })
+    fireEvent.change(screen.getByLabelText("Contraseña"), { target: { value: "password123" } })
     fireEvent.click(screen.getByRole("button", { name: /registrarse/i }))
 
     await waitFor(() => {

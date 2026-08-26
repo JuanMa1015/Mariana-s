@@ -8,6 +8,7 @@ import DetalleView from "./components/DetalleView"
 import { useNavigate, useParams } from "react-router-dom"
 import { captureException } from "./sentry"
 import { formatearFechaCorta } from "./utils/fechas"
+import { useTitle } from "./hooks/useTitle"
 
 function tiempoRelativo(fecha: string | null | undefined): string {
   if (!fecha) return "Aún sin sincronizar"
@@ -30,6 +31,7 @@ function fetchProcesosNovedades(skip: number, limit: number, categoria?: string,
 
 export default function App() {
   const navigate = useNavigate()
+  useTitle("Mis procesos")
   const username = localStorage.getItem("username") || localStorage.getItem("email")?.split("@")[0] || "Mariana"
 
   const saludo = useMemo(() => {
@@ -162,7 +164,7 @@ export default function App() {
   }
 
   const volverLista = () => {
-    navigate("/")
+    navigate("/procesos")
   }
 
   useEffect(() => {
@@ -181,7 +183,7 @@ export default function App() {
         searchRef.current?.focus()
       } else if (e.key === "Escape" && esDetalle) {
         e.preventDefault()
-        navigate("/")
+        navigate("/procesos")
       }
     }
     window.addEventListener("keydown", onKey)
