@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom"
 import { useTitle } from "../hooks/useTitle"
-import { CONTACT_EMAIL, NOMBRE_APP, RESPONSABLE, UBICACION } from "../site"
+import { CONTACT_EMAIL, NOMBRE_APP, UBICACION } from "../site"
 import { CookieBanner, PublicShell } from "./PublicShell"
 
 function Bolt({ className = "h-5 w-5" }: { className?: string }) {
@@ -178,7 +178,7 @@ export default function LandingPage() {
       <section className="border-t border-slate-100 bg-slate-50 py-10">
         <div className="mx-auto max-w-3xl px-4 text-center sm:px-6">
           <p className="text-sm text-slate-600">
-            {NOMBRE_APP} es desarrollada y operada por <strong>{RESPONSABLE}</strong>, desde {UBICACION}.
+            <strong>{NOMBRE_APP}</strong> es una organización con presencia en {UBICACION}.
             Comprometidos con la seguridad de la información procesal de nuestros usuarios.
           </p>
         </div>

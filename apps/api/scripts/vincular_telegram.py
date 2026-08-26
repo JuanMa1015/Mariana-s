@@ -6,7 +6,7 @@ USO:
     python scripts/vincular_telegram.py listar
 
     # 2. Vincular un chat_id a un usuario (por email)
-    python scripts/vincular_telegram.py vincular 5157563788 gonzalezjuanmanuel645@gmail.com
+    python scripts/vincular_telegram.py vincular 5157563788 usuario@ejemplo.com
 """
 
 import sys
