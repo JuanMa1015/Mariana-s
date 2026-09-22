@@ -201,8 +201,12 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
   }
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(detalle.llave_proceso)
-    toast.success("Radicado copiado al portapapeles")
+    try {
+      await navigator.clipboard.writeText(detalle.llave_proceso)
+      toast.success("Radicado copiado al portapapeles")
+    } catch {
+      toast.error("No se pudo copiar el radicado")
+    }
   }
 
   const handleMarcarLeido = async () => {

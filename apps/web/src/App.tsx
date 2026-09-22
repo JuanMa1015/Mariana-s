@@ -434,7 +434,7 @@ export default function App() {
                 try {
                   const res = await postAddRadicado(newRadicado)
                   if (res.created) {
-                    setNewRadicado({ llave_proceso: "", categoria: "Trabajo" })
+                    setNewRadicado({ llave_proceso: "", categoria: "General" })
                     removeCache(cacheKey)
                     removeCache("novedades")
                     await cargarLista()

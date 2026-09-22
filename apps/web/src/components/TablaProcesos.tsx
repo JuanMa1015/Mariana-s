@@ -328,8 +328,12 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete }: Pro
 
   const handleCopy = useCallback(async (e: React.MouseEvent, llave: string) => {
     e.stopPropagation()
-    await navigator.clipboard.writeText(llave)
-    toast.success("Radicado copiado al portapapeles")
+    try {
+      await navigator.clipboard.writeText(llave)
+      toast.success("Radicado copiado al portapapeles")
+    } catch {
+      toast.error("No se pudo copiar el radicado")
+    }
   }, [])
 
   const abrirEditor = useCallback((llave: string) => {
