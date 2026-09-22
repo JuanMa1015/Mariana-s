@@ -1,5 +1,5 @@
 // Constantes del sitio — actualizar SITE_URL si se agrega dominio propio
-export const SITE_URL = "https://marianas.vercel.app"
+export const SITE_URL = "https://mariana-app-nu.vercel.app"
 export const NOMBRE_APP = "Mariana's"
 export const CONTACT_EMAIL = "contacto.marianas@gmail.com"
 export const RESPONSABLE = "Mariana's"

@@ -4,4 +4,4 @@ Disallow: /procesos
 Disallow: /novedades
 Disallow: /gracias
 
-Sitemap: https://marianas.vercel.app/sitemap.xml
+Sitemap: https://mariana-app-nu.vercel.app/sitemap.xml
