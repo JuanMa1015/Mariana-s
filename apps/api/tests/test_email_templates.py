@@ -220,6 +220,27 @@ async def test_template_resumen_es_html_valido():
 
 
 @pytest.mark.asyncio
+async def test_template_resumen_usa_primera_actuacion_del_listado():
+    """Regression: el dict acumulado en sync trae 'actuaciones' (lista), no
+    'actuacion'/'con_documentos' a nivel superior. El resumen debe leer la
+    primera actuacion, no quedar siempre en 'N/D' y 'No'."""
+    from services.email_templates import template_resumen
+
+    _, html = template_resumen([
+        {"llave_proceso": "p1", "despacho": "D1", "categoria": "General",
+         "departamento": "Dep",
+         "actuaciones": [
+             {"actuacion": "Se admitio demanda", "con_documentos": True,
+              "fecha_actuacion": "2024-06-10"},
+         ]},
+    ])
+
+    assert "Se admitio demanda" in html
+    assert "N/D" not in html
+    assert "Sí" in html or "Si" in html
+
+
+@pytest.mark.asyncio
 async def test_color_categoria_default():
     from services.email_templates import _color_categoria
 

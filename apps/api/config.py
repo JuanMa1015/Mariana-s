@@ -42,6 +42,9 @@ API_URL = os.getenv("API_URL", "")
 # URL pública de la aplicación (usada en notificaciones para enlaces)
 APP_URL = os.getenv("APP_URL", "https://marianas.vercel.app")
 
+# URL pública de consulta de procesos de la Rama Judicial (enlaces en notificaciones)
+RAMA_JUDICIAL_URL = "https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion"
+
 # SendGrid (alternativa a SMTP directo)
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
 
