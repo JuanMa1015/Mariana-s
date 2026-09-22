@@ -13,6 +13,8 @@ async def test_list_procesos_empty(client, auth_headers):
     assert data["procesos"] == []
     # La paginacion no debe reportar "pagina 1 de 0": minimo 1 pagina
     assert data["total_paginas"] == 1
+    # Sin radicados, la ultima sincronizacion global es None
+    assert data["ultima_sincronizacion_global"] is None
 
 
 @pytest.mark.asyncio

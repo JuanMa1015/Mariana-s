@@ -61,11 +61,20 @@ def listar_procesos(
     total = query.count()
     procesos = query.offset(skip).limit(limit).all()
 
+    # Maxima ultima sincronizacion de TODOS los radicados del usuario (no
+    # solo de la pagina actual), para que el dashboard la muestre correcta.
+    ultima_sincronizacion_global = (
+        db.query(func.max(Proceso.ultima_sincronizacion))
+        .filter(Proceso.user_id == current_user.id)
+        .scalar()
+    )
+
     return {
         "total": total,
         "skip": skip,
         "limit": limit,
         "total_paginas": max(1, (total + limit - 1) // limit) if limit else 1,
+        "ultima_sincronizacion_global": ultima_sincronizacion_global,
         "procesos": [
             {
                 "llave_proceso": p.llave_proceso,

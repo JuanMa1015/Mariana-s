@@ -3,8 +3,21 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def _entero(nombre: str, defecto: int) -> int:
+    """Lee una variable de entorno como entero sin romper el arranque si
+    viene vacia o mal formada."""
+    valor = os.getenv(nombre)
+    if valor is None or valor.strip() == "":
+        return defecto
+    try:
+        return int(valor)
+    except ValueError:
+        return defecto
+
+
 SMTP_HOST = os.getenv("SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_PORT = _entero("SMTP_PORT", 587)
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_USE_TLS = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
@@ -31,7 +44,7 @@ if _EN_PRODUCCION and (not os.getenv("SECRET_KEY") and not os.getenv("JWT_SECRET
     )
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
+ACCESS_TOKEN_EXPIRE_MINUTES = _entero("ACCESS_TOKEN_EXPIRE_MINUTES", 1440)
 
 # Token que permite invocar endpoints protegidos desde CI/CD o workflows.
 API_TOKEN = os.getenv("API_TOKEN", "")
@@ -68,5 +81,5 @@ if _EN_PRODUCCION and not RAMA_VERIFY_SSL:
     )
 
 # Base de datos: pool configuration
-DB_POOL_SIZE = int(os.getenv("DB_POOL_SIZE", "10"))
-DB_MAX_OVERFLOW = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+DB_POOL_SIZE = _entero("DB_POOL_SIZE", 10)
+DB_MAX_OVERFLOW = _entero("DB_MAX_OVERFLOW", 20)
