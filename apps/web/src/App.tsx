@@ -123,7 +123,7 @@ export default function App() {
 
   const verificarConexion = useCallback(async () => {
     try {
-      const r = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/health`, {
+      const r = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8000"}/healthz`, {
         signal: AbortSignal.timeout(5000),
       })
       if (!r.ok) throw new Error(`HTTP ${r.status}`)
@@ -144,7 +144,9 @@ export default function App() {
 
   useEffect(() => {
     void verificarConexion()
-    const id = setInterval(verificarConexion, 15000)
+    // Poll de 60s contra /healthz (sin BD): detecta si la API esta viva sin
+    // despertar el compute de Neon (cada check de /health abre una conexion).
+    const id = setInterval(verificarConexion, 60000)
     return () => clearInterval(id)
   }, [verificarConexion])
 

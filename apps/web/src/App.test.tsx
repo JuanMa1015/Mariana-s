@@ -84,11 +84,11 @@ it("tras varios fallos explica que los datos no se perdieron y ofrece reintentar
   const App = (await import('./App')).default
   render(<BrowserRouter><App /></BrowserRouter>)
 
-  // Ping inicial + 3 reintentos del intervalo (15s cada uno) = 4 fallos seguidos.
+  // Ping inicial + 3 reintentos del intervalo (60s cada uno) = 4 fallos seguidos.
   // El ultimo flush adicional deja drenar el render agendado por React
   // (MessageChannel tambien queda bajo fake timers).
   await vi.advanceTimersByTimeAsync(0)
-  for (let i = 0; i < 3; i++) await vi.advanceTimersByTimeAsync(15000)
+  for (let i = 0; i < 3; i++) await vi.advanceTimersByTimeAsync(60000)
   await vi.advanceTimersByTimeAsync(0)
 
   expect(screen.getByText(/tus procesos no se han perdido/i)).toBeInTheDocument()
@@ -105,8 +105,8 @@ it("al recuperarse la conexion quita el aviso y recarga la lista", async () => {
   await vi.advanceTimersByTimeAsync(0)
   expect(await vi.waitFor(() => screen.getByText(/conectando con la aplicación/i))).toBeInTheDocument()
 
-  // Siguiente ping exitoso (15s despues): el aviso desaparece y se recarga
-  await vi.advanceTimersByTimeAsync(15000)
+  // Siguiente ping exitoso (60s despues): el aviso desaparece y se recarga
+  await vi.advanceTimersByTimeAsync(60000)
   expect(screen.queryByText(/conectando con la aplicación/i)).not.toBeInTheDocument()
   await vi.waitFor(() => expect(mockGetProcesos).toHaveBeenCalledTimes(2))
 })
