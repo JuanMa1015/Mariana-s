@@ -11,6 +11,8 @@ async def test_list_procesos_empty(client, auth_headers):
     data = response.json()
     assert data["total"] == 0
     assert data["procesos"] == []
+    # La paginacion no debe reportar "pagina 1 de 0": minimo 1 pagina
+    assert data["total_paginas"] == 1
 
 
 @pytest.mark.asyncio

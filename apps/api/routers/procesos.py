@@ -65,7 +65,7 @@ def listar_procesos(
         "total": total,
         "skip": skip,
         "limit": limit,
-        "total_paginas": (total + limit - 1) // limit if limit else 1,
+        "total_paginas": max(1, (total + limit - 1) // limit) if limit else 1,
         "procesos": [
             {
                 "llave_proceso": p.llave_proceso,
