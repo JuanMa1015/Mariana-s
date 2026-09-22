@@ -17,6 +17,9 @@ node_modules/
 dist/
 .next/
 
+# Unlighthouse (reportes de performance generados)
+.unlighthouse/
+
 # VS Code
 .vscode/
 

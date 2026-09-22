@@ -40,7 +40,7 @@ API_TOKEN = os.getenv("API_TOKEN", "")
 API_URL = os.getenv("API_URL", "")
 
 # URL pública de la aplicación (usada en notificaciones para enlaces)
-APP_URL = os.getenv("APP_URL", "https://marianas.vercel.app")
+APP_URL = os.getenv("APP_URL", "https://mariana-app-nu.vercel.app")
 
 # SendGrid (alternativa a SMTP directo)
 SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "")
@@ -56,7 +56,7 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 
 # CORS: origenes permitidos separados por coma
-_CORS_DEFAULT = "http://localhost:5173,http://localhost:4173,https://marianas.vercel.app,https://mariana-app-nu.vercel.app"
+_CORS_DEFAULT = "http://localhost:5173,http://localhost:4173,https://mariana-app-nu.vercel.app"
 CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", _CORS_DEFAULT).split(",") if o.strip()]
 
 # Rama Judicial: verificar SSL
