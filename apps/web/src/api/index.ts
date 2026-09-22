@@ -160,7 +160,7 @@ export async function marcarTodoLeido() {
 }
 
 export async function descargarDocumento(id: number, nombre: string) {
-  const res = await fetchBase(`${BASE_URL}/procesos/documento/${id}`)
+  const res = await fetchWithAuth(`${BASE_URL}/procesos/documento/${id}`)
   if (!res.ok) throw new Error("No se pudo descargar el documento")
   const blob = await res.blob()
   const url = URL.createObjectURL(blob)
