@@ -44,7 +44,9 @@ interface Props {
 }
 
 const ROW_HEIGHT = 73
-const EXPANDED_HEIGHT = 380
+// Suficiente para el panel de informacion expandido (grid de 2/3 columnas);
+// un valor menor recortaba el contenido en pantallas medianas/angostas.
+const EXPANDED_HEIGHT = 560
 
 const IconExternalLink = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
@@ -173,7 +175,7 @@ function Row({ index, style, data }: ListChildProps) {
                       {statusColor.label}
                     </span>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-2 gap-3 xl:grid-cols-3">
                     {[
                       { label: "Tipo de proceso", value: p.tipo_proceso },
                       { label: "Clase", value: p.clase_proceso },
