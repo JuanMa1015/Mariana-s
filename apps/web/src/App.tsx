@@ -65,6 +65,9 @@ export default function App() {
   const loadingLista = loadedKey !== cacheKey
 
   const ultimaSync = useMemo(() => {
+    // El backend devuelve la maxima sincronizacion de TODOS los radicados;
+    // si el dato no esta (cache previa), se cae al maximo de la pagina actual.
+    if (procesos?.ultima_sincronizacion_global) return procesos.ultima_sincronizacion_global
     let mejor: string | null = null
     let mejorT = -Infinity
     for (const p of procesos?.procesos ?? []) {

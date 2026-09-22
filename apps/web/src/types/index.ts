@@ -46,6 +46,8 @@ export interface ListaProcesos {
   skip?: number
   limit?: number
   total_paginas?: number
+  /** Maxima ultima_sincronizacion de TODOS los radicados del usuario. */
+  ultima_sincronizacion_global?: string | null
   procesos: Proceso[]
 }
 
