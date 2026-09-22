@@ -1,10 +1,8 @@
 import html as _html
 from urllib.parse import quote
 
+from config import APP_URL, RAMA_JUDICIAL_URL
 from services.fechas import fecha_corta
-
-APP_URL = "https://mariana-app-nu.vercel.app"
-RAMA_JUDICIAL_URL = "https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion"
 
 
 def _esc(valor) -> str:
@@ -134,7 +132,10 @@ def template_resumen(novedades: list[dict]) -> tuple[str, str]:
     items_html = ""
     for n in novedades:
         color_fg, _color_bg = _color_categoria(n.get("categoria"))
-        docs = "Sí" if n.get("con_documentos") else "No"
+        primera = (n.get("actuaciones") or [{}])[0]
+        actuacion = primera.get("actuacion") or n.get("actuacion") or "N/D"
+        con_docs = primera.get("con_documentos", n.get("con_documentos", False))
+        docs = "Sí" if con_docs else "No"
         items_html += f"""
 <tr><td style="padding:0 0 16px">
 <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:12px;border:1px solid #e2e8f0;background:#ffffff">
@@ -143,7 +144,7 @@ def template_resumen(novedades: list[dict]) -> tuple[str, str]:
 <tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Radicado</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;font-weight:600;color:#1e293b;font-family:monospace;letter-spacing:0.08em">{_esc(n["llave_proceso"])}</span></td></tr>
 <tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Categoría</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:12px;font-weight:600;color:{color_fg}">{_esc(n.get("categoria") or "General")}</span></td></tr>
 <tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Despacho</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;color:#334155">{_esc(n.get("despacho", "") or "—")}</span></td></tr>
-<tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Actuación</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;color:#334155">{_esc(n.get("actuacion") or "N/D")}</span></td></tr>
+<tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Actuación</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;color:#334155">{_esc(actuacion)}</span></td></tr>
 <tr><td style="padding:4px 0"><span style="font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#94a3b8">Documentos</span></td><td style="padding:4px 0;text-align:right"><span style="font-size:13px;color:#334155">{docs}</span></td></tr>
 </table>
 </td></tr>

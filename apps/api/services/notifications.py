@@ -12,6 +12,7 @@ from config import (
     BREVO_API_KEY,
     EMAIL_FROM,
     EMAIL_TO,
+    RAMA_JUDICIAL_URL,
     SENDGRID_API_KEY,
     SMTP_HOST,
     SMTP_PASSWORD,
@@ -182,7 +183,7 @@ def notificar_cambio_radicado(
             )
             partes_sujetos = [p.strip() for p in (sujetos_procesales or "").split("|") if p.strip()]
             sujetos_texto = "\n".join(f"  {p}" for p in partes_sujetos) or "  Sin informacion"
-            link_rama = f"https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion?numero={llave_proceso}"
+            link_rama = f"{RAMA_JUDICIAL_URL}?numero={llave_proceso}"
             if actuaciones:
                 lines = []
                 for act in actuaciones:
