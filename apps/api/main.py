@@ -138,6 +138,18 @@ async def csrf_origin_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+@app.get("/healthz")
+def healthz():
+    """Health check SIN base de datos (uso del keepalive interno).
+
+    A diferencia de /health, no abre conexion a la BD: mantiene despierto a
+    Render (evita el cold start de 30-60s) sin gastar CU-hours de Neon, ya
+    que el compute de Neon duerme con el autosuspend de 5 min en cuanto no
+    haya consultas.
+    """
+    return {"status": "ok"}
+
+
 @app.get("/health")
 def health(request: Request, deep: bool = False):
     """Health check ligero (solo BD) para polls frecuentes.

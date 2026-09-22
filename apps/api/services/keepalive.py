@@ -1,12 +1,16 @@
 import asyncio
 import logging
+import os
 
 import httpx
 from config import API_URL
 
 logger = logging.getLogger(__name__)
 
-_INTERVALO_SEGUNDOS = 300
+# Nota: el keepalive pega a /healthz (sin consulta a la BD) para mantener
+# despierto a Render sin gastar CU-hours de Neon. No usar /health aqui: su
+# SELECT 1 impide que el compute de Neon duerma con el autosuspend.
+_INTERVALO_SEGUNDOS = int(os.getenv("KEEPALIVE_INTERVAL_SECONDS", "300"))
 
 
 class Keepalive:
@@ -14,7 +18,7 @@ class Keepalive:
         self._task: asyncio.Task | None = None
 
     def iniciar(self):
-        url = f"{API_URL.rstrip('/')}/health" if API_URL else ""
+        url = f"{API_URL.rstrip('/')}/healthz" if API_URL else ""
         if not url:
             logger.warning("API_URL no configurada, keepalive desactivado")
             return
