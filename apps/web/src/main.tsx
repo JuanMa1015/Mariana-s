@@ -24,6 +24,11 @@ const NovedadesPage = lazy(() => import('./components/NovedadesPage.tsx'))
 
 initSentry()
 
+// App móvil: iconos oscuros en la barra de estado (el encabezado es claro)
+if (Capacitor.isNativePlatform()) {
+  void import('@capacitor/status-bar').then(({ StatusBar, Style }) => StatusBar.setStyle({ style: Style.Light }).catch(() => undefined))
+}
+
 // App móvil: el botón atrás de Android navega hacia atrás y sale de la app solo desde la raíz.
 const BackButton = () => {
   const navigate = useNavigate()

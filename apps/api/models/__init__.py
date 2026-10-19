@@ -1,6 +1,6 @@
 import logging
 from models.database import Base, engine
-from models import proceso, user, actuacion, documento_actuacion
+from models import proceso, user, actuacion, documento_actuacion, dispositivo
 from sqlalchemy import inspect, text
 from alembic.config import Config
 from alembic import command
