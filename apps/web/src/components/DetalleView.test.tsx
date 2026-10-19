@@ -61,7 +61,7 @@ describe("DetalleView", () => {
   it("debe renderizar el radicado y datos principales", async () => {
     const { default: DetalleView } = await import("./DetalleView")
     render(<DetalleView detalle={DETALLE_MOCK} onVolver={onVolver} />)
-    expect(screen.getByText("05001310301720240048000")).toBeInTheDocument()
+    expect(screen.getByText("05001 31 03 017 2024 00480 00")).toBeInTheDocument()
     expect(screen.getByText(/Juzgado 17 Civil/i)).toBeInTheDocument()
     expect(screen.getByText("Antioquia")).toBeInTheDocument()
     expect(screen.getAllByText("Trabajo").length).toBeGreaterThanOrEqual(1)
@@ -69,16 +69,16 @@ describe("DetalleView", () => {
     expect(screen.getByText("Ordinario")).toBeInTheDocument()
   })
 
-  it("debe mostrar 'Pendiente de revisión' cuando notificado es false", async () => {
+  it("debe mostrar 'Con novedad' cuando notificado es false", async () => {
     const { default: DetalleView } = await import("./DetalleView")
     render(<DetalleView detalle={DETALLE_MOCK} onVolver={onVolver} />)
-    expect(screen.getByText("Pendiente de revisión")).toBeInTheDocument()
+    expect(screen.getByText("Con novedad")).toBeInTheDocument()
   })
 
-  it("debe mostrar 'Vigente' cuando notificado es true", async () => {
+  it("debe mostrar 'Al día' cuando notificado es true", async () => {
     const { default: DetalleView } = await import("./DetalleView")
     render(<DetalleView detalle={{ ...DETALLE_MOCK, notificado: true }} onVolver={onVolver} />)
-    expect(screen.getByText("Vigente")).toBeInTheDocument()
+    expect(screen.getByText("Al día")).toBeInTheDocument()
   })
 
   it("debe llamar onVolver al hacer clic en Volver", async () => {

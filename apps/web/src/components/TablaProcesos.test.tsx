@@ -62,8 +62,8 @@ describe("TablaProcesos", () => {
         <TablaProcesos procesos={PROCESOS_MOCK} onOpenDetalle={onOpenDetalle} />
       </div>,
     )
-    expect(screen.getByText("05001310301720240048000")).toBeInTheDocument()
-    expect(screen.getByText("05001400300520230010000")).toBeInTheDocument()
+    expect(screen.getByText("05001 31 03 017 2024 00480 00")).toBeInTheDocument()
+    expect(screen.getByText("05001 40 03 005 2023 00100 00")).toBeInTheDocument()
   })
 
   it("debe mostrar nombres de despacho", async () => {
@@ -88,15 +88,15 @@ describe("TablaProcesos", () => {
     expect(screen.getByText("Consultorio")).toBeInTheDocument()
   })
 
-  it("debe mostrar estado Pendiente y Vigente", async () => {
+  it("debe mostrar estado Con novedad y Al día", async () => {
     const { default: TablaProcesos } = await import("./TablaProcesos")
     render(
       <div style={{ height: 500 }}>
         <TablaProcesos procesos={PROCESOS_MOCK} onOpenDetalle={onOpenDetalle} />
       </div>,
     )
-    expect(screen.getByText("Pendiente")).toBeInTheDocument()
-    expect(screen.getByText("Vigente")).toBeInTheDocument()
+    expect(screen.getByText("Con novedad")).toBeInTheDocument()
+    expect(screen.getByText("Al día")).toBeInTheDocument()
   })
 
   it("debe expandir fila al hacer clic y mostrar detalle", async () => {
@@ -106,7 +106,7 @@ describe("TablaProcesos", () => {
         <TablaProcesos procesos={PROCESOS_MOCK} onOpenDetalle={onOpenDetalle} />
       </div>,
     )
-    fireEvent.click(screen.getByText("05001310301720240048000"))
+    fireEvent.click(screen.getByText("05001 31 03 017 2024 00480 00"))
     await waitFor(() => {
       expect(screen.getByText("VERBAL")).toBeInTheDocument()
     })
@@ -124,7 +124,7 @@ describe("TablaProcesos", () => {
     expect(onOpenDetalle).toHaveBeenCalledWith("05001310301720240048000")
   })
 
-  it("debe mostrar toast de confirmación al eliminar", async () => {
+  it("debe pedir confirmación en un diálogo al eliminar", async () => {
     const { default: TablaProcesos } = await import("./TablaProcesos")
     render(
       <div style={{ height: 500 }}>
@@ -132,10 +132,10 @@ describe("TablaProcesos", () => {
       </div>,
     )
     fireEvent.click(screen.getAllByTitle("Eliminar radicado")[0])
-    expect(toastFn).toHaveBeenCalled()
+    expect(screen.getByRole("alertdialog", { name: "¿Eliminar este radicado?" })).toBeInTheDocument()
   })
 
-  it("debe eliminar al confirmar en el toast", async () => {
+  it("debe eliminar al confirmar en el diálogo", async () => {
     const { deleteProceso } = await import("../api")
     vi.mocked(deleteProceso).mockResolvedValue({ deleted: true })
 
@@ -147,11 +147,6 @@ describe("TablaProcesos", () => {
     )
 
     fireEvent.click(screen.getAllByTitle("Eliminar radicado")[0])
-
-    const contentFn = toastFn.mock.calls[0][0]
-    const toastArgs = { id: "test-id", visible: true, type: "custom" as const }
-    render(<div>{contentFn(toastArgs)}</div>, { container: document.body })
-
     fireEvent.click(screen.getByText("Sí, eliminar"))
 
     await waitFor(() => {
@@ -161,7 +156,8 @@ describe("TablaProcesos", () => {
     expect(onDelete).toHaveBeenCalledWith("05001310301720240048000")
   })
 
-  it("debe cerrar toast al cancelar eliminación", async () => {
+  it("debe cerrar el diálogo con Cancelar y con Escape sin eliminar", async () => {
+    const { deleteProceso } = await import("../api")
     const { default: TablaProcesos } = await import("./TablaProcesos")
     render(
       <div style={{ height: 500 }}>
@@ -170,12 +166,60 @@ describe("TablaProcesos", () => {
     )
 
     fireEvent.click(screen.getAllByTitle("Eliminar radicado")[0])
-
-    const contentFn = toastFn.mock.calls[0][0]
-    const toastArgs = { id: "test-id", visible: true, type: "custom" as const }
-    render(<div>{contentFn(toastArgs)}</div>, { container: document.body })
-
     fireEvent.click(screen.getByText("Cancelar"))
-    expect(toastFn.dismiss).toHaveBeenCalledWith("test-id")
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getAllByTitle("Eliminar radicado")[0])
+    fireEvent.keyDown(document, { key: "Escape" })
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+    expect(deleteProceso).not.toHaveBeenCalled()
+  })
+
+  it("no debe permitir guardar un radicado de menos de 23 dígitos", async () => {
+    const { default: TablaProcesos } = await import("./TablaProcesos")
+    render(
+      <div style={{ height: 500 }}>
+        <TablaProcesos procesos={PROCESOS_MOCK} onOpenDetalle={onOpenDetalle} />
+      </div>,
+    )
+    fireEvent.click(screen.getAllByTitle("Editar radicado")[0])
+    const input = screen.getByLabelText(/Radicado \(23 dígitos\)/)
+    fireEvent.change(input, { target: { value: "123" } })
+    expect(screen.getByRole("button", { name: "Guardar" })).toBeDisabled()
+  })
+
+  it("debe pedir al servidor el orden elegido", async () => {
+    const onOrden = vi.fn()
+    const { default: TablaProcesos } = await import("./TablaProcesos")
+    render(
+      <div style={{ height: 500 }}>
+        <TablaProcesos procesos={PROCESOS_MOCK} onOpenDetalle={onOpenDetalle} orden="novedad" onOrden={onOrden} />
+      </div>,
+    )
+    fireEvent.change(screen.getByLabelText("Ordenar"), { target: { value: "antigua" } })
+    expect(onOrden).toHaveBeenCalledWith("antigua")
+  })
+
+  it("debe mostrar y enviar el alias al editar", async () => {
+    const { updateProceso } = await import("../api")
+    vi.mocked(updateProceso).mockResolvedValue({ updated: true })
+    const { default: TablaProcesos } = await import("./TablaProcesos")
+    render(
+      <div style={{ height: 500 }}>
+        <TablaProcesos procesos={PROCESOS_MOCK} onOpenDetalle={onOpenDetalle} />
+      </div>,
+    )
+    fireEvent.click(screen.getAllByTitle("Editar radicado")[0])
+    fireEvent.change(screen.getByLabelText(/Cliente o alias/), { target: { value: "  Pérez  " } })
+    fireEvent.click(screen.getByRole("button", { name: "Guardar" }))
+    await waitFor(() => {
+      expect(updateProceso).toHaveBeenCalledWith("05001310301720240048000", expect.objectContaining({ alias: "Pérez" }))
+    })
+  })
+
+  it("debe mostrar guía cuando no hay procesos", async () => {
+    const { default: TablaProcesos } = await import("./TablaProcesos")
+    render(<TablaProcesos procesos={[]} onOpenDetalle={onOpenDetalle} />)
+    expect(screen.getByText("Aún no tienes procesos guardados")).toBeInTheDocument()
   })
 })

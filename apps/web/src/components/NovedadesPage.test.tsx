@@ -81,8 +81,8 @@ describe("NovedadesPage", () => {
     const { default: NovedadesPage } = await import("./NovedadesPage")
     render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
     await waitFor(() => {
-      expect(screen.getByText(/05001310301720240048000/)).toBeInTheDocument()
-      expect(screen.getByText(/05001400300520230010000/)).toBeInTheDocument()
+      expect(screen.getByText(/05001 31 03 017 2024 00480 00/)).toBeInTheDocument()
+      expect(screen.getByText(/05001 40 03 005 2023 00100 00/)).toBeInTheDocument()
     })
   })
 
@@ -91,9 +91,9 @@ describe("NovedadesPage", () => {
     const { default: NovedadesPage } = await import("./NovedadesPage")
     render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
     await waitFor(() => {
-      expect(screen.getByText(/05001310301720240048000/)).toBeInTheDocument()
+      expect(screen.getByText(/05001 31 03 017 2024 00480 00/)).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByText(/05001310301720240048000/))
+    fireEvent.click(screen.getByText(/05001 31 03 017 2024 00480 00/))
     await waitFor(() => {
       expect(screen.getByText("Auto admite demanda")).toBeInTheDocument()
     })
@@ -138,7 +138,7 @@ describe("NovedadesPage", () => {
     const { default: NovedadesPage } = await import("./NovedadesPage")
     render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
     await waitFor(() => {
-      expect(screen.getByText(/05001310301720240048000/)).toBeInTheDocument()
+      expect(screen.getByText(/05001 31 03 017 2024 00480 00/)).toBeInTheDocument()
     })
     expect(screen.queryByText(/sin aviso/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/avisado/i)).not.toBeInTheDocument()

@@ -7,6 +7,7 @@ export interface Proceso {
   clase_proceso?: string | null
   es_privado?: boolean | null
   categoria?: string | null
+  alias?: string | null
   fecha_proceso?: string | null
   fecha_ultima_actuacion: string | null
   notificado: boolean
@@ -99,6 +100,7 @@ export interface NovedadDetalle {
   despacho: string
   departamento: string
   categoria?: string | null
+  alias?: string | null
   sujetos_procesales: string
   fecha_ultima_actuacion: string | null
   tipo_novedad?: string | null
@@ -119,3 +121,5 @@ export interface NovedadesDetalle {
   intentos_max_aviso?: number
   novedades: NovedadDetalle[]
 }
+/** Orden de la lista de procesos (lo aplica el servidor antes de paginar). */
+export type Orden = "novedad" | "reciente" | "antigua"

@@ -26,3 +26,20 @@
   outline-offset: 2px;
   border-radius: 6px;
 }
+
+/* Móvil / Capacitor: zonas seguras (notch, barra de gestos) y sin zoom en inputs de iOS */
+body {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: none;
+}
+
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

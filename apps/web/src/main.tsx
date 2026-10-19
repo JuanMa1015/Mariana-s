@@ -2,7 +2,9 @@
 import { StrictMode, lazy, Suspense, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
+import { App as CapApp } from '@capacitor/app'
 import { Toaster } from 'react-hot-toast'
 import { Analytics } from '@vercel/analytics/react'
 import './index.css'
@@ -21,6 +23,21 @@ const App = lazy(() => import('./App.tsx'))
 const NovedadesPage = lazy(() => import('./components/NovedadesPage.tsx'))
 
 initSentry()
+
+// App móvil: el botón atrás de Android navega hacia atrás y sale de la app solo desde la raíz.
+const BackButton = () => {
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    const h = CapApp.addListener('backButton', () => {
+      if (pathname === '/procesos' || pathname === '/login') void CapApp.exitApp()
+      else navigate(-1)
+    })
+    return () => { void h.then((x) => x.remove()) }
+  }, [pathname, navigate])
+  return null
+}
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const [ok, setOk] = useState<boolean | null>(null)
@@ -45,9 +62,10 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <BrowserRouter>
         <Toaster position="top-right" toastOptions={{ duration: 3000, style: { background: '#f5f3ff', color: '#5b21b6', border: '1px solid #ddd6fe', fontWeight: '500' } }} />
+        <BackButton />
         <Routes>
           {/* Rutas públicas */}
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={Capacitor.isNativePlatform() ? <Navigate to="/procesos" replace /> : <LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/privacidad" element={<PrivacyPage />} />

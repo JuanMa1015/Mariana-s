@@ -1,15 +1,27 @@
+import { Capacitor } from "@capacitor/core"
+
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
+
+// App movil: las cookies cross-site no son fiables en el WebView, asi que se usa Bearer.
+// ponytail: token en localStorage; migrar a almacenamiento seguro (Keychain/Keystore) si se endurece.
+const nativa = Capacitor.isNativePlatform()
+const TOKEN_KEY = "mariana_token"
+const guardarToken = (data: { access_token?: string }) => {
+  if (nativa && data.access_token) localStorage.setItem(TOKEN_KEY, data.access_token)
+}
 
 function _esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 function fetchBase(url: string, options: RequestInit = {}) {
-  const merged: RequestInit = {
-    ...options,
-    credentials: "include",
-    headers: new Headers(options.headers || {}),
+  const headers = new Headers(options.headers || {})
+  if (nativa) {
+    headers.set("X-Client", "native")
+    const token = localStorage.getItem(TOKEN_KEY)
+    if (token) headers.set("Authorization", `Bearer ${token}`)
   }
+  const merged: RequestInit = { ...options, credentials: "include", headers }
   return fetch(url, merged)
 }
 
@@ -29,6 +41,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos 
     }
 
     if (res.status === 401) {
+      localStorage.removeItem(TOKEN_KEY)
       window.location.href = "/login"
       throw new Error("Unauthorized")
     }
@@ -58,7 +71,9 @@ export async function loginUser(payload: { credential: string; password: string 
     throw new Error("Error de conexión. Revisa tu internet.")
   }
   if (!res.ok) throw new Error((await res.json()).detail || "Error en login")
-  return res.json()
+  const data = await res.json()
+  guardarToken(data)
+  return data
 }
 
 export async function registerUser(payload: { email: string; password: string; username?: string }) {
@@ -73,7 +88,9 @@ export async function registerUser(payload: { email: string; password: string; u
     throw new Error("Error de conexión. Revisa tu internet.")
   }
   if (!res.ok) throw new Error((await res.json()).detail || "Error en registro")
-  return res.json()
+  const data = await res.json()
+  guardarToken(data)
+  return data
 }
 
 export async function getMe() {
@@ -83,15 +100,17 @@ export async function getMe() {
 
 export async function logoutUser() {
   const res = await fetchWithAuth(`${BASE_URL}/auth/logout`, { method: "POST" })
+  localStorage.removeItem(TOKEN_KEY)
   return res.json()
 }
 
-export async function getProcesos(despacho?: string, departamento?: string, skip = 0, limit = 10, categoria?: string, q?: string) {
+export async function getProcesos(despacho?: string, departamento?: string, skip = 0, limit = 10, categoria?: string, q?: string, orden?: string) {
   const params = new URLSearchParams()
   if (despacho) params.append("despacho", despacho)
   if (departamento) params.append("departamento", departamento)
   if (categoria) params.append("categoria", categoria)
   if (q) params.append("q", q)
+  if (orden) params.append("orden", orden)
   params.append("skip", String(skip))
   params.append("limit", String(limit))
   const res = await fetchWithAuth(`${BASE_URL}/procesos/?${params}`)
@@ -144,7 +163,7 @@ export async function getNovedadesDetalle(skip = 0, limit = 50) {
   return res.json()
 }
 
-export async function updateProceso(llaveProceso: string, payload: Partial<{ llave_proceso: string; despacho: string; departamento: string; sujetos_procesales: string; categoria: string; notificado: boolean; fecha_ultima_actuacion: string }>) {
+export async function updateProceso(llaveProceso: string, payload: Partial<{ llave_proceso: string; despacho: string; departamento: string; sujetos_procesales: string; categoria: string; alias: string; notificado: boolean; fecha_ultima_actuacion: string }>) {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/${llaveProceso}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },

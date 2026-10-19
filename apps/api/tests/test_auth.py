@@ -100,6 +100,7 @@ async def test_login_with_email(client, test_user):
     data = response.json()
     assert "access_token" in response.cookies
     assert data["email"] == "test@example.com"
+    assert "access_token" not in data  # el token en body es solo para la app nativa
 
 
 @pytest.mark.asyncio
@@ -107,8 +108,12 @@ async def test_login_with_username(client, test_user):
     response = await client.post(
         "/auth/login",
         json={"credential": "testuser", "password": "password123"},
+        headers={"X-Client": "native"},
     )
     assert response.status_code == 200
+    token = response.json()["access_token"]
+    me = await client.get("/auth/me", headers={"Authorization": f"Bearer {token}"})
+    assert me.status_code == 200
 
 
 @pytest.mark.asyncio
