@@ -1,0 +1,111 @@
+name: Release Android (APK)
+
+# Se publica al empujar un tag de version: git tag vX.Y.Z && git push origin vX.Y.Z
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+*"]
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version a partir del tag
+        id: ver
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+) ]] || { echo "Tag invalido: $GITHUB_REF_NAME"; exit 1; }
+          # versionCode crece de forma monotona con la version: MAJOR*10000 + MINOR*100 + PATCH
+          CODE=$(( BASH_REMATCH[1]*10000 + BASH_REMATCH[2]*100 + BASH_REMATCH[3] ))
+          PKG=$(node -p "require('./package.json').version")
+          [[ "$PKG" == "$VERSION" ]] || { echo "package.json ($PKG) no coincide con el tag ($VERSION). Sube la version en una rama antes de etiquetar."; exit 1; }
+          PRE=false; [[ "$VERSION" == 0.* || "$VERSION" == *-* ]] && PRE=true
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$PRE" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test
+
+      - name: Build web con la URL de la API
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          [ -n "$VITE_API_URL" ] || { echo "Falta la variable de repositorio VITE_API_URL"; exit 1; }
+          npm run build
+          npx cap sync android
+
+      - name: Preparar keystore (si hay secrets)
+        id: ks
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Sin keystore: se genera un APK de depuracion (instalable, no apto para Play Store)."
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compilar APK
+        working-directory: apps/web/android
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          TASK=assembleDebug; [ "${{ steps.ks.outputs.signed }}" = "true" ] && TASK=assembleRelease
+          chmod +x gradlew
+          ./gradlew "$TASK" -PversionName=${{ steps.ver.outputs.version }} -PversionCode=${{ steps.ver.outputs.code }}
+
+      - name: Nombrar APK y checksum
+        id: apk
+        run: |
+          SRC=$(ls android/app/build/outputs/apk/*/*.apk | head -n1)
+          KIND=$([ "${{ steps.ks.outputs.signed }}" = "true" ] && echo "" || echo "-debug")
+          OUT="Marianas-v${{ steps.ver.outputs.version }}${KIND}.apk"
+          cp "$SRC" "$OUT"
+          sha256sum "$OUT" > "$OUT.sha256"
+          echo "file=$OUT" >> "$GITHUB_OUTPUT"
+
+      - name: Notas de la version (CHANGELOG.md)
+        run: |
+          V="${{ steps.ver.outputs.version }}"
+          {
+            echo "## Instalación (Android)"
+            echo "1. Descarga \`${{ steps.apk.outputs.file }}\` en tu celular."
+            echo "2. Ábrelo y permite *instalar apps de esta fuente* si Android lo pide."
+            echo "3. Verifica la integridad con el archivo \`.sha256\` (opcional)."
+            echo
+            awk -v v="$V" 'index($0, "## [" v "]") == 1 {f=1; next} /^## / {f=0} f' ../../CHANGELOG.md
+          } > "$RUNNER_TEMP/notes.md"
+
+      - name: Publicar release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FLAGS=""; [ "${{ steps.ver.outputs.prerelease }}" = "true" ] && FLAGS="--prerelease"
+          gh release create "$GITHUB_REF_NAME" $FLAGS \
+            --title "Mariana's $GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md" --generate-notes --verify-tag \
+            "${{ steps.apk.outputs.file }}" "${{ steps.apk.outputs.file }}.sha256"

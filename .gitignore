@@ -26,3 +26,8 @@ dist/
 # Sistema operativo
 .DS_Store
 Thumbs.db
+# Android: nunca subir keystores ni APK/AAB compilados
+*.jks
+*.keystore
+*.apk
+*.aab
