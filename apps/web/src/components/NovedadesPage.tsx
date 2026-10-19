@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react"
 import { getNovedadesDetalle, marcarTodoLeido, descargarDocumento } from "../api"
 import { formatearFechaCorta } from "../utils/fechas"
+import { formatearRadicado } from "../utils/radicado"
 import toast from "react-hot-toast"
 import type { NovedadesDetalle, NovedadDetalle, Actuacion } from "../types"
 import { useNavigate } from "react-router-dom"
@@ -69,7 +70,7 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-xs">
         <thead>
-          <tr className="border-b border-violet-100 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          <tr className="border-b border-indigo-100 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             <th className="px-3 py-2">Fecha actuación</th>
             <th className="px-3 py-2">Actuación</th>
             <th className="px-3 py-2">Anotación</th>
@@ -83,7 +84,7 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
           {actuaciones.map((a, i) => (
             <tr
               key={a.id_reg_actuacion}
-              className={`border-b border-violet-50 transition hover:bg-violet-50/50 ${i === 0 ? "bg-amber-50/40" : ""}`}
+              className={`border-b border-indigo-50 transition hover:bg-indigo-50/50 ${i === 0 ? "bg-amber-50/40" : ""}`}
             >
               <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-700">
                 {i === 0 && (
@@ -244,16 +245,16 @@ export default function NovedadesPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f5f3ff] text-slate-900">
-      <header className="border-b border-violet-100 bg-white/90 backdrop-blur-md">
+    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
+      <header className="border-b border-indigo-100 bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-none items-center justify-between px-4 py-3 sm:px-5">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-violet-400">Mariana's</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-indigo-400">Mariana's</p>
             <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">Novedades</h1>
           </div>
           <button
             onClick={() => navigate("/procesos")}
-            className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 sm:px-4 sm:py-2 sm:text-sm"
+            className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:px-4 sm:py-2 sm:text-sm"
           >
             ← Volver
           </button>
@@ -273,7 +274,7 @@ export default function NovedadesPage() {
           </div>
         ) : error ? (
           <div className="flex flex-1 items-center justify-center">
-            <div className="rounded-3xl border border-rose-200 bg-rose-50 p-8 text-center text-sm">
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-8 text-center text-sm">
               <p className="font-semibold text-rose-700">No se pudieron cargar las novedades</p>
               <p className="mt-1 text-rose-600">Revisa tu conexión e intenta de nuevo.</p>
               <button
@@ -286,7 +287,7 @@ export default function NovedadesPage() {
           </div>
         ) : !data?.novedades?.length ? (
           <div className="flex flex-1 items-center justify-center">
-            <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-8 text-center text-sm">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center text-sm">
               <p className="font-semibold text-emerald-700">¡Todo al día!</p>
               <p className="mt-1 text-emerald-600">No hay novedades pendientes de revisar.</p>
             </div>
@@ -308,7 +309,7 @@ export default function NovedadesPage() {
                 <button
                   onClick={() => { setLoading(true); setSkip((s) => Math.max(0, s - limit)) }}
                   disabled={skip === 0}
-                  className="rounded-lg border border-violet-200 px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="rounded-lg border border-indigo-200 px-3 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   ← Anterior
                 </button>
@@ -318,7 +319,7 @@ export default function NovedadesPage() {
                 <button
                   onClick={() => { setLoading(true); setSkip((s) => s + limit) }}
                   disabled={!data || skip + limit >= data.total}
-                  className="rounded-lg border border-violet-200 px-3 py-1 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="rounded-lg border border-indigo-200 px-3 py-1 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   Siguiente →
                 </button>
@@ -332,7 +333,7 @@ export default function NovedadesPage() {
                   <div
                     key={nov.llave_proceso}
                     className={`rounded-2xl border transition ${
-                      isOpen ? "border-violet-300 bg-white shadow-md" : "border-violet-100 bg-white shadow-sm hover:border-violet-200"
+                      isOpen ? "border-indigo-300 bg-white shadow-md" : "border-indigo-100 bg-white shadow-sm hover:border-indigo-200"
                     }`}
                   >
                     <button
@@ -340,15 +341,16 @@ export default function NovedadesPage() {
                       className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left sm:px-5"
                     >
                       <svg
-                        className={`h-4 w-4 shrink-0 text-violet-400 transition ${isOpen ? "rotate-90" : ""}`}
+                        className={`h-4 w-4 shrink-0 text-indigo-400 transition ${isOpen ? "rotate-90" : ""}`}
                         fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                       </svg>
 
-                      <span className="min-w-[13ch] font-mono text-xs font-bold tracking-widest text-violet-800">
-                        {nov.llave_proceso}
+                      <span className="min-w-[13ch] font-mono text-xs font-bold tracking-widest text-indigo-800">
+                        {formatearRadicado(nov.llave_proceso)}
                       </span>
+                      {nov.alias && <span className="max-w-[16rem] truncate text-sm font-semibold text-slate-800">{nov.alias}</span>}
 
                       {nov.tipo_novedad && (
                         <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
@@ -360,7 +362,7 @@ export default function NovedadesPage() {
 
                       {nov.categoria && (
                         <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
-                          nov.categoria === "Trabajo" ? "bg-sky-100 text-sky-700" : nov.categoria === "Consultorio" ? "bg-amber-100 text-amber-700" : "bg-violet-100 text-violet-700"
+                          nov.categoria === "Trabajo" ? "bg-sky-100 text-sky-700" : nov.categoria === "Consultorio" ? "bg-amber-100 text-amber-700" : "bg-indigo-100 text-indigo-700"
                         }`}>
                           {nov.categoria}
                         </span>
@@ -382,12 +384,12 @@ export default function NovedadesPage() {
                     </button>
 
                     {isOpen && (
-                      <div className="border-t border-violet-100 px-4 pb-3 pt-3 sm:px-5">
+                      <div className="border-t border-indigo-100 px-4 pb-3 pt-3 sm:px-5">
                         <ActuacionesTable actuaciones={nov.actuaciones} />
                         <div className="mt-3 flex justify-end">
                           <button
                             onClick={() => navigate(`/procesos/${nov.llave_proceso}`)}
-                            className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold text-violet-700 transition hover:bg-violet-100"
+                            className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100"
                           >
                             Ver detalle completo →
                           </button>

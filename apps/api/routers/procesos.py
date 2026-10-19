@@ -35,6 +35,7 @@ def listar_procesos(
     categoria: str = Query(None),
     notificado: Optional[bool] = Query(None),
     q: str = Query(None),
+    orden: str = Query("novedad", pattern="^(novedad|reciente|antigua)$"),
     skip: int = Query(0, ge=0),
     limit: int = Query(10, ge=1, le=100),
 ):
@@ -55,11 +56,20 @@ def listar_procesos(
                 Proceso.llave_proceso.ilike(term),
                 Proceso.sujetos_procesales.ilike(term),
                 Proceso.despacho.ilike(term),
+                Proceso.alias.ilike(term),
             )
         )
 
     total = query.count()
-    procesos = query.offset(skip).limit(limit).all()
+    # Orden global (antes de paginar). "id" desempata para que las paginas sean estables.
+    fecha = Proceso.fecha_ultima_actuacion
+    if orden == "antigua":
+        criterios = [fecha.asc().nullslast()]
+    elif orden == "reciente":
+        criterios = [fecha.desc().nullslast()]
+    else:  # novedad: lo que requiere revision primero
+        criterios = [Proceso.notificado.asc(), fecha.desc().nullslast()]
+    procesos = query.order_by(*criterios, Proceso.id).offset(skip).limit(limit).all()
 
     # Maxima ultima sincronizacion de TODOS los radicados del usuario (no
     # solo de la pagina actual), para que el dashboard la muestre correcta.
@@ -85,6 +95,7 @@ def listar_procesos(
                 "clase_proceso": p.clase_proceso,
                 "es_privado": p.es_privado,
                 "categoria": p.categoria,
+                "alias": p.alias,
                 "fecha_proceso": p.fecha_proceso,
                 "fecha_ultima_actuacion": p.fecha_ultima_actuacion,
                 "notificado": p.notificado,
@@ -406,6 +417,7 @@ def novedades_detalle(
                 "despacho": p.despacho,
                 "departamento": p.departamento,
                 "categoria": p.categoria,
+                "alias": p.alias,
                 "sujetos_procesales": p.sujetos_procesales,
                 "fecha_ultima_actuacion": p.fecha_ultima_actuacion,
                 "tipo_novedad": p.tipo_novedad or "nuevo",
@@ -493,6 +505,7 @@ def obtener_proceso(
         "clase_proceso": proceso.clase_proceso,
         "es_privado": proceso.es_privado,
         "categoria": proceso.categoria,
+        "alias": proceso.alias,
         "fecha_proceso": proceso.fecha_proceso,
         "fecha_ultima_actuacion": proceso.fecha_ultima_actuacion,
         "notificado": proceso.notificado,
@@ -540,6 +553,7 @@ class UpdateProceso(BaseModel):
     departamento: Optional[str] = None
     sujetos_procesales: Optional[str] = None
     categoria: Optional[str] = None
+    alias: Optional[constr(max_length=100)] = None  # "" limpia el alias
     notificado: Optional[bool] = None
     fecha_ultima_actuacion: Optional[datetime] = None
 
@@ -580,6 +594,9 @@ def update_proceso(request: Request, llave_proceso: str, payload: UpdateProceso,
         changed = True
     if payload.categoria is not None:
         proceso.categoria = payload.categoria
+        changed = True
+    if payload.alias is not None:
+        proceso.alias = payload.alias.strip() or None
         changed = True
     if payload.notificado is not None:
         proceso.notificado = payload.notificado

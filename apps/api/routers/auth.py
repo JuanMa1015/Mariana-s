@@ -79,7 +79,14 @@ def register_user(user: UserCreate, request: Request, response: Response, db: Se
         "email": new_user.email,
         "username": new_user.username,
         "telegram_chat_id": None,
+        **_token_nativo(request, access_token),
     }
+
+
+def _token_nativo(request: Request, token: str) -> dict:
+    """La app movil (Capacitor) no puede usar cookies cross-site: recibe el token y lo envia como Bearer.
+    Se entrega solo si lo pide (X-Client: native) para no exponerlo al JS de la web."""
+    return {"access_token": token} if request.headers.get("x-client") == "native" else {}
 
 
 @router.post("/login")
@@ -110,6 +117,7 @@ def login_user(user: UserLogin, request: Request, response: Response, db: Sessio
         "email": db_user.email,
         "username": db_user.username,
         "telegram_chat_id": db_user.telegram_chat_id,
+        **_token_nativo(request, access_token),
     }
 
 

@@ -2,6 +2,8 @@ import { useState } from "react"
 import toast from "react-hot-toast"
 import { getProceso, updateProceso, descargarDocumento } from "../api"
 import { formatearFechaCorta } from "../utils/fechas"
+import { formatearRadicado } from "../utils/radicado"
+import { CategoriaBadge, EstadoBadge } from "./Badges"
 import type { Actuacion, DetalleProceso, DocumentoActuacion } from "../types"
 
 interface Props {
@@ -68,19 +70,6 @@ const IconChevronDown = ({ open }: { open: boolean }) => (
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
 
-const StatusBadge = ({ notificado }: { notificado: boolean }) =>
-  notificado ? (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
-      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-      Vigente
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700">
-      <span className="h-2 w-2 rounded-full bg-amber-500" />
-      Pendiente de revisión
-    </span>
-  )
-
 const InfoCard = ({ label, value, highlight = false }: { label: string; value?: string | null; highlight?: boolean }) => (
   <div className={`rounded-2xl border p-4 ${highlight ? "border-sky-200 bg-sky-50" : "border-slate-200 bg-white shadow-sm"}`}>
     <p className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${highlight ? "text-sky-600" : "text-slate-500"}`}>{label}</p>
@@ -108,7 +97,7 @@ const DocumentosList = ({ docs }: { docs: DocumentoActuacion[] }) => {
         type="button"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
-        className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-800 transition"
+        className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition"
       >
         <IconDocument />
         {docs.length} documento{docs.length > 1 ? "s" : ""}
@@ -126,7 +115,7 @@ const DocumentosList = ({ docs }: { docs: DocumentoActuacion[] }) => {
                 type="button"
                 onClick={() => descargar(doc.id_reg_documento, doc.nombre)}
                 aria-label={`Descargar ${doc.nombre}`}
-                className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-violet-600 shadow-sm ring-1 ring-violet-200 transition hover:bg-violet-50"
+                className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-indigo-600 shadow-sm ring-1 ring-indigo-200 transition hover:bg-indigo-50"
               >
                 Descargar
               </button>
@@ -138,22 +127,22 @@ const DocumentosList = ({ docs }: { docs: DocumentoActuacion[] }) => {
   )
 }
 
-const ActuacionCard = ({ actuacion, isLatest }: { actuacion: Actuacion; isLatest: boolean }) => {
+const ActuacionCard = ({ actuacion, isLatest, isLast }: { actuacion: Actuacion; isLatest: boolean; isLast: boolean }) => {
   const esNueva = esHoy(actuacion.fecha_registro)
   return (
     <div className="relative pl-8 pb-6 last:pb-0">
       {/* Timeline connector */}
-      <div className="absolute left-[11px] top-2 bottom-0 w-0.5 bg-violet-200 last:hidden" />
-      <div className={`absolute left-[5px] top-1.5 h-3.5 w-3.5 rounded-full border-2 ${isLatest ? "border-violet-500 bg-violet-300 ring-4 ring-violet-100" : "border-slate-300 bg-white"}`} />
+      {!isLast && <div className="absolute left-[11px] top-2 bottom-0 w-0.5 bg-indigo-200" />}
+      <div className={`absolute left-[5px] top-1.5 h-3.5 w-3.5 rounded-full border-2 ${isLatest ? "border-indigo-500 bg-indigo-300 ring-4 ring-indigo-100" : "border-slate-300 bg-white"}`} />
 
-      <div className={`rounded-2xl border p-4 transition ${isLatest ? "border-violet-200 bg-violet-50/50 shadow-sm" : "border-slate-100 bg-white hover:bg-slate-50/50"}`}>
+      <div className={`rounded-2xl border p-4 transition ${isLatest ? "border-indigo-200 bg-indigo-50/50 shadow-sm" : "border-slate-100 bg-white hover:bg-slate-50/50"}`}>
         <div className="flex items-start justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs font-semibold text-violet-600 whitespace-nowrap">
+            <span className="text-xs font-semibold text-indigo-600 whitespace-nowrap">
               {formatearFecha(actuacion.fecha_actuacion)}
             </span>
             {isLatest && (
-              <span className="rounded-full bg-violet-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-violet-800">
+              <span className="rounded-full bg-indigo-200 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-800">
                 Última
               </span>
             )}
@@ -251,7 +240,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
         <button
           type="button"
           onClick={onVolver}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 active:scale-95"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50 active:scale-95"
         >
           <IconArrowLeft />
           Volver
@@ -272,7 +261,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
           <button
             onClick={handleCopy}
             aria-label="Copiar radicado"
-            className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-3 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 active:scale-95"
+            className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-3 py-2 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50 active:scale-95"
           >
             <IconClipboard />
             <span className="hidden sm:block">Copiar</span>
@@ -290,7 +279,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
             target="_blank"
             rel="noreferrer"
             aria-label="Abrir en Rama Judicial"
-            className="inline-flex items-center gap-2 rounded-xl border border-violet-500 bg-violet-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 active:scale-95"
+            className="inline-flex items-center gap-2 rounded-xl border border-indigo-500 bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95"
           >
             <IconExternalLink />
             <span className="hidden sm:block">Oficial</span>
@@ -299,54 +288,43 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
       </div>
 
       {/* ── Hero card ── */}
-      <div className="relative overflow-hidden rounded-3xl border border-violet-200 bg-gradient-to-br from-violet-100 to-indigo-50 p-6 shadow-sm">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-violet-300/20" />
+      <div className="relative overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-100 to-indigo-50 p-6 shadow-sm">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-indigo-300/20" />
         <div className="pointer-events-none absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-indigo-300/10" />
 
         <div className="relative flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-violet-200 text-violet-600">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-200 text-indigo-600">
               <IconScale />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600">Proceso judicial</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-600">{detalle.alias || "Proceso judicial"}</p>
               <h2 className="mt-0.5 font-mono text-lg font-bold tracking-widest text-slate-800 leading-tight">
-                {detalle.llave_proceso}
+                {formatearRadicado(detalle.llave_proceso)}
               </h2>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {detalle.categoria && (
-              <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-semibold ${
-                detalle.categoria === "Trabajo"
-                  ? "border-sky-200 bg-sky-50 text-sky-700"
-                  : "border-amber-200 bg-amber-50 text-amber-700"
-              }`}>
-                <span className={`h-1.5 w-1.5 rounded-full ${
-                  detalle.categoria === "Trabajo" ? "bg-sky-500" : "bg-amber-500"
-                }`} />
-                {detalle.categoria}
-              </span>
-            )}
-            <StatusBadge notificado={detalle.notificado} />
+            <CategoriaBadge categoria={detalle.categoria} />
+            <EstadoBadge notificado={detalle.notificado} />
           </div>
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <div className="rounded-xl bg-white/60 border border-violet-200 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600">Última actuación</p>
+          <div className="rounded-xl bg-white/60 border border-indigo-200 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-600">Última actuación</p>
             <p className="mt-1 text-sm font-semibold text-slate-700">
               {fechaUltima ?? <span className="italic font-normal text-slate-400">Sin dato</span>}
             </p>
           </div>
-          <div className="rounded-xl bg-white/60 border border-violet-200 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600">Tipo</p>
+          <div className="rounded-xl bg-white/60 border border-indigo-200 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-600">Tipo</p>
             <p className="mt-1 text-sm font-semibold text-slate-700">
               {detalle.tipo_proceso ?? <span className="italic font-normal text-slate-400">Sin dato</span>}
             </p>
           </div>
-          <div className="rounded-xl bg-white/60 border border-violet-200 px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-600">Clase</p>
+          <div className="rounded-xl bg-white/60 border border-indigo-200 px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-600">Clase</p>
             <p className="mt-1 text-sm font-semibold text-slate-700">
               {detalle.clase_proceso ?? <span className="italic font-normal text-slate-400">Sin dato</span>}
             </p>
@@ -367,20 +345,20 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
 
       {/* ── Sujetos procesales ── */}
       {detalle.sujetos_procesales && (
-        <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-500 mb-3">Sujetos procesales</p>
+        <div className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-500 mb-3">Sujetos procesales</p>
           <p className="whitespace-pre-line text-sm leading-7 text-slate-700">{detalle.sujetos_procesales}</p>
         </div>
       )}
 
       {/* ── Actuaciones (Timeline) ── */}
-      <div className="rounded-2xl border border-violet-100 bg-white p-5 shadow-sm" id="actuaciones">
+      <div className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm" id="actuaciones">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-violet-500">Actuaciones</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-500">Actuaciones</p>
             <h3 className="mt-1 text-lg font-semibold text-slate-800">Historial del proceso</h3>
           </div>
-          <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
+          <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700">
             {typeof total === "number" && total !== cargadas
               ? `${cargadas} de ${total} registros`
               : `${cargadas} registro${cargadas !== 1 ? "s" : ""}`}
@@ -394,6 +372,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
                 key={actuacion.id_reg_actuacion}
                 actuacion={actuacion}
                 isLatest={i === 0}
+                isLast={i === actuaciones.length - 1}
               />
             ))}
           </div>
@@ -411,11 +390,11 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
               type="button"
               onClick={cargarMas}
               disabled={cargandoMas}
-              className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm transition hover:bg-violet-50 active:scale-95 disabled:opacity-50"
+              className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-4 py-2 text-sm font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-50 active:scale-95 disabled:opacity-50"
             >
               {cargandoMas ? (
                 <>
-                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-violet-300 border-t-violet-600" aria-hidden="true" />
+                  <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-indigo-300 border-t-indigo-600" aria-hidden="true" />
                   Cargando...
                 </>
               ) : (

@@ -401,3 +401,53 @@ async def test_novedades_detalle_sin_aviso_registrado(client, auth_headers, test
     assert item["canales_notificados"] is None
     assert item["notificacion_pendiente"] is False
     assert item["intentos_notificacion"] == 0
+
+
+@pytest.mark.asyncio
+async def test_alias_se_guarda_busca_y_limpia(client, auth_headers, test_user, db):
+    from models.proceso import Proceso
+
+    db.add(Proceso(llave_proceso=RADICADO_VALIDO, user_id=test_user.id))
+    db.commit()
+
+    r = await client.patch(f"{PREFIX}/{RADICADO_VALIDO}", json={"alias": "  Cliente Pérez  "}, headers=auth_headers)
+    assert r.status_code == 200
+
+    lista = (await client.get(f"{PREFIX}/?q=pérez", headers=auth_headers)).json()
+    assert lista["total"] == 1 and lista["procesos"][0]["alias"] == "Cliente Pérez"
+    detalle = (await client.get(f"{PREFIX}/{RADICADO_VALIDO}", headers=auth_headers)).json()
+    assert detalle["alias"] == "Cliente Pérez"
+
+    # Cadena vacia limpia el alias; mas de 100 caracteres se rechaza
+    await client.patch(f"{PREFIX}/{RADICADO_VALIDO}", json={"alias": ""}, headers=auth_headers)
+    assert (await client.get(f"{PREFIX}/", headers=auth_headers)).json()["procesos"][0]["alias"] is None
+    largo = await client.patch(f"{PREFIX}/{RADICADO_VALIDO}", json={"alias": "x" * 101}, headers=auth_headers)
+    assert largo.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_orden_global_antes_de_paginar(client, auth_headers, test_user, db):
+    from datetime import datetime
+    from models.proceso import Proceso
+
+    # A: al dia y reciente | B: con novedad y antigua | C: con novedad y reciente
+    datos = [
+        ("05001310301220210012301", True, datetime(2026, 6, 1)),
+        ("05001310301220210012302", False, datetime(2025, 1, 1)),
+        ("05001310301220210012303", False, datetime(2026, 5, 1)),
+    ]
+    for llave, notificado, fecha in datos:
+        db.add(Proceso(llave_proceso=llave, user_id=test_user.id, notificado=notificado, fecha_ultima_actuacion=fecha))
+    db.commit()
+
+    async def llaves(orden, **extra):
+        qs = f"orden={orden}&" + "&".join(f"{k}={v}" for k, v in extra.items())
+        data = (await client.get(f"{PREFIX}/?{qs}", headers=auth_headers)).json()
+        return [p["llave_proceso"][-1] for p in data["procesos"]]
+
+    assert await llaves("novedad") == ["3", "2", "1"]
+    assert await llaves("reciente") == ["1", "3", "2"]
+    assert await llaves("antigua") == ["2", "3", "1"]
+    # La pagina 2 continua el mismo orden global (no reordena dentro de la pagina)
+    assert await llaves("novedad", limit=1, skip=1) == ["2"]
+    assert (await client.get(f"{PREFIX}/?orden=invalido", headers=auth_headers)).status_code == 422

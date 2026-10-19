@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync, getSyncEstado, logoutUser } from "./api"
 import { getCache, setCache, removeCache } from "./api/cache"
 import toast from "react-hot-toast"
-import type { DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync, SyncEstado, SyncIniciado } from "./types"
+import type { Orden, DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync, SyncEstado, SyncIniciado } from "./types"
+import BottomNav from "./components/BottomNav"
 import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
 import { useNavigate, useParams } from "react-router-dom"
@@ -22,9 +23,9 @@ function tiempoRelativo(fecha: string | null | undefined): string {
   return formatearFechaCorta(fecha) ?? "Aún sin sincronizar"
 }
 
-function fetchProcesosNovedades(skip: number, limit: number, categoria?: string, q?: string) {
+function fetchProcesosNovedades(skip: number, limit: number, categoria?: string, q?: string, orden?: Orden) {
   return Promise.all([
-    getProcesos(undefined, undefined, skip, limit, categoria, q),
+    getProcesos(undefined, undefined, skip, limit, categoria, q, orden),
     getNovedades(),
   ])
 }
@@ -52,7 +53,8 @@ export default function App() {
     return () => clearTimeout(t)
   }, [busquedaInput])
 
-  const cacheKey = `lista:${page}:${limit}:${filtroCategoria || ""}:${busqueda || ""}`
+  const [orden, setOrden] = useState<Orden>("novedad")
+  const cacheKey = `lista:${page}:${limit}:${filtroCategoria || ""}:${busqueda || ""}:${orden}`
 
   const [procesos, setProcesos] = useState<ListaProcesos | null>(() => getCache<ListaProcesos>(cacheKey))
   const [novedades, setNovedades] = useState<ListaNovedades | null>(() => getCache<ListaNovedades>("novedades"))
@@ -82,6 +84,10 @@ export default function App() {
     return mejor
   }, [procesos])
 
+  // Las novedades son un conteo global (no dependen del filtro actual).
+  const pendientes = novedades?.total ?? 0
+  const hayFiltro = Boolean(filtroCategoria || busqueda)
+
   const { llaveProceso } = useParams()
   const esDetalle = Boolean(llaveProceso)
   const fetchSeq = useRef(0)
@@ -93,7 +99,7 @@ export default function App() {
     const seq = ++fetchSeq.current
     const skip = (page - 1) * limit
     try {
-      const [p, n] = await fetchProcesosNovedades(skip, limit, filtroCategoria || undefined, busqueda || undefined)
+      const [p, n] = await fetchProcesosNovedades(skip, limit, filtroCategoria || undefined, busqueda || undefined, orden)
       if (seq !== fetchSeq.current) return
       setProcesos(p)
       setNovedades(n)
@@ -103,7 +109,7 @@ export default function App() {
     } catch {
       /* keep showing cached data on error */
     }
-  }, [page, limit, filtroCategoria, busqueda, cacheKey])
+  }, [page, limit, filtroCategoria, busqueda, orden, cacheKey])
 
   useEffect(() => {
     // Se difiere a microtask para no disparar un render en cascada sincrono
@@ -248,14 +254,14 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#f5f3ff] text-slate-900">
-      <header className="border-b border-violet-100 bg-white/90 backdrop-blur-md">
+    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
+      <header className="border-b border-indigo-100 bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex w-full max-w-none items-center justify-between px-4 py-3 sm:px-5">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-violet-500">Mariana's</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-500">Mariana's</p>
             <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">{saludo}, {username}</h1>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hidden items-center gap-2 sm:flex sm:gap-3">
             <button
               onClick={handleSync}
               disabled={syncing}
@@ -270,7 +276,7 @@ export default function App() {
             <button
               onClick={() => navigate("/novedades")}
               aria-label="Ver novedades"
-              className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 sm:px-4 sm:py-2 sm:text-sm"
+              className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:px-4 sm:py-2 sm:text-sm"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -282,7 +288,7 @@ export default function App() {
               target="_blank"
               rel="noreferrer"
               aria-label="Abrir consulta oficial en Rama Judicial"
-              className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-100 sm:px-4 sm:py-2 sm:text-sm"
+              className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:px-4 sm:py-2 sm:text-sm"
             >
               <span className="hidden sm:inline">Consulta oficial</span>
               <span aria-hidden="true">↗</span>
@@ -298,7 +304,7 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-none flex-1 min-h-0 flex-col gap-3 px-4 py-4 sm:px-5 sm:py-5">
+      <main className="mx-auto flex w-full max-w-none flex-1 min-h-0 flex-col gap-3 px-4 py-4 pb-24 sm:px-5 sm:py-5 sm:pb-5">
         {estadoConexion === "conectando" && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm no-print">
             Conectando con la aplicación… si acabas de entrar, puede tardar unos segundos. En un momento verás tus procesos.
@@ -333,7 +339,7 @@ export default function App() {
             ) : currentDetalle ? (
               <DetalleView detalle={currentDetalle} onVolver={volverLista} onActualizado={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista() }} />
             ) : (
-              <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
                 No se encontró el radicado solicitado.
               </div>
             )}
@@ -342,7 +348,7 @@ export default function App() {
           <>
         {syncResult && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm no-print">
-            <span className="font-semibold">Sincronizacion completada:</span>{' '}
+            <span className="font-semibold">Sincronización completada:</span>{' '}
             {syncResult.nuevos} nuevo{syncResult.nuevos !== 1 ? "s" : ""},{" "}
             {syncResult.actualizados} actualizado{syncResult.actualizados !== 1 ? "s" : ""},{" "}
             {syncResult.total_consultados} consultado{syncResult.total_consultados !== 1 ? "s" : ""}
@@ -358,37 +364,40 @@ export default function App() {
               <>
                 <span className="mx-2 inline-block h-3 w-px bg-emerald-300" />
                 <span className="font-medium text-amber-600">
-                  {((syncResult.errores_rama ?? 0) + (syncResult.radicados_saltados_rama?.length ?? 0))} por Rama Judicial (la app esta bien)
+                  {((syncResult.errores_rama ?? 0) + (syncResult.radicados_saltados_rama?.length ?? 0))} por Rama Judicial (la app está bien)
                 </span>
               </>
             ) : null}
           </div>
         )}
-        <section className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-3xl border border-violet-200 bg-violet-50 px-5 py-4 text-slate-900 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-violet-600">Total procesos guardados</p>
-            <p className="mt-1 text-3xl font-black tracking-tight text-violet-900">{procesos?.total ?? 0}</p>
-          </div>
-          <div className="rounded-3xl border border-amber-200 bg-amber-50 px-5 py-4 text-slate-900 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-amber-600">Novedades sin revisar</p>
-            <p className="mt-1 text-3xl font-black tracking-tight text-amber-900">{novedades?.total ?? 0}</p>
-          </div>
-          <div className="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-slate-900 shadow-sm">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-emerald-600">Procesos al día</p>
-            <p className="mt-1 text-3xl font-black tracking-tight text-emerald-900">{Math.max((procesos?.total ?? 0) - (novedades?.total ?? 0), 0)}</p>
-          </div>
-          <div className="rounded-3xl border border-indigo-200 bg-indigo-50 px-5 py-4 text-slate-900 shadow-sm">
-            <p className="text-[11px] font-medium uppercase tracking-[0.15em] text-indigo-600">Última sincronización</p>
-            <p className="mt-1 text-2xl font-black tracking-tight text-indigo-900">
-              {ultimaSync ? tiempoRelativo(ultimaSync) : "Sin datos"}
-            </p>
-            <p className="mt-1 text-xs text-indigo-700">
-              {ultimaSync ? "Datos actualizados desde Rama Judicial." : "Agrega un radicado y sincroniza."}
-            </p>
-          </div>
+        <section className="flex flex-col gap-2 no-print">
+          {pendientes > 0 ? (
+            <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-sm">
+              <p className="text-sm font-semibold">
+                {pendientes} proceso{pendientes !== 1 ? "s" : ""} requiere{pendientes !== 1 ? "n" : ""} revisión
+                <span className="ml-2 font-normal text-amber-800">Tienen actuaciones nuevas sin revisar.</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/novedades")}
+                className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-amber-700 active:scale-95"
+              >
+                Revisar novedades
+              </button>
+            </div>
+          ) : (
+            <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-sm">
+              Todos tus procesos están al día.
+            </div>
+          )}
+          <p className="px-1 text-xs text-slate-600">
+            {procesos?.total ?? 0} proceso{(procesos?.total ?? 0) !== 1 ? "s" : ""} {hayFiltro ? "coinciden con tu búsqueda" : "guardados"}
+            {" · "}
+            {ultimaSync ? `Última sincronización ${tiempoRelativo(ultimaSync)}` : "Aún sin sincronizar: agrega un radicado y pulsa Sincronizar"}
+          </p>
         </section>
 
-        <section className="rounded-3xl border border-violet-100 bg-white p-4 shadow-sm">
+        <section className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex flex-1 flex-col gap-1.5">
               <div className="flex gap-1.5 sm:flex-row sm:items-center sm:gap-2">
@@ -400,10 +409,10 @@ export default function App() {
                     const digitos = e.target.value.replace(/\D/g, "").slice(0, 23)
                     setNewRadicado({ ...newRadicado, llave_proceso: digitos })
                   }}
-                  className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition placeholder:text-violet-400 focus:ring-4 ${
+                  className={`w-full rounded-2xl border px-4 py-3 text-sm outline-none transition placeholder:text-indigo-400 focus:ring-4 ${
                     newRadicado.llave_proceso.length > 0 && newRadicado.llave_proceso.length !== 23
                       ? "border-rose-300 bg-rose-50/30 focus:border-rose-400 focus:ring-rose-100"
-                      : "border-violet-200 bg-violet-50/30 focus:border-violet-400 focus:ring-violet-100"
+                      : "border-indigo-200 bg-indigo-50/30 focus:border-indigo-400 focus:ring-indigo-100"
                   }`}
                   maxLength={23}
                   inputMode="numeric"
@@ -412,7 +421,7 @@ export default function App() {
                   aria-label="Categoría del radicado"
                   value={newRadicado.categoria}
                   onChange={(e) => setNewRadicado({ ...newRadicado, categoria: e.target.value })}
-                  className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-3 text-sm outline-none transition focus:border-violet-400 focus:ring-4 focus:ring-violet-100 sm:w-44"
+                  className="w-full rounded-2xl border border-indigo-200 bg-indigo-50/30 px-4 py-3 text-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100 sm:w-44"
                 >
                   <option value="General">General</option>
                   <option value="Trabajo">Trabajo</option>
@@ -450,67 +459,70 @@ export default function App() {
                   toast.error(err instanceof Error ? err.message : "Error al agregar", { id: loadingToast })
                 }
               }}
-              className="rounded-2xl border border-violet-500 bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-95"
+              className="rounded-2xl border border-indigo-500 bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 active:scale-95"
             >
               Agregar
             </button>
           </div>
         </section>
 
-        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-sm">
-          <div className="flex items-center justify-between border-b border-violet-100 px-4 py-3 sm:px-5">
+        <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-indigo-100 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-indigo-100 px-4 py-3 sm:px-5">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-500">Lista de seguimiento</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-500">Lista de seguimiento</p>
               <h3 className="mt-1 text-base font-semibold text-slate-800 sm:text-lg">Radicados guardados y novedades</h3>
-            </div>
-            <div className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-semibold text-violet-600 sm:text-xs">
-              {procesos?.total ?? 0} guardados · {novedades?.total ?? 0} novedades
-              {ultimaSync ? <span className="hidden sm:inline"> · sincronizado {tiempoRelativo(ultimaSync)}</span> : null}
             </div>
           </div>
 
           {/* ── Filters ── */}
-          <div className="flex flex-col gap-2 border-b border-violet-50 px-4 py-3 sm:flex-row sm:items-center sm:px-5">
-              <div className="flex gap-1">
+          <div className="flex flex-col gap-2 border-b border-indigo-50 px-4 py-3 sm:flex-row sm:items-center sm:px-5">
+              <div className="flex gap-1 overflow-x-auto pb-1 sm:pb-0">
                 {["", "General", "Trabajo", "Consultorio"].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => { setFiltroCategoria(cat); setPage(1) }}
-                  className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+                  className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
                     filtroCategoria === cat
-                      ? "bg-violet-200 text-violet-800"
-                      : "bg-violet-50 text-violet-600 hover:bg-violet-100"
+                      ? "bg-indigo-200 text-indigo-800"
+                      : "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
                   }`}
                 >
                   {cat || "Todas"}
                 </button>
               ))}
             </div>
-            <input
-              ref={searchRef}
-              aria-label="Buscar por radicado, parte o juzgado"
-              title="Buscar (atajo: /)"
-              placeholder="Buscar por radicado, parte o juzgado..."
-              value={busquedaInput}
-              onChange={(e) => { setBusquedaInput(e.target.value); setPage(1) }}
-              className="w-full rounded-2xl border border-violet-200 bg-violet-50/30 px-4 py-2 text-sm outline-none transition placeholder:text-violet-400 focus:border-violet-400 focus:ring-4 focus:ring-violet-100 sm:w-80"
-            />
+            <div className="relative w-full sm:w-96">
+              <svg className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z" />
+              </svg>
+              <input
+                ref={searchRef}
+                type="search"
+                aria-label="Buscar por radicado, cliente, parte o juzgado"
+                title="Buscar (atajo: /)"
+                placeholder="Buscar por radicado, cliente, parte o juzgado"
+                value={busquedaInput}
+                onChange={(e) => { setBusquedaInput(e.target.value); setPage(1) }}
+                className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+              />
+              <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] text-slate-600 sm:block" aria-hidden="true">/</kbd>
+            </div>
           </div>
 
-          <div className="min-h-0 flex-1 border-t border-violet-50">
+          <div className="min-h-0 flex-1 border-t border-indigo-50">
             {loadingLista ? (
               <div className="flex flex-col gap-2 px-1">
                 {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 rounded-2xl border border-violet-100 bg-white px-4 py-3">
-                    <div className="h-3 w-3 shrink-0 animate-pulse rounded-full bg-violet-200" />
-                    <div className="h-3 w-[18ch] animate-pulse rounded bg-violet-100" />
-                    <div className="ml-auto h-3 w-[10ch] animate-pulse rounded bg-violet-100" />
-                    <div className="h-6 w-6 shrink-0 animate-pulse rounded-full bg-violet-100" />
+                  <div key={i} className="flex items-center gap-3 rounded-2xl border border-indigo-100 bg-white px-4 py-3">
+                    <div className="h-3 w-3 shrink-0 animate-pulse rounded-full bg-indigo-200" />
+                    <div className="h-3 w-[18ch] animate-pulse rounded bg-indigo-100" />
+                    <div className="ml-auto h-3 w-[10ch] animate-pulse rounded bg-indigo-100" />
+                    <div className="h-6 w-6 shrink-0 animate-pulse rounded-full bg-indigo-100" />
                   </div>
                 ))}
               </div>
             ) : procesos ? (
-              <TablaProcesos procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista() }} />
+              <TablaProcesos hayFiltro={hayFiltro} orden={orden} onOrden={(o) => { setOrden(o); setPage(1) }} procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista() }} />
             ) : null}
           </div>
         </section>
@@ -519,19 +531,19 @@ export default function App() {
             type="button"
             onClick={() => setPage((current) => Math.max(1, current - 1))}
             disabled={page <= 1}
-            className="rounded-full border border-violet-200 bg-white px-3 py-1.5 font-semibold text-violet-600 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-full border border-indigo-200 bg-white px-3 py-1.5 font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Anterior
           </button>
           <div className="flex items-center gap-3">
-            <div className="rounded-full border border-violet-100 bg-violet-50 px-3 py-1.5 font-semibold text-violet-600">
+            <div className="rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 font-semibold text-indigo-600">
               Página {page} de {procesos?.total_paginas ?? 1}
             </div>
             <select
               aria-label="Procesos por página"
               value={limit}
               onChange={(e) => { setLimit(Number(e.target.value)); setPage(1) }}
-              className="rounded-full border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-600 outline-none transition hover:bg-violet-50"
+              className="rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-600 outline-none transition hover:bg-indigo-50"
             >
               <option value={25}>25/pág</option>
               <option value={50}>50/pág</option>
@@ -542,7 +554,7 @@ export default function App() {
             type="button"
             onClick={() => setPage((current) => current + 1)}
             disabled={page >= (procesos?.total_paginas ?? 1)}
-            className="rounded-full border border-violet-200 bg-white px-3 py-1.5 font-semibold text-violet-600 transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="rounded-full border border-indigo-200 bg-white px-3 py-1.5 font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Siguiente
           </button>
@@ -550,6 +562,15 @@ export default function App() {
           </>
         )}
       </main>
+
+      <BottomNav
+        enDetalle={esDetalle}
+        syncing={syncing}
+        onProcesos={() => volverLista()}
+        onNovedades={() => navigate("/novedades")}
+        onSync={() => { void handleSync() }}
+        onSalir={() => { void handleLogout() }}
+      />
     </div>
   )
 }

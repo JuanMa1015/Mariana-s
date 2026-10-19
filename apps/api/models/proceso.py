@@ -29,6 +29,8 @@ class Proceso(Base):
     notificado = Column(Boolean, default=False)
     tipo_novedad = Column(String, default="nuevo")
     categoria = Column(String, default="General")
+    # Nombre del cliente / etiqueta libre que el abogado asigna al proceso
+    alias = Column(String(100), nullable=True)
     creado_en = Column(DateTime, server_default=func.now())
     actualizado_en = Column(DateTime, onupdate=func.now())
     ultima_sincronizacion = Column(DateTime, nullable=True)
