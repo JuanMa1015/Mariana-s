@@ -45,9 +45,23 @@ jobs:
       - run: npm run lint
       - run: npm run test
 
+      - name: Firebase para notificaciones push (si hay secret)
+        id: fb
+        env:
+          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          if [ -n "$GS_B64" ]; then
+            echo "$GS_B64" | base64 -d > android/app/google-services.json
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Sin GOOGLE_SERVICES_JSON_BASE64: el APK se genera sin notificaciones push."
+            echo "push=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build web con la URL de la API
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_PUSH_ENABLED: ${{ steps.fb.outputs.push }}
         run: |
           [ -n "$VITE_API_URL" ] || { echo "Falta la variable de repositorio VITE_API_URL"; exit 1; }
           npm run build

@@ -14,6 +14,7 @@ from services.logging_config import configurar_logging, set_request_id, get_requ
 from routers.procesos import router as procesos_router
 from routers.auth import router as auth_router
 from routers.admin import router as admin_router
+from routers.dispositivos import router as dispositivos_router
 from config import SENTRY_DSN, CORS_ORIGINS, API_TOKEN
 
 if SENTRY_DSN:
@@ -195,3 +196,4 @@ def health(request: Request, deep: bool = False):
 app.include_router(auth_router)
 app.include_router(procesos_router)
 app.include_router(admin_router)
+app.include_router(dispositivos_router)

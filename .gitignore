@@ -31,3 +31,7 @@ Thumbs.db
 *.keystore
 *.apk
 *.aab
+
+# Firebase: credenciales del proyecto (van como secret de GitHub, no al repo)
+google-services.json
+*firebase-adminsdk*.json

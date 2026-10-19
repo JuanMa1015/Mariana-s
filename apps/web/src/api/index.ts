@@ -93,6 +93,26 @@ export async function registerUser(payload: { email: string; password: string; u
   return data
 }
 
+/** Registra el token push de este celular para el usuario autenticado. */
+export async function registrarDispositivo(token: string) {
+  const res = await fetchWithAuth(`${BASE_URL}/dispositivos/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, plataforma: Capacitor.getPlatform() === "ios" ? "ios" : "android" }),
+  })
+  return res.json()
+}
+
+/** Deja de enviar push a este celular (se llama antes de cerrar sesión). */
+export async function bajaDispositivo(token: string) {
+  const res = await fetchWithAuth(`${BASE_URL}/dispositivos/baja`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token }),
+  })
+  return res.json()
+}
+
 export async function getMe() {
   const res = await fetchWithAuth(`${BASE_URL}/auth/me`)
   return res.json()

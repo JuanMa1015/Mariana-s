@@ -68,6 +68,10 @@ BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
+# Push movil (Firebase Cloud Messaging). JSON completo de la cuenta de servicio de Firebase;
+# vacio = push desactivado (correo y Telegram siguen funcionando).
+FCM_SERVICE_ACCOUNT_JSON = os.getenv("FCM_SERVICE_ACCOUNT_JSON", "")
+
 # Sentry (monitoreo de errores en produccion)
 SENTRY_DSN = os.getenv("SENTRY_DSN", "")
 

@@ -269,6 +269,22 @@ def _fetch_actuaciones_multi(ids_proceso: list[int]) -> dict:
 
 
 
+def _avisar_por_push(notifs: list[dict]) -> None:
+    """Push a la app movil como canal extra: best effort, no afecta la entrega ni los reintentos."""
+    user_id = notifs[0].get("user_id")
+    if user_id is None:
+        return
+    from services.push import notificar_usuario
+
+    if len(notifs) > 3:
+        notificar_usuario(user_id, "Novedades judiciales", f"{len(notifs)} procesos tienen actuaciones nuevas.")
+        return
+    for n in notifs:
+        acts = n.get("actuaciones") or []
+        ultima = (acts[-1].get("actuacion") if acts else None) or "Nueva actuación"
+        notificar_usuario(user_id, "Novedad judicial", f"{n['llave_proceso']}: {ultima}"[:160], n["llave_proceso"])
+
+
 def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list) -> dict[int, str]:
     """Envia notificaciones agrupadas por destinatario.
 
@@ -282,6 +298,7 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
         destinatarios = [email] if email else None
         chat_id = notifs[0].get("telegram_chat_id")
         tiene_telegram_canal = bool(chat_id) and bool(TELEGRAM_BOT_TOKEN)
+        _avisar_por_push(notifs)
         if len(notifs) > 3:
             from services.email_templates import template_resumen
             asunto, cuerpo_html = template_resumen(notifs)
@@ -551,6 +568,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
                     "categoria": radicado.categoria,
                     "telegram_chat_id": telegram_chat_id,
                     "email": user_email,
+                    "user_id": radicado.user_id,
                 })
         else:
             radicado.notificado = True
@@ -591,6 +609,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
                 "categoria": radicado.categoria,
                 "telegram_chat_id": telegram_chat_id,
                 "email": user_email,
+                "user_id": radicado.user_id,
             })
 
     radicado.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None)
