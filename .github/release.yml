@@ -1,0 +1,11 @@
+# Categorias de las notas autogeneradas (PRs) de cada release
+changelog:
+  exclude:
+    labels: [skip-changelog]
+  categories:
+    - title: "Novedades"
+      labels: [feat, enhancement]
+    - title: "Correcciones"
+      labels: [fix, bug]
+    - title: "Otros cambios"
+      labels: ["*"]
