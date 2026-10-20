@@ -122,3 +122,22 @@ async def test_prueba_requiere_push_configurado_y_dispositivo(client, auth_heade
     r = await client.post("/dispositivos/prueba", headers=auth_headers)
     assert r.status_code == 200 and r.json() == {"enviados": 1}
     assert enviados[0][0] == test_user.id and "simulado" in enviados[0][2]
+
+
+@pytest.mark.asyncio
+async def test_prueba_con_demora_responde_antes_de_enviar(client, auth_headers, test_user, db, monkeypatch):
+    from models.dispositivo import Dispositivo
+    from routers import dispositivos
+    from services import push
+
+    monkeypatch.setattr(push, "habilitado", lambda: True)
+    db.add(Dispositivo(user_id=test_user.id, token=TOKEN_A))
+    db.commit()
+    esperas, enviados = [], []
+    monkeypatch.setattr(dispositivos.time, "sleep", lambda s: esperas.append(s))
+    monkeypatch.setattr(push, "notificar_usuario", lambda *a, **k: enviados.append(a) or 1)
+
+    r = await client.post("/dispositivos/prueba?demora=15", headers=auth_headers)
+    assert r.json() == {"enviados": 0, "programado_en": 15}
+    assert esperas == [15] and len(enviados) == 1
+    assert (await client.post("/dispositivos/prueba?demora=999", headers=auth_headers)).status_code == 422

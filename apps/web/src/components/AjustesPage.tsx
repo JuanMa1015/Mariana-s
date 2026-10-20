@@ -1,7 +1,8 @@
-import { useId, useRef, useState } from "react"
+import { useEffect, useId, useRef, useState } from "react"
 import { useNavigate } from "react-router-dom"
 import toast from "react-hot-toast"
-import { borrarAvatar, cambiarUsuario, solicitarCambioPassword, subirAvatar } from "../api"
+import { borrarAvatar, cambiarUsuario, enviarAvisoDePrueba, getMe, solicitarCambioPassword, subirAvatar } from "../api"
+import { activarPush, pedirPermiso, permisoActual, pushDisponible, type EstadoPermiso } from "../push"
 import { useAvatar, recargarAvatar } from "../hooks/useAvatar"
 import { useTitle } from "../hooks/useTitle"
 import { cerrarSesion } from "../session"
@@ -33,6 +34,51 @@ export default function AjustesPage() {
   const [passwordActual, setPasswordActual] = useState("")
   const [ocupado, setOcupado] = useState<null | "foto" | "usuario" | "password">(null)
   const archivoRef = useRef<HTMLInputElement>(null)
+  const [permiso, setPermiso] = useState<EstadoPermiso | null>(null)
+  // Herramienta de soporte oculta (como el «modo desarrollador» de Android): 7 toques sobre la versión
+  const [toquesVersion, setToquesVersion] = useState(0)
+  const modoSoporte = toquesVersion >= 7
+
+  const [esAdmin, setEsAdmin] = useState(false)
+
+  useEffect(() => {
+    getMe().then((me) => setEsAdmin(Boolean(me.es_admin))).catch(() => undefined)
+  }, [])
+
+  useEffect(() => {
+    if (pushDisponible) permisoActual().then(setPermiso).catch(() => undefined)
+  }, [])
+
+  const activarAvisos = async () => {
+    try {
+      const nuevo = await pedirPermiso()
+      setPermiso(nuevo)
+      if (nuevo === "granted") {
+        await activarPush()
+        toast.success("Avisos activados")
+      }
+    } catch {
+      toast.error("No se pudieron activar los avisos")
+    }
+  }
+
+  const probarAvisos = async (demora: number) => {
+    const t = toast.loading("Enviando aviso de prueba...")
+    try {
+      const r = await enviarAvisoDePrueba(demora)
+      if (r.programado_en) toast.success(`Programado: llega en ${r.programado_en} s. Cierra la app ahora.`, { id: t, duration: 6000 })
+      else if (r.enviados > 0) toast.success("Enviado", { id: t })
+      else toast.error("El servidor no pudo entregarlo", { id: t })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo enviar", { id: t })
+    }
+  }
+
+  const tocarVersion = () => {
+    const n = toquesVersion + 1
+    setToquesVersion(n)
+    if (n === 7) toast("Herramientas de soporte activadas", { icon: "🛠️" })
+  }
   const idUsuario = useId()
   const idPassword = useId()
 
@@ -186,6 +232,30 @@ export default function AjustesPage() {
           </div>
         </section>
 
+        {pushDisponible && (
+          <section className={tarjeta} aria-labelledby="t-avisos">
+            <h2 id="t-avisos" className="text-sm font-bold text-slate-800">Notificaciones</h2>
+            {permiso === "granted" && <p className="mt-2 text-sm text-slate-600">Activadas: te avisamos en este celular cuando uno de tus procesos tenga actuaciones nuevas, aunque la app esté cerrada.</p>}
+            {permiso === "prompt" && (
+              <>
+                <p className="mt-2 text-sm text-slate-600">Recibe un aviso al instante cuando haya actuaciones nuevas en tus procesos.</p>
+                <button type="button" onClick={activarAvisos} className={`${botonPrimario} mt-3`}>Activar avisos</button>
+              </>
+            )}
+            {permiso === "denied" && <p className="mt-2 text-sm text-slate-600">Están bloqueadas. Actívalas en los ajustes del celular: Aplicaciones → Mariana's → Notificaciones.</p>}
+            {modoSoporte && permiso === "granted" && (
+              <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs font-semibold text-amber-800">Soporte: probar avisos</p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => probarAvisos(0)} className={botonSecundario}>Enviar ahora</button>
+                  <button type="button" onClick={() => probarAvisos(15)} className={botonSecundario}>Enviar en 15 s</button>
+                </div>
+                <p className="mt-2 text-xs text-amber-800">Con «en 15 s» cierra la app por completo: el aviso debe llegar a la bandeja del celular.</p>
+              </div>
+            )}
+          </section>
+        )}
+
         <section className={tarjeta} aria-labelledby="t-seguridad">
           <h2 id="t-seguridad" className="text-sm font-bold text-slate-800">Seguridad</h2>
           <p className="mt-2 text-sm text-slate-600">Para cambiar tu contraseña te enviamos un enlace de un solo uso a tu correo. Al cambiarla se cierran tus sesiones abiertas.</p>
@@ -193,6 +263,14 @@ export default function AjustesPage() {
             {ocupado === "password" ? "Enviando..." : "Enviarme el enlace por correo"}
           </button>
         </section>
+
+        {esAdmin && (
+          <section className={tarjeta} aria-labelledby="t-admin">
+            <h2 id="t-admin" className="text-sm font-bold text-slate-800">Administración</h2>
+            <p className="mt-2 text-sm text-slate-600">Usuarios, procesos, dispositivos, pruebas del sistema y registro de actividad.</p>
+            <button type="button" onClick={() => navigate("/admin")} className={`${botonPrimario} mt-3`}>Abrir panel de administración</button>
+          </section>
+        )}
 
         <section className={tarjeta} aria-labelledby="t-cuenta">
           <h2 id="t-cuenta" className="text-sm font-bold text-slate-800">Cuenta</h2>
@@ -202,7 +280,7 @@ export default function AjustesPage() {
             </a>
             <button type="button" onClick={salir} className={`${botonSecundario} !border-rose-200 !text-rose-600`}>Cerrar sesión</button>
           </div>
-          <p className="mt-4 text-xs text-slate-500">Mariana's v{__APP_VERSION__}</p>
+          <button type="button" onClick={tocarVersion} className="mt-4 block min-h-8 text-xs text-slate-500">Mariana's v{__APP_VERSION__}</button>
         </section>
       </main>
     </div>

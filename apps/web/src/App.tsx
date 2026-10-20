@@ -4,7 +4,7 @@ import { getCache, setCache, removeCache } from "./api/cache"
 import toast from "react-hot-toast"
 import type { Orden, DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync, SyncEstado, SyncIniciado } from "./types"
 import BottomNav from "./components/BottomNav"
-import AvisosPush from "./components/AvisosPush"
+import AvisoPermisoPush from "./components/AvisoPermisoPush"
 import Avatar from "./components/Avatar"
 import { useAvatar } from "./hooks/useAvatar"
 import { cerrarSesion } from "./session"
@@ -318,7 +318,7 @@ export default function App() {
       </header>
 
       <main className="mx-auto flex w-full max-w-none flex-1 min-h-0 flex-col gap-3 px-4 py-4 pb-24 sm:px-5 sm:py-5 sm:pb-5">
-        <AvisosPush onAbrirProceso={abrirDetalle} />
+        <AvisoPermisoPush />
         {estadoConexion === "conectando" && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm no-print">
             Conectando con la aplicación… si acabas de entrar, puede tardar unos segundos. En un momento verás tus procesos.

@@ -8,7 +8,7 @@ from sqlalchemy import pool
 from alembic import context
 
 from models.database import Base
-from models import proceso, user, actuacion, documento_actuacion, dispositivo, password_reset
+from models import proceso, user, actuacion, documento_actuacion, dispositivo, password_reset, audit_log
 
 config = context.config
 

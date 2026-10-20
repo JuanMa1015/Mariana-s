@@ -9,21 +9,38 @@ const push = vi.hoisted(() => ({
   escucharPush: vi.fn(async () => () => undefined),
 }))
 vi.mock("../push", () => push)
-vi.mock("../api", () => ({ enviarAvisoDePrueba: vi.fn(async () => ({ enviados: 1 })) }))
-vi.mock("react-hot-toast", () => ({ default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), loading: vi.fn(() => "t") }) }))
+vi.mock("react-hot-toast", () => ({ default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }))
 
 import AvisosPush from "./AvisosPush"
+import AvisoPermisoPush from "./AvisoPermisoPush"
 
-describe("AvisosPush", () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-    localStorage.clear()
+beforeEach(() => {
+  vi.clearAllMocks()
+  localStorage.clear()
+})
+
+describe("AvisosPush (conexión sin interfaz)", () => {
+  it("conecta los eventos y registra el celular si el permiso ya está concedido", async () => {
+    push.permisoActual.mockResolvedValue("granted")
+    const { container } = render(<AvisosPush onAbrirProceso={() => undefined} />)
+    await waitFor(() => expect(push.activarPush).toHaveBeenCalledTimes(1))
+    expect(push.escucharPush).toHaveBeenCalledTimes(1)
+    expect(container).toBeEmptyDOMElement()
   })
 
+  it("no registra el celular mientras el usuario no haya dado permiso", async () => {
+    push.permisoActual.mockResolvedValue("prompt")
+    render(<AvisosPush onAbrirProceso={() => undefined} />)
+    await waitFor(() => expect(push.permisoActual).toHaveBeenCalled())
+    expect(push.activarPush).not.toHaveBeenCalled()
+  })
+})
+
+describe("AvisoPermisoPush (tarjeta de la pantalla principal)", () => {
   it("explica y pide el permiso solo cuando el usuario pulsa Activar", async () => {
     push.permisoActual.mockResolvedValue("prompt")
     push.pedirPermiso.mockResolvedValue("granted")
-    render(<AvisosPush onAbrirProceso={() => undefined} />)
+    render(<AvisoPermisoPush />)
 
     expect(await screen.findByText("Activa los avisos en tu celular")).toBeInTheDocument()
     expect(push.pedirPermiso).not.toHaveBeenCalled()
@@ -33,29 +50,20 @@ describe("AvisosPush", () => {
     expect(screen.queryByRole("region", { name: "Avisos en tu celular" })).not.toBeInTheDocument()
   })
 
-  it("si el permiso ya está concedido se registra sin mostrar el aviso", async () => {
+  it("con los avisos activos no muestra nada (ni botón de prueba)", async () => {
     push.permisoActual.mockResolvedValue("granted")
-    render(<AvisosPush onAbrirProceso={() => undefined} />)
-    await waitFor(() => expect(push.activarPush).toHaveBeenCalledTimes(1))
-    expect(screen.queryByRole("region")).not.toBeInTheDocument()
+    const { container } = render(<AvisoPermisoPush />)
+    await waitFor(() => expect(push.permisoActual).toHaveBeenCalled())
+    expect(container).toBeEmptyDOMElement()
+    expect(screen.queryByText(/prueba/i)).not.toBeInTheDocument()
   })
 
-  it("si está bloqueado explica cómo habilitarlo y 'Ahora no' lo pospone", async () => {
+  it("si está bloqueado explica cómo habilitarlo y «Entendido» lo pospone", async () => {
     push.permisoActual.mockResolvedValue("denied")
-    render(<AvisosPush onAbrirProceso={() => undefined} />)
+    render(<AvisoPermisoPush />)
     expect(await screen.findByText("Los avisos están bloqueados")).toBeInTheDocument()
     fireEvent.click(screen.getByRole("button", { name: "Entendido" }))
     expect(screen.queryByRole("region")).not.toBeInTheDocument()
     expect(localStorage.getItem("mariana_push_snooze")).not.toBeNull()
-  })
-})
-
-describe("AvisosPush: aviso de prueba", () => {
-  it("con permiso concedido permite simular una novedad", async () => {
-    push.permisoActual.mockResolvedValue("granted")
-    const { enviarAvisoDePrueba } = await import("../api")
-    render(<AvisosPush onAbrirProceso={() => undefined} />)
-    fireEvent.click(await screen.findByRole("button", { name: "Enviar prueba" }))
-    await waitFor(() => expect(enviarAvisoDePrueba).toHaveBeenCalledTimes(1))
   })
 })

@@ -5,6 +5,29 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-19
+
+Panel de administración.
+
+### Añadido
+- **Panel de administración** (`/admin`, desde Ajustes) para cuentas con rol de administrador: resumen del sistema, gestión completa de usuarios (crear con invitación, editar, suspender, cerrar sesiones, eliminar), procesos de todos los usuarios, celulares registrados para push y registro de auditoría.
+- **Pruebas y diagnóstico** dentro del panel: base de datos y migraciones, configuración, registro, ingreso, restablecer contraseña, ingreso de radicados, correo, push, Telegram y Rama Judicial, con resultado paso a paso y modo «ejecutar todas» sin envíos reales.
+- Roles y estado de cuenta: `is_admin`, `activo` (cuenta suspendida) y último acceso. Los administradores se definen con la variable `ADMIN_EMAILS` o desde el panel; no hay usuario ni contraseña por defecto.
+- Los avisos push se gestionan en Ajustes → Notificaciones; «Probar avisos» queda como herramienta de soporte oculta.
+
+### Notas de despliegue
+- Incluye la migración `a7c3d5e9f1b2` (columnas de rol/estado en `users` y tabla `audit_log`), aditiva; se aplica sola al arrancar la API.
+- Para tener un primer administrador, define `ADMIN_EMAILS` en Render con tu correo. Ver `docs/panel-admin.md`.
+
+## [0.3.1] - 2026-10-19
+
+### Cambiado
+- Los avisos push se gestionan en **Ajustes → Notificaciones** (estado y activación). La pantalla principal ya no muestra el botón «Enviar prueba» ni la franja de «avisos activados»; solo aparece la tarjeta para activarlos si falta el permiso.
+- «Probar avisos» pasa a ser una herramienta de soporte oculta (siete toques sobre la versión, en Ajustes). Permite enviar el aviso «en 15 s» para cerrar la app y comprobar que llega a la bandeja del celular.
+
+### Corregido
+- Los avisos push quedan conectados en todas las pantallas privadas (antes solo en la lista de procesos): activarlos desde Ajustes ahora registra el celular de inmediato.
+
 ## [0.3.0] - 2026-10-19
 
 Pulido de la app móvil y prueba de avisos.
@@ -69,7 +92,9 @@ Primera versión móvil (Android) y mejoras de experiencia para abogados.
 - Colores de categoría consistentes; línea sobrante del historial de actuaciones.
 - Tildes faltantes en el panel.
 
-[Unreleased]: https://github.com/JuanMa1015/Mariana-s/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/JuanMa1015/Mariana-s/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/JuanMa1015/Mariana-s/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/JuanMa1015/Mariana-s/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/JuanMa1015/Mariana-s/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/JuanMa1015/Mariana-s/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JuanMa1015/Mariana-s/releases/tag/v0.1.0

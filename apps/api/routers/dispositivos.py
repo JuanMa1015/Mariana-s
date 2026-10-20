@@ -1,6 +1,7 @@
+import time
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, constr
 from sqlalchemy.orm import Session
 
@@ -65,6 +66,8 @@ def dar_de_baja_dispositivo(
 @limiter.limit("5/minute")
 def enviar_aviso_de_prueba(
     request: Request,
+    tareas: BackgroundTasks,
+    demora: int = Query(0, ge=0, le=60, description="Segundos de espera antes de enviar (para cerrar la app y probar con ella cerrada)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -85,7 +88,14 @@ def enviar_aviso_de_prueba(
     )
     llave = proceso.llave_proceso if proceso else None
     detalle = f"{llave}: " if llave else ""
-    enviados = push.notificar_usuario(
-        current_user.id, "Novedad judicial (prueba)", f"{detalle}Auto que fija fecha de audiencia (aviso simulado)", llave
-    )
-    return {"enviados": enviados}
+    titulo, cuerpo = "Novedad judicial (prueba)", f"{detalle}Auto que fija fecha de audiencia (aviso simulado)"
+    if demora:
+        # Con demora, el aviso sale despues de responder: da tiempo de cerrar la app antes de que llegue
+        tareas.add_task(_enviar_tras_espera, demora, current_user.id, titulo, cuerpo, llave)
+        return {"enviados": 0, "programado_en": demora}
+    return {"enviados": push.notificar_usuario(current_user.id, titulo, cuerpo, llave)}
+
+
+def _enviar_tras_espera(segundos: int, user_id: int, titulo: str, cuerpo: str, llave: str | None) -> None:
+    time.sleep(segundos)
+    push.notificar_usuario(user_id, titulo, cuerpo, llave)
