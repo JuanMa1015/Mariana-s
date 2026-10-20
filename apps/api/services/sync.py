@@ -277,16 +277,17 @@ def _avisar_por_push(notifs: list[dict]) -> set[int]:
     user_id = notifs[0].get("user_id")
     if user_id is None:
         return set()
-    from services.push import notificar_usuario
+    from services.push import armar_aviso, armar_resumen, notificar_usuario
 
     if len(notifs) > 3:
-        ok = notificar_usuario(user_id, "Novedades judiciales", f"{len(notifs)} procesos tienen actuaciones nuevas.") > 0
+        titulo, cuerpo = armar_resumen(notifs)
+        ok = notificar_usuario(user_id, titulo, cuerpo, tag="resumen") > 0
         return {n["proceso_id"] for n in notifs if ok and n.get("proceso_id") is not None}
     con_push: set[int] = set()
     for n in notifs:
-        acts = n.get("actuaciones") or []
-        ultima = (acts[-1].get("actuacion") if acts else None) or "Nueva actuación"
-        if notificar_usuario(user_id, "Novedad judicial", f"{n['llave_proceso']}: {ultima}"[:160], n["llave_proceso"]) > 0 and n.get("proceso_id") is not None:
+        titulo, cuerpo = armar_aviso(n)
+        # tag = radicado: si el mismo proceso vuelve a tener novedad, el aviso nuevo reemplaza al anterior
+        if notificar_usuario(user_id, titulo, cuerpo, n["llave_proceso"], tag=n["llave_proceso"]) > 0 and n.get("proceso_id") is not None:
             con_push.add(n["proceso_id"])
     return con_push
 
@@ -581,6 +582,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
                     "telegram_chat_id": telegram_chat_id,
                     "email": user_email,
                     "user_id": radicado.user_id,
+                    "alias": radicado.alias,
                 })
         else:
             radicado.notificado = True
@@ -622,6 +624,7 @@ def _aplicar_datos_remotos(db: Session, radicado: Proceso, datos: dict, nuevos: 
                 "telegram_chat_id": telegram_chat_id,
                 "email": user_email,
                 "user_id": radicado.user_id,
+                "alias": radicado.alias,
             })
 
     radicado.ultima_sincronizacion = datetime.now(timezone.utc).replace(tzinfo=None)

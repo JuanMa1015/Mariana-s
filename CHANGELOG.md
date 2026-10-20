@@ -5,6 +5,11 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ## [Unreleased]
 
+### Cambiado
+- **Avisos push más útiles:** muestran el radicado, el nombre del cliente (alias), la actuación nueva, el despacho, la anotación, la fecha y si trae documentos. Plegado se ve el radicado; al desplegar el aviso, el resto. Si el mismo proceso vuelve a tener novedad, el aviso reemplaza al anterior en vez de apilarse, y cuando llegan más de tres a la vez se agrupan en un solo aviso.
+- «Enviar prueba» y la prueba de push del panel usan el mismo formato, con los datos reales del proceso más reciente del usuario y la marca «[Prueba]».
+- El contenido se arma en el servidor: no requiere instalar una APK nueva.
+
 ## [0.4.1] - 2026-10-20
 
 ### Corregido

@@ -335,12 +335,12 @@ def prueba_push(db: Session, admin: User, p: dict) -> Pasos:
     r.ok("Celulares registrados del usuario", str(n)) if n else r.aviso("Celulares registrados del usuario", "ninguno: la persona debe activar los avisos en la app")
     if p.get("enviar", True) and n:
         demora = max(0, min(int(p.get("demora") or 0), 60))
-        titulo, cuerpo = "Novedad judicial (prueba)", "Aviso de prueba enviado desde el panel de administración"
+        titulo, cuerpo, llave = push.ejemplo_de_aviso(db, usuario_id)
         if demora:
-            threading.Timer(demora, push.notificar_usuario, args=(usuario_id, titulo, cuerpo)).start()
+            threading.Timer(demora, push.notificar_usuario, args=(usuario_id, titulo, cuerpo, llave), kwargs={"tag": "prueba"}).start()
             r.ok("Aviso programado", f"llegará en {demora} s: cierra la app para probar con ella cerrada")
         else:
-            res = push.notificar_usuario_detalle(usuario_id, titulo, cuerpo)
+            res = push.notificar_usuario_detalle(usuario_id, titulo, cuerpo, llave, tag="prueba")
             if res.aceptados:
                 r.ok("Aviso aceptado por FCM", f"{res.aceptados} de {res.dispositivos} celular(es)")
             else:
