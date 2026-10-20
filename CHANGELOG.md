@@ -5,6 +5,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-20
+
+### Corregido
+- Los avisos push ya no se daban por entregados cuando Firebase los rechazaba (error de permisos, fallo de autenticación o red): el recuento incluía los envíos fallidos, y la prueba mostraba «Enviado» aunque no hubiera llegado nada.
+
+### Añadido
+- Cada aviso push deja una línea en el registro del servidor (usuario, celulares, aceptados y motivo de los fallos) para poder reconstruir por qué no llegó.
+- Las novedades registran si el aviso también llegó a la app del celular: «Avisado: Correo, Telegram, App» en Novedades y en el panel de administración.
+- La prueba de push del panel y «Enviar prueba» explican el motivo cuando Firebase no acepta el aviso (token caducado, permiso denegado, etc.).
+
 ## [0.4.0] - 2026-10-19
 
 Panel de administración.
@@ -92,7 +102,8 @@ Primera versión móvil (Android) y mejoras de experiencia para abogados.
 - Colores de categoría consistentes; línea sobrante del historial de actuaciones.
 - Tildes faltantes en el panel.
 
-[Unreleased]: https://github.com/JuanMa1015/Mariana-s/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/JuanMa1015/Mariana-s/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/JuanMa1015/Mariana-s/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/JuanMa1015/Mariana-s/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/JuanMa1015/Mariana-s/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/JuanMa1015/Mariana-s/compare/v0.2.0...v0.3.0

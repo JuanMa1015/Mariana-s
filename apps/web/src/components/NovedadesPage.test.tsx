@@ -128,6 +128,16 @@ describe("NovedadesPage", () => {
     })
   })
 
+  it("indica cuando el aviso también llegó a la app del celular (push)", async () => {
+    vi.mocked((await import("../api")).getNovedadesDetalle).mockResolvedValue({
+      total: 1,
+      novedades: [{ ...NOVEDADES_MOCK.novedades[0], notificacion_pendiente: false, canales_notificados: "email+telegram+push" }],
+    })
+    const { default: NovedadesPage } = await import("./NovedadesPage")
+    render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
+    await waitFor(() => expect(screen.getByText(/correo, telegram, app/i)).toBeInTheDocument())
+  })
+
   it("no muestra insignia cuando la novedad no tiene registro de envio (legacy)", async () => {
     vi.mocked((await import("../api")).getNovedadesDetalle).mockResolvedValue({
       total: 1,

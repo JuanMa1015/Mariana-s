@@ -93,7 +93,8 @@ def enviar_aviso_de_prueba(
         # Con demora, el aviso sale despues de responder: da tiempo de cerrar la app antes de que llegue
         tareas.add_task(_enviar_tras_espera, demora, current_user.id, titulo, cuerpo, llave)
         return {"enviados": 0, "programado_en": demora}
-    return {"enviados": push.notificar_usuario(current_user.id, titulo, cuerpo, llave)}
+    res = push.notificar_usuario_detalle(current_user.id, titulo, cuerpo, llave)
+    return {"enviados": res.aceptados, "errores": res.errores, "caducados": len(res.tokens_invalidos)}
 
 
 def _enviar_tras_espera(segundos: int, user_id: int, titulo: str, cuerpo: str, llave: str | None) -> None:

@@ -269,20 +269,26 @@ def _fetch_actuaciones_multi(ids_proceso: list[int]) -> dict:
 
 
 
-def _avisar_por_push(notifs: list[dict]) -> None:
-    """Push a la app movil como canal extra: best effort, no afecta la entrega ni los reintentos."""
+def _avisar_por_push(notifs: list[dict]) -> set[int]:
+    """Push a la app movil como canal extra: best effort, no afecta la entrega ni los reintentos.
+
+    Retorna los proceso_id cuyo aviso FCM acepto en al menos un celular (se registra como canal "push").
+    """
     user_id = notifs[0].get("user_id")
     if user_id is None:
-        return
+        return set()
     from services.push import notificar_usuario
 
     if len(notifs) > 3:
-        notificar_usuario(user_id, "Novedades judiciales", f"{len(notifs)} procesos tienen actuaciones nuevas.")
-        return
+        ok = notificar_usuario(user_id, "Novedades judiciales", f"{len(notifs)} procesos tienen actuaciones nuevas.") > 0
+        return {n["proceso_id"] for n in notifs if ok and n.get("proceso_id") is not None}
+    con_push: set[int] = set()
     for n in notifs:
         acts = n.get("actuaciones") or []
         ultima = (acts[-1].get("actuacion") if acts else None) or "Nueva actuación"
-        notificar_usuario(user_id, "Novedad judicial", f"{n['llave_proceso']}: {ultima}"[:160], n["llave_proceso"])
+        if notificar_usuario(user_id, "Novedad judicial", f"{n['llave_proceso']}: {ultima}"[:160], n["llave_proceso"]) > 0 and n.get("proceso_id") is not None:
+            con_push.add(n["proceso_id"])
+    return con_push
 
 
 def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_enviados: list) -> dict[int, str]:
@@ -293,12 +299,14 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
     donde dos usuarios siguen el mismo radicado).
     """
     entregadas: dict[int, str] = {}
+    con_push_total: set[int] = set()
     for llave_grupo, notifs in acumuladas.items():
         email = notifs[0].get("email")
         destinatarios = [email] if email else None
         chat_id = notifs[0].get("telegram_chat_id")
         tiene_telegram_canal = bool(chat_id) and bool(TELEGRAM_BOT_TOKEN)
-        _avisar_por_push(notifs)
+        con_push = _avisar_por_push(notifs)
+        con_push_total |= con_push
         if len(notifs) > 3:
             from services.email_templates import template_resumen
             asunto, cuerpo_html = template_resumen(notifs)
@@ -349,6 +357,10 @@ def _enviar_notificaciones_acumuladas(acumuladas: dict[str, list[dict]], emails_
                             _canales_entregados(res, bool(destinatarios), tiene_telegram_canal) or ""
                         )
                 time.sleep(0.5)
+    # El canal push se anota solo en avisos ya entregados por correo/Telegram (si no, la novedad sigue pendiente)
+    for proceso_id in con_push_total:
+        if proceso_id in entregadas:
+            entregadas[proceso_id] = "+".join(filter(None, [entregadas[proceso_id], "push"]))
     return entregadas
 
 

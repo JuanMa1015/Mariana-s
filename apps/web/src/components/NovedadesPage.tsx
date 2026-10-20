@@ -150,10 +150,21 @@ function InsigniaAviso({ novedad, intentosMax = 5 }: { novedad: NovedadDetalle; 
           Telegram<span className="hidden sm:inline"> avisado</span>
         </span>
       )
-    default:
+    default: {
+      // Combinaciones con la app ("email+push", "email+telegram+push"…): se arma la lista de canales
+      if (novedad.canales_notificados?.includes("push")) {
+        const nombres = { email: "Correo", telegram: "Telegram", push: "App" } as Record<string, string>
+        const lista = novedad.canales_notificados.split("+").map((c) => nombres[c] ?? c)
+        return (
+          <span className={`${base} bg-emerald-100 text-emerald-700`} title={`El aviso llegó por ${lista.join(", ")}`}>
+            Avisado<span className="hidden sm:inline">: {lista.join(", ")}</span>
+          </span>
+        )
+      }
       // Novedades anteriores al registro de canales: sin dato confiable,
       // mejor no mostrar nada que mostrar algo equivocado.
       return null
+    }
   }
 }
 

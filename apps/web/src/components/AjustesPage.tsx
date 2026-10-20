@@ -68,7 +68,7 @@ export default function AjustesPage() {
       const r = await enviarAvisoDePrueba(demora)
       if (r.programado_en) toast.success(`Programado: llega en ${r.programado_en} s. Cierra la app ahora.`, { id: t, duration: 6000 })
       else if (r.enviados > 0) toast.success("Enviado", { id: t })
-      else toast.error("El servidor no pudo entregarlo", { id: t })
+      else toast.error(`FCM no lo aceptó: ${r.errores?.[0] ?? (r.caducados ? "el celular estaba caducado; abre la app de nuevo" : "sin detalle")}`, { id: t, duration: 8000 })
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo enviar", { id: t })
     }

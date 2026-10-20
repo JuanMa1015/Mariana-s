@@ -104,7 +104,7 @@ export async function registrarDispositivo(token: string) {
 }
 
 /** Pide al servidor un aviso push de ejemplo (simula una novedad); `demora` da tiempo de cerrar la app. */
-export async function enviarAvisoDePrueba(demora = 0): Promise<{ enviados: number; programado_en?: number }> {
+export async function enviarAvisoDePrueba(demora = 0): Promise<{ enviados: number; programado_en?: number; errores?: string[]; caducados?: number }> {
   const res = await fetchWithAuth(`${BASE_URL}/dispositivos/prueba?demora=${demora}`, { method: "POST" })
   if (!res.ok) throw new Error((await res.json()).detail || "No se pudo enviar el aviso de prueba")
   return res.json()
