@@ -36,6 +36,16 @@ body {
   overscroll-behavior-y: none;
 }
 
+/* App móvil edge-to-edge: la barra de estado no debe superponerse al contenido que se desplaza */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: env(safe-area-inset-top);
+  background: var(--surface, #fff);
+  z-index: 60;
+}
+
 @media (max-width: 640px) {
   input,
   select,
@@ -43,3 +53,79 @@ body {
     font-size: 16px !important;
   }
 }
+
+/* ───────── Modo oscuro ─────────
+   Tailwind 4 expone la paleta como variables CSS. Con la clase `dark` en <html> se
+   redefinen las que se usan como fondo/borde/texto neutro, y las clases existentes
+   (bg-slate-50, border-indigo-200, text-slate-800…) cambian solas sin duplicarlas. */
+:root {
+  --surface: #fff;
+  --toast-bg: #f5f3ff;
+  --toast-fg: #5b21b6;
+  --toast-border: #ddd6fe;
+}
+
+.dark {
+  --surface: #111a2e;
+  --toast-bg: #1e2552;
+  --toast-fg: #c7d2fe;
+  --toast-border: #2c3478;
+
+  --color-slate-50: #0b1120;
+  --color-slate-100: #1a2540;
+  --color-slate-200: #25324f;
+  --color-slate-300: #34456a;
+  --color-slate-400: #7b8aa8;
+  --color-slate-500: #94a3b8;
+  --color-slate-600: #a9b6cb;
+  --color-slate-700: #c7d1e0;
+  --color-slate-800: #e2e8f0;
+  --color-slate-900: #f1f5f9;
+  --color-slate-950: #f8fafc;
+
+  --color-indigo-50: #161b3f;
+  --color-indigo-100: #1e2552;
+  --color-indigo-200: #2c3478;
+  --color-indigo-300: #3d47a1;
+  --color-violet-50: #1b1740;
+  --color-violet-100: #261f55;
+  --color-violet-200: #382d7a;
+  --color-violet-300: #4b3da3;
+  --color-amber-50: #2b1d08;
+  --color-amber-100: #3d2a0b;
+  --color-amber-200: #5e4310;
+  --color-amber-300: #8a6215;
+  --color-emerald-50: #072820;
+  --color-emerald-100: #0a3a2d;
+  --color-emerald-200: #135640;
+  --color-emerald-300: #1c7a58;
+  --color-rose-50: #2d1019;
+  --color-rose-100: #401621;
+  --color-rose-200: #65202f;
+  --color-rose-300: #8b2c42;
+  --color-sky-50: #082233;
+  --color-sky-100: #0c3249;
+  --color-sky-200: #124f6e;
+  --color-sky-300: #1b6f98;
+}
+
+/* text-white y bg-white comparten variable, por eso el fondo blanco se remapea por clase */
+.dark .bg-white { background-color: var(--surface); }
+.dark [class*="bg-white/"] { background-color: color-mix(in srgb, var(--surface) 92%, transparent); }
+.dark body { background-color: var(--color-slate-50); color: var(--color-slate-800); }
+
+/* Textos de color: tonos claros legibles sobre fondos oscuros (los botones sólidos 600/700 no cambian) */
+.dark :is([class~="text-indigo-500"], [class~="text-indigo-600"], [class~="text-indigo-700"], [class~="text-indigo-800"], [class~="text-indigo-900"]) { color: #a5b4fc; }
+.dark :is([class~="text-violet-500"], [class~="text-violet-600"], [class~="text-violet-700"], [class~="text-violet-800"], [class~="text-violet-900"]) { color: #c4b5fd; }
+.dark :is([class~="text-amber-500"], [class~="text-amber-600"], [class~="text-amber-700"], [class~="text-amber-800"], [class~="text-amber-900"]) { color: #fcd34d; }
+.dark :is([class~="text-emerald-500"], [class~="text-emerald-600"], [class~="text-emerald-700"], [class~="text-emerald-800"], [class~="text-emerald-900"]) { color: #6ee7b7; }
+.dark :is([class~="text-rose-500"], [class~="text-rose-600"], [class~="text-rose-700"], [class~="text-rose-800"], [class~="text-rose-900"]) { color: #fda4af; }
+.dark :is([class~="text-sky-500"], [class~="text-sky-600"], [class~="text-sky-700"], [class~="text-sky-800"], [class~="text-sky-900"]) { color: #7dd3fc; }
+
+/* Los botones sólidos conservan texto blanco aunque la regla anterior coincida */
+.dark :is([class~="bg-indigo-600"], [class~="bg-violet-600"], [class~="bg-amber-600"], [class~="bg-emerald-600"], [class~="bg-rose-600"]) { color: #fff; }
+
+/* Degradados que terminan en blanco (to-white, from-white…) deben terminar en el fondo oscuro */
+.dark [class*="from-white"] { --tw-gradient-from: var(--surface); }
+.dark [class*="via-white"] { --tw-gradient-via: var(--surface); }
+.dark [class*="to-white"] { --tw-gradient-to: var(--surface); }

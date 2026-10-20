@@ -54,7 +54,7 @@ export default function Login() {
   }`
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f7fb] text-slate-900 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-900 px-4">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Mariana's</p>
@@ -136,6 +136,7 @@ export default function Login() {
             />
             <label htmlFor="remember" className="text-sm text-slate-600">Recordarme</label>
           </div>
+          <p className="-mb-1 text-right text-sm"><Link to="/olvide" className="font-semibold text-violet-500 hover:underline">¿Olvidaste tu contraseña?</Link></p>
           <button type="submit" className="mt-2 w-full rounded-2xl border border-violet-500 bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-95 focus-visible:outline-none">
             Ingresar
           </button>

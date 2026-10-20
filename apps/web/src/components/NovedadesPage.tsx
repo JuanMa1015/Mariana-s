@@ -294,7 +294,7 @@ export default function NovedadesPage() {
           </div>
         ) : (
           <>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm font-semibold text-slate-600">
                 {data.total} proceso{data.total > 1 ? "s" : ""} con novedades
               </p>
@@ -302,10 +302,11 @@ export default function NovedadesPage() {
                 <button
                   onClick={handleMarcarTodo}
                   disabled={marcando}
-                  className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40"
+                  className="whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40"
                 >
-                  {marcando ? "Marcando..." : "Marcar todo como leido"}
+                  {marcando ? "Marcando..." : "Marcar todo como leído"}
                 </button>
+                {totalPages > 1 && (<>
                 <button
                   onClick={() => { setLoading(true); setSkip((s) => Math.max(0, s - limit)) }}
                   disabled={skip === 0}
@@ -323,6 +324,7 @@ export default function NovedadesPage() {
                 >
                   Siguiente →
                 </button>
+                </>)}
               </div>
             </div>
 
@@ -378,8 +380,8 @@ export default function NovedadesPage() {
                         {formatearFechaCorta(nov.fecha_ultima_actuacion) ?? "—"}
                       </span>
 
-                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                        {nov.actuaciones.length}
+                      <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700" title={`${nov.actuaciones.length} actuaciones nuevas`}>
+                        {nov.actuaciones.length} act.
                       </span>
                     </button>
 

@@ -9,7 +9,8 @@ const push = vi.hoisted(() => ({
   escucharPush: vi.fn(async () => () => undefined),
 }))
 vi.mock("../push", () => push)
-vi.mock("react-hot-toast", () => ({ default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }))
+vi.mock("../api", () => ({ enviarAvisoDePrueba: vi.fn(async () => ({ enviados: 1 })) }))
+vi.mock("react-hot-toast", () => ({ default: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn(), loading: vi.fn(() => "t") }) }))
 
 import AvisosPush from "./AvisosPush"
 
@@ -46,5 +47,15 @@ describe("AvisosPush", () => {
     fireEvent.click(screen.getByRole("button", { name: "Entendido" }))
     expect(screen.queryByRole("region")).not.toBeInTheDocument()
     expect(localStorage.getItem("mariana_push_snooze")).not.toBeNull()
+  })
+})
+
+describe("AvisosPush: aviso de prueba", () => {
+  it("con permiso concedido permite simular una novedad", async () => {
+    push.permisoActual.mockResolvedValue("granted")
+    const { enviarAvisoDePrueba } = await import("../api")
+    render(<AvisosPush onAbrirProceso={() => undefined} />)
+    fireEvent.click(await screen.findByRole("button", { name: "Enviar prueba" }))
+    await waitFor(() => expect(enviarAvisoDePrueba).toHaveBeenCalledTimes(1))
   })
 })

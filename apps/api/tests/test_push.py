@@ -100,3 +100,25 @@ def test_avisar_por_push_agrupa_si_son_muchos(monkeypatch):
     enviados.clear()
     sync._avisar_por_push([{**n, "user_id": None}])
     assert enviados == []
+
+
+@pytest.mark.asyncio
+async def test_prueba_requiere_push_configurado_y_dispositivo(client, auth_headers, test_user, db, monkeypatch):
+    from models.dispositivo import Dispositivo
+    from services import push
+
+    # Sin credenciales FCM en el servidor
+    r = await client.post("/dispositivos/prueba", headers=auth_headers)
+    assert r.status_code == 503
+
+    monkeypatch.setattr(push, "habilitado", lambda: True)
+    # Con push activo pero sin celulares registrados
+    assert (await client.post("/dispositivos/prueba", headers=auth_headers)).status_code == 409
+
+    db.add(Dispositivo(user_id=test_user.id, token=TOKEN_A))
+    db.commit()
+    enviados = []
+    monkeypatch.setattr(push, "notificar_usuario", lambda *a, **k: enviados.append(a) or 1)
+    r = await client.post("/dispositivos/prueba", headers=auth_headers)
+    assert r.status_code == 200 and r.json() == {"enviados": 1}
+    assert enviados[0][0] == test_user.id and "simulado" in enviados[0][2]

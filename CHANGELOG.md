@@ -5,6 +5,31 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-19
+
+Pulido de la app móvil y prueba de avisos.
+
+### Añadido
+- Pantalla de **Ajustes** (`/ajustes`): foto de perfil, cambio de nombre de usuario (pide la contraseña actual), apariencia y cierre de sesión.
+- **Modo oscuro** (claro, oscuro o automático según el dispositivo), recordado en cada dispositivo.
+- **Cambio y recuperación de contraseña por correo**: enlace de un solo uso (vence en 30 min) desde Ajustes o desde «¿Olvidaste tu contraseña?»; al usarlo se cierran las demás sesiones.
+- Foto de perfil visible en el encabezado; el menú inferior móvil ahora incluye Ajustes.
+- «Enviar prueba» en la app: simula una novedad y llega como notificación push, para comprobar los avisos (`POST /dispositivos/prueba`).
+
+### Calidad
+- La integración continua ahora también ejecuta lint y compilación (tipos) del front y exige 80 % de cobertura en el backend antes de dar un cambio por bueno.
+
+### Notas de despliegue
+- Incluye la migración `f6b2c3d4e5a8` (columnas de foto en `users` y tabla `password_resets`), aditiva; se aplica sola al arrancar la API.
+- El correo de restablecimiento usa los mismos proveedores que los avisos (Brevo, SendGrid o SMTP) y el enlace apunta a `APP_URL`.
+
+### Corregido
+- La barra de estado del celular ya no se superpone al contenido al desplazarse.
+- Tarjetas de proceso: el radicado ya no se parte en dos líneas y los botones caben en la tarjeta.
+- El icono del botón «Detalle» se veía como una mancha blanca.
+- Formulario de agregar radicado: el campo ya no queda cortado en pantallas estrechas.
+- Novedades: la cabecera no se apila en móvil, se oculta la paginación con una sola página y el contador de actuaciones indica qué significa.
+
 ## [0.2.0] - 2026-10-19
 
 Notificaciones push y acabado de app móvil.
@@ -44,6 +69,7 @@ Primera versión móvil (Android) y mejoras de experiencia para abogados.
 - Colores de categoría consistentes; línea sobrante del historial de actuaciones.
 - Tildes faltantes en el panel.
 
-[Unreleased]: https://github.com/JuanMa1015/Mariana-s/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/JuanMa1015/Mariana-s/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/JuanMa1015/Mariana-s/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/JuanMa1015/Mariana-s/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/JuanMa1015/Mariana-s/releases/tag/v0.1.0

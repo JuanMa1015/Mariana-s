@@ -34,7 +34,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
       - name: Run tests
-        run: pytest -v --no-header --tb=short --cov=. --cov-report=term-missing
+        # Falla si la cobertura baja del 80% (hoy ~87%)
+        run: pytest -v --no-header --tb=short --cov=. --cov-report=term-missing --cov-fail-under=80
 
   api:
     if: github.event_name == 'push'
@@ -82,6 +83,10 @@ jobs:
           cache-dependency-path: apps/web/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type-check and build
+        run: npm run build
       - name: Run tests
         run: npx vitest run --reporter=verbose
 
