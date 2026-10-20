@@ -1,13 +1,15 @@
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, constr
 from sqlalchemy.orm import Session
 
 from models.database import get_db
 from models.dispositivo import Dispositivo
+from models.proceso import Proceso
 from models.user import User
 from services.auth import get_current_user
+from services import push
 from services.limiter import limiter
 
 router = APIRouter(prefix="/dispositivos", tags=["dispositivos"])
@@ -57,3 +59,33 @@ def dar_de_baja_dispositivo(
     )
     db.commit()
     return {"removed": borrados > 0}
+
+
+@router.post("/prueba")
+@limiter.limit("5/minute")
+def enviar_aviso_de_prueba(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Simula una novedad: envia un push de ejemplo a los celulares del usuario.
+
+    Usa el mismo camino que un aviso real. Si el usuario tiene procesos, el aviso
+    apunta al mas reciente para probar tambien el toque que abre el detalle.
+    """
+    if not push.habilitado():
+        raise HTTPException(status_code=503, detail="Las notificaciones push no están configuradas en el servidor")
+    if not db.query(Dispositivo).filter(Dispositivo.user_id == current_user.id).count():
+        raise HTTPException(status_code=409, detail="No hay celulares registrados. Activa los avisos en la app primero")
+    proceso = (
+        db.query(Proceso)
+        .filter(Proceso.user_id == current_user.id)
+        .order_by(Proceso.fecha_ultima_actuacion.desc().nullslast(), Proceso.id)
+        .first()
+    )
+    llave = proceso.llave_proceso if proceso else None
+    detalle = f"{llave}: " if llave else ""
+    enviados = push.notificar_usuario(
+        current_user.id, "Novedad judicial (prueba)", f"{detalle}Auto que fija fecha de audiencia (aviso simulado)", llave
+    )
+    return {"enviados": enviados}

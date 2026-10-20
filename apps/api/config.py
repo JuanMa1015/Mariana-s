@@ -68,6 +68,9 @@ BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
+# Restablecimiento de contraseña: minutos de vigencia del enlace enviado por correo
+PASSWORD_RESET_MINUTES = _entero("PASSWORD_RESET_MINUTES", 30)
+
 # Push movil (Firebase Cloud Messaging). JSON completo de la cuenta de servicio de Firebase;
 # vacio = push desactivado (correo y Telegram siguen funcionando).
 FCM_SERVICE_ACCOUNT_JSON = os.getenv("FCM_SERVICE_ACCOUNT_JSON", "")

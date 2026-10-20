@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react"
 import toast from "react-hot-toast"
+import { enviarAvisoDePrueba } from "../api"
 import { activarPush, escucharPush, pedirPermiso, permisoActual, pushDisponible, type EstadoPermiso } from "../push"
 
 const SNOOZE_KEY = "mariana_push_snooze"
@@ -52,12 +53,33 @@ export default function AvisosPush({ onAbrirProceso }: { onAbrirProceso: (llave:
     }
   }
 
+  const probar = async () => {
+    const t = toast.loading("Enviando aviso de prueba...")
+    try {
+      const r = await enviarAvisoDePrueba()
+      if (r.enviados > 0) toast.success("Enviado: llegará como notificación del celular", { id: t })
+      else toast.error("El servidor no pudo entregarlo. Vuelve a abrir la app e inténtalo de nuevo", { id: t })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo enviar", { id: t })
+    }
+  }
+
   const ahoraNo = () => {
     try { localStorage.setItem(SNOOZE_KEY, String(Date.now())) } catch { /* sin almacenamiento */ }
     setOculto(true)
   }
 
-  if (!pushDisponible || oculto || !permiso || permiso === "granted") return null
+  if (!pushDisponible || !permiso) return null
+
+  if (permiso === "granted") {
+    return (
+      <div className="no-print flex items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+        <span>Avisos activados en este celular</span>
+        <button type="button" onClick={probar} className="min-h-9 rounded-lg border border-emerald-300 bg-white px-3 font-semibold text-emerald-700 transition hover:bg-emerald-100">Enviar prueba</button>
+      </div>
+    )
+  }
+  if (oculto) return null
 
   return (
     <div role="region" aria-label="Avisos en tu celular" className="no-print rounded-2xl border border-indigo-200 bg-indigo-50 p-4 text-indigo-900 shadow-sm">

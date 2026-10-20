@@ -81,8 +81,7 @@ const IconExternalLink = () => (
 
 const IconEye = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
-    <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
-    <path fillRule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41Z" clipRule="evenodd" />
+    <path fillRule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.41ZM14 10a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z" clipRule="evenodd" />
   </svg>
 )
 
@@ -124,7 +123,7 @@ function Acciones({ p, data, compacto = false }: { p: Proceso; data: FilaData; c
   return (
     <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
       <button type="button" onClick={(e) => { e.stopPropagation(); onOpenDetalle(p.llave_proceso) }} title="Ver actuaciones" className={`inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 active:scale-95 ${compacto ? "min-h-10 flex-1 justify-center" : ""}`}><IconEye /><span>Detalle</span></button>
-      <a href="https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion" target="_blank" rel="noreferrer" title="Abrir en Rama Judicial" onClick={(e) => e.stopPropagation()} className={`inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100 active:scale-95 ${compacto ? "hidden" : ""}`}><IconExternalLink /><span>Oficial</span></a>
+      {!compacto && <a href="https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion" target="_blank" rel="noreferrer" title="Abrir en Rama Judicial" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 shadow-sm transition hover:bg-indigo-100 active:scale-95"><IconExternalLink /><span>Oficial</span></a>}
       <button type="button" onClick={(e) => { e.stopPropagation(); abrirEditor(p.llave_proceso) }} title="Editar radicado" aria-label="Editar radicado" className={`${botonIcono} border-slate-200 text-slate-600 hover:bg-amber-50 hover:text-amber-600 ${compacto ? "min-h-10 min-w-10" : ""}`}><IconPencil /></button>
       <button type="button" onClick={(e) => handleCopy(e, p.llave_proceso)} title="Copiar radicado" aria-label="Copiar radicado" className={`${botonIcono} border-slate-200 text-slate-600 hover:bg-indigo-50 hover:text-indigo-600 ${compacto ? "min-h-10 min-w-10" : ""}`}><IconClipboard /></button>
       <button type="button" onClick={(e) => pedirBorrar(e, p.llave_proceso)} title="Eliminar radicado" aria-label="Eliminar radicado" className={`${botonIcono} border-rose-200 bg-rose-50 text-rose-500 hover:bg-rose-100 hover:text-rose-600 ${compacto ? "min-h-10 min-w-10" : ""}`}><IconTrash /></button>
@@ -237,22 +236,18 @@ function Row({ index, style, data }: ListChildProps) {
 function Tarjeta({ p, data }: { p: Proceso; data: FilaData }) {
   return (
     <li className={`rounded-2xl border bg-white p-4 shadow-sm ${p.notificado ? "border-slate-200" : "border-amber-300"}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          {p.alias && <p className="truncate text-sm font-bold text-slate-900">{p.alias}</p>}
-          <span className="font-mono text-xs font-bold tracking-wide text-slate-800">{formatearRadicado(p.llave_proceso)}</span>
-        </div>
+      {p.alias && <p className="truncate text-sm font-bold text-slate-900">{p.alias}</p>}
+      <span className="block whitespace-nowrap font-mono text-[13px] font-bold text-slate-800">{formatearRadicado(p.llave_proceso)}</span>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <EstadoBadge notificado={p.notificado} />
+        <CategoriaBadge categoria={p.categoria} />
       </div>
       <p className="mt-2 text-sm font-semibold leading-snug text-slate-800">
         {p.despacho || <span className="font-normal italic text-slate-500">Sin despacho</span>}
       </p>
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-        <CategoriaBadge categoria={p.categoria} />
-        <span>
-          {p.fecha_ultima_actuacion ? `Última actuación: ${formatearFechaCorta(p.fecha_ultima_actuacion)}` : "Sin actuaciones"}
-        </span>
-      </div>
+      <p className="mt-1 text-xs text-slate-500">
+        {p.fecha_ultima_actuacion ? `Última actuación: ${formatearFechaCorta(p.fecha_ultima_actuacion)}` : "Sin actuaciones"}
+      </p>
       <div className="mt-3"><Acciones p={p} data={data} compacto /></div>
     </li>
   )

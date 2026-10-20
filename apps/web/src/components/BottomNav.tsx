@@ -4,22 +4,21 @@ interface Props {
   onProcesos: () => void
   onNovedades: () => void
   onSync: () => void
-  onSalir: () => void
+  onAjustes: () => void
 }
 
 /** Navegación inferior (solo móvil): acciones al alcance del pulgar. */
-export default function BottomNav({ enDetalle, syncing, onProcesos, onNovedades, onSync, onSalir }: Props) {
+export default function BottomNav({ enDetalle, syncing, onProcesos, onNovedades, onSync, onAjustes }: Props) {
   const items = [
           { label: "Procesos", icon: "M4 6h16M4 12h16M4 18h16", onClick: onProcesos, activo: !enDetalle },
           { label: "Novedades", icon: "M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 00-4-5.7V5a2 2 0 10-4 0v.3C7.7 6.2 6 8.4 6 11v3.2c0 .5-.2 1.1-.6 1.4L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9", onClick: onNovedades },
           { label: syncing ? "Actualizando" : "Actualizar", icon: "M16 9.3h5V4.4M3 19.6v-5h5m-5 0l3.2 3.2a8.3 8.3 0 0013.8-3.7M4 9.9a8.3 8.3 0 0113.8-3.7L21 9.3", onClick: onSync, deshabilitado: syncing },
-          { label: "Oficial", icon: "M13.5 6H18v4.5M18 6l-7.5 7.5M10 6H6.5A1.5 1.5 0 005 7.5v10A1.5 1.5 0 006.5 19h10a1.5 1.5 0 001.5-1.5V14", onClick: () => window.open("https://consultaprocesos.ramajudicial.gov.co/Procesos/NumeroRadicacion", "_blank", "noopener") },
-          { label: "Salir", icon: "M15 12H4m0 0l3-3m-3 3l3 3m5-8V6a2 2 0 012-2h5a2 2 0 012 2v12a2 2 0 01-2 2h-5a2 2 0 01-2-2v-2", onClick: onSalir },
+          { label: "Ajustes", icon: "M10.3 4.3c.4-1.8 3-1.8 3.4 0a1.7 1.7 0 002.6 1.1c1.5-1 3.3.8 2.3 2.3a1.7 1.7 0 001.1 2.6c1.8.4 1.8 3 0 3.4a1.7 1.7 0 00-1.1 2.6c1 1.5-.8 3.3-2.3 2.3a1.7 1.7 0 00-2.6 1.1c-.4 1.8-3 1.8-3.4 0a1.7 1.7 0 00-2.6-1.1c-1.5 1-3.3-.8-2.3-2.3a1.7 1.7 0 00-1.1-2.6c-1.8-.4-1.8-3 0-3.4a1.7 1.7 0 001.1-2.6c-1-1.5.8-3.3 2.3-2.3a1.7 1.7 0 002.6-1.1zM15 12a3 3 0 11-6 0 3 3 0 016 0z", onClick: onAjustes },
         ]
   return (
     <nav
       aria-label="Navegación principal"
-      className="no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-indigo-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden"
+      className="no-print fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-indigo-100 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md sm:hidden"
     >
       {items.map((it) => (
         <button

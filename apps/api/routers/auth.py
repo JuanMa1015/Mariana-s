@@ -14,6 +14,7 @@ from services.auth import (
     clear_token_cookie,
     password_en_filtraciones,
 )
+from services import password_reset
 from services.limiter import limiter
 from config import ACCESS_TOKEN_EXPIRE_MINUTES
 
@@ -141,6 +142,7 @@ def me(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "username": current_user.username,
         "telegram_chat_id": current_user.telegram_chat_id,
+        "tiene_avatar": bool(current_user.avatar_mime),
     }
 
 
@@ -156,4 +158,35 @@ def logout(
     db.add(current_user)
     db.commit()
     clear_token_cookie(response)
+    return {"ok": True}
+
+
+class OlvidePassword(BaseModel):
+    email: EmailStr
+
+
+class RestablecerPassword(BaseModel):
+    token: str
+    password: str
+
+
+@router.post("/password/olvide")
+@limiter.limit("5/hour")
+def olvide_password(request: Request, payload: OlvidePassword, db: Session = Depends(get_db)):
+    """Envia el enlace de restablecimiento si el correo existe. Siempre responde igual (no revela cuentas)."""
+    user = db.query(User).filter(User.email == payload.email).first()
+    if user:
+        password_reset.enviar_enlace(db, user)
+    return {"ok": True}
+
+
+@router.post("/password/restablecer")
+@limiter.limit("10/hour")
+def restablecer_password(request: Request, payload: RestablecerPassword, db: Session = Depends(get_db)):
+    try:
+        password_reset.restablecer(db, payload.token, payload.password)
+    except password_reset.PasswordInsegura as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except password_reset.TokenInvalido:
+        raise HTTPException(status_code=400, detail="El enlace no es válido o ya venció. Solicita uno nuevo.")
     return {"ok": True}

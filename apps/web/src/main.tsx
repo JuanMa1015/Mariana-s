@@ -18,16 +18,16 @@ import ErrorBoundary from './components/ErrorBoundary.tsx'
 
 import { getMe } from './api'
 import { initSentry } from './sentry'
+import { iniciarTema } from './theme'
+import { OlvidePage, RestablecerPage } from './components/RecuperarPassword.tsx'
 
 const App = lazy(() => import('./App.tsx'))
 const NovedadesPage = lazy(() => import('./components/NovedadesPage.tsx'))
+const AjustesPage = lazy(() => import('./components/AjustesPage.tsx'))
 
 initSentry()
 
-// App móvil: iconos oscuros en la barra de estado (el encabezado es claro)
-if (Capacitor.isNativePlatform()) {
-  void import('@capacitor/status-bar').then(({ StatusBar, Style }) => StatusBar.setStyle({ style: Style.Light }).catch(() => undefined))
-}
+iniciarTema()
 
 // App móvil: el botón atrás de Android navega hacia atrás y sale de la app solo desde la raíz.
 const BackButton = () => {
@@ -66,13 +66,15 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       <BrowserRouter>
-        <Toaster position="top-right" toastOptions={{ duration: 3000, style: { background: '#f5f3ff', color: '#5b21b6', border: '1px solid #ddd6fe', fontWeight: '500' } }} />
+        <Toaster position="top-right" toastOptions={{ duration: 3000, style: { background: 'var(--toast-bg)', color: 'var(--toast-fg)', border: '1px solid var(--toast-border)', fontWeight: '500' } }} />
         <BackButton />
         <Routes>
           {/* Rutas públicas */}
           <Route path="/" element={Capacitor.isNativePlatform() ? <Navigate to="/procesos" replace /> : <LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/olvide" element={<OlvidePage />} />
+          <Route path="/restablecer" element={<RestablecerPage />} />
           <Route path="/privacidad" element={<PrivacyPage />} />
           <Route path="/terminos" element={<TermsPage />} />
           <Route path="/gracias" element={<ThanksPage />} />
@@ -81,6 +83,13 @@ createRoot(document.getElementById('root')!).render(
             <ProtectedRoute>
               <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
                 <App />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/ajustes" element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
+                <AjustesPage />
               </Suspense>
             </ProtectedRoute>
           } />

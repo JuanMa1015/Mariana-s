@@ -39,7 +39,7 @@ export default function Register() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#f5f7fb] text-slate-900 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-900 px-4">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Mariana's</p>

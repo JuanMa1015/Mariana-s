@@ -103,6 +103,13 @@ export async function registrarDispositivo(token: string) {
   return res.json()
 }
 
+/** Pide al servidor un aviso push de ejemplo (simula una novedad) para este usuario. */
+export async function enviarAvisoDePrueba(): Promise<{ enviados: number }> {
+  const res = await fetchWithAuth(`${BASE_URL}/dispositivos/prueba`, { method: "POST" })
+  if (!res.ok) throw new Error((await res.json()).detail || "No se pudo enviar el aviso de prueba")
+  return res.json()
+}
+
 /** Deja de enviar push a este celular (se llama antes de cerrar sesión). */
 export async function bajaDispositivo(token: string) {
   const res = await fetchWithAuth(`${BASE_URL}/dispositivos/baja`, {
@@ -111,6 +118,87 @@ export async function bajaDispositivo(token: string) {
     body: JSON.stringify({ token }),
   })
   return res.json()
+}
+
+async function detalleError(res: Response, porDefecto: string): Promise<string> {
+  try {
+    return (await res.json()).detail || porDefecto
+  } catch {
+    return porDefecto
+  }
+}
+
+/** Foto de perfil como data URL (null si el usuario no tiene). */
+export async function bajarAvatar(): Promise<string | null> {
+  const res = await fetchWithAuth(`${BASE_URL}/cuenta/avatar`)
+  if (res.status === 404) return null
+  if (!res.ok) throw new Error(await detalleError(res, "No se pudo cargar la foto"))
+  return (await res.json()).data_url
+}
+
+export async function subirAvatar(imagen: Blob): Promise<void> {
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const lector = new FileReader()
+    lector.onload = () => resolve(String(lector.result).split(",")[1] ?? "")
+    lector.onerror = () => reject(new Error("No se pudo leer la imagen"))
+    lector.readAsDataURL(imagen)
+  })
+  const res = await fetchWithAuth(`${BASE_URL}/cuenta/avatar`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ imagen: base64 }),
+  })
+  if (!res.ok) throw new Error(await detalleError(res, "No se pudo guardar la foto"))
+}
+
+export async function borrarAvatar(): Promise<void> {
+  const res = await fetchWithAuth(`${BASE_URL}/cuenta/avatar`, { method: "DELETE" })
+  if (!res.ok) throw new Error(await detalleError(res, "No se pudo quitar la foto"))
+}
+
+export async function cambiarUsuario(username: string, password: string): Promise<{ username: string }> {
+  const res = await fetchWithAuth(`${BASE_URL}/cuenta/usuario`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  })
+  if (!res.ok) throw new Error(await detalleError(res, "No se pudo cambiar el usuario"))
+  return res.json()
+}
+
+/** Envía al correo de la cuenta el enlace para elegir una nueva contraseña. */
+export async function solicitarCambioPassword(): Promise<{ email: string }> {
+  const res = await fetchWithAuth(`${BASE_URL}/cuenta/password/solicitar`, { method: "POST" })
+  if (!res.ok) throw new Error(await detalleError(res, "No se pudo enviar el correo"))
+  return res.json()
+}
+
+export async function olvidePassword(email: string): Promise<void> {
+  let res: Response
+  try {
+    res = await fetchBase(`${BASE_URL}/auth/password/olvide`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    })
+  } catch {
+    throw new Error("Error de conexión. Revisa tu internet.")
+  }
+  if (!res.ok) throw new Error(await detalleError(res, "No se pudo enviar el correo"))
+}
+
+export async function restablecerPassword(token: string, password: string): Promise<void> {
+  let res: Response
+  try {
+    res = await fetchBase(`${BASE_URL}/auth/password/restablecer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, password }),
+    })
+  } catch {
+    throw new Error("Error de conexión. Revisa tu internet.")
+  }
+  if (!res.ok) throw new Error(await detalleError(res, "No se pudo cambiar la contraseña"))
 }
 
 export async function getMe() {

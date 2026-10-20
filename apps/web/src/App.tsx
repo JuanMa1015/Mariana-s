@@ -1,11 +1,13 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync, getSyncEstado, logoutUser } from "./api"
+import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync, getSyncEstado } from "./api"
 import { getCache, setCache, removeCache } from "./api/cache"
 import toast from "react-hot-toast"
 import type { Orden, DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync, SyncEstado, SyncIniciado } from "./types"
 import BottomNav from "./components/BottomNav"
 import AvisosPush from "./components/AvisosPush"
-import { bajaPush } from "./push"
+import Avatar from "./components/Avatar"
+import { useAvatar } from "./hooks/useAvatar"
+import { cerrarSesion } from "./session"
 import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
 import { useNavigate, useParams } from "react-router-dom"
@@ -37,6 +39,7 @@ export default function App() {
   useTitle("Mis procesos")
   const username = localStorage.getItem("username") || localStorage.getItem("email")?.split("@")[0] || "Mariana"
 
+  const avatar = useAvatar()
   const saludo = useMemo(() => {
     const h = new Date().getHours()
     if (h < 12) return "Buenos días"
@@ -250,9 +253,7 @@ export default function App() {
   }, [syncing, cacheKey, cargarLista])
 
   const handleLogout = async () => {
-    await bajaPush() // antes de cerrar sesión: requiere el token de acceso vigente
-    try { await logoutUser() } catch { /* ignore */ }
-    localStorage.clear()
+    await cerrarSesion()
     navigate("/login", { replace: true })
   }
 
@@ -304,6 +305,15 @@ export default function App() {
               Salir
             </button>
           </div>
+          <button
+            type="button"
+            onClick={() => navigate("/ajustes")}
+            aria-label="Perfil y ajustes"
+            title="Perfil y ajustes"
+            className="ml-3 rounded-full ring-2 ring-transparent transition hover:ring-indigo-200 focus-visible:ring-indigo-300"
+          >
+            <Avatar nombre={username} url={avatar} tamano="h-10 w-10" />
+          </button>
         </div>
       </header>
 
@@ -379,7 +389,7 @@ export default function App() {
             <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 shadow-sm">
               <p className="text-sm font-semibold">
                 {pendientes} proceso{pendientes !== 1 ? "s" : ""} requiere{pendientes !== 1 ? "n" : ""} revisión
-                <span className="ml-2 font-normal text-amber-800">Tienen actuaciones nuevas sin revisar.</span>
+                <span className="block font-normal text-amber-800">Tienen actuaciones nuevas sin revisar.</span>
               </p>
               <button
                 type="button"
@@ -404,7 +414,7 @@ export default function App() {
         <section className="rounded-2xl border border-indigo-100 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex flex-1 flex-col gap-1.5">
-              <div className="flex gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <input
                   aria-label="Radicado de 23 dígitos"
                   placeholder="Radicado de 23 dígitos"
@@ -504,7 +514,7 @@ export default function App() {
                 type="search"
                 aria-label="Buscar por radicado, cliente, parte o juzgado"
                 title="Buscar (atajo: /)"
-                placeholder="Buscar por radicado, cliente, parte o juzgado"
+                placeholder="Buscar radicado o cliente"
                 value={busquedaInput}
                 onChange={(e) => { setBusquedaInput(e.target.value); setPage(1) }}
                 className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
@@ -573,7 +583,7 @@ export default function App() {
         onProcesos={() => volverLista()}
         onNovedades={() => navigate("/novedades")}
         onSync={() => { void handleSync() }}
-        onSalir={() => { void handleLogout() }}
+        onAjustes={() => navigate("/ajustes")}
       />
     </div>
   )

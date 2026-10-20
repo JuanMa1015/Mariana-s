@@ -138,6 +138,20 @@ def _enviar_smtp(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo
     return False, " | ".join(errores)
 
 
+def enviar_correo(destinatarios: list[str], asunto: str, cuerpo_html: str, cuerpo_texto: str) -> bool:
+    """Envia un correo transaccional probando Brevo, SendGrid y SMTP en ese orden."""
+    exito = False
+    if BREVO_API_KEY:
+        exito, _ = _enviar_brevo(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+    if not exito and SENDGRID_API_KEY:
+        exito, _ = _enviar_sendgrid(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+    if not exito and SMTP_HOST:
+        exito, _ = _enviar_smtp(destinatarios, asunto, cuerpo_html, cuerpo_texto)
+    if not exito:
+        logger.error("Correo '%s' NO enviado: ningun proveedor de correo disponible o todos fallaron.", asunto)
+    return exito
+
+
 def notificar_cambio_radicado(
     llave_proceso: str,
     despacho: str,
