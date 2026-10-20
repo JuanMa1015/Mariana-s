@@ -16,6 +16,8 @@ from routers.auth import router as auth_router
 from routers.admin import router as admin_router
 from routers.dispositivos import router as dispositivos_router
 from routers.cuenta import router as cuenta_router
+from routers.panel_admin import router as panel_admin_router
+from routers.panel_pruebas import router as panel_pruebas_router
 from config import SENTRY_DSN, CORS_ORIGINS, API_TOKEN
 
 if SENTRY_DSN:
@@ -199,3 +201,5 @@ app.include_router(procesos_router)
 app.include_router(admin_router)
 app.include_router(dispositivos_router)
 app.include_router(cuenta_router)
+app.include_router(panel_admin_router)
+app.include_router(panel_pruebas_router)

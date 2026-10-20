@@ -1,5 +1,5 @@
 import re
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
@@ -13,6 +13,7 @@ from services.auth import (
     set_token_cookie,
     clear_token_cookie,
     password_en_filtraciones,
+    es_admin,
 )
 from services import password_reset
 from services.limiter import limiter
@@ -107,6 +108,11 @@ def login_user(user: UserLogin, request: Request, response: Response, db: Sessio
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    if db_user.activo is False:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Tu cuenta está suspendida. Contacta al administrador.")
+    db_user.ultimo_acceso = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": db_user.email, "ver": db_user.token_version},
@@ -139,10 +145,12 @@ def actualizar_telegram_chat_id(
 @router.get("/me")
 def me(current_user: User = Depends(get_current_user)):
     return {
+        "id": current_user.id,
         "email": current_user.email,
         "username": current_user.username,
         "telegram_chat_id": current_user.telegram_chat_id,
         "tiene_avatar": bool(current_user.avatar_mime),
+        "es_admin": es_admin(current_user),
     }
 
 

@@ -103,9 +103,9 @@ export async function registrarDispositivo(token: string) {
   return res.json()
 }
 
-/** Pide al servidor un aviso push de ejemplo (simula una novedad) para este usuario. */
-export async function enviarAvisoDePrueba(): Promise<{ enviados: number }> {
-  const res = await fetchWithAuth(`${BASE_URL}/dispositivos/prueba`, { method: "POST" })
+/** Pide al servidor un aviso push de ejemplo (simula una novedad); `demora` da tiempo de cerrar la app. */
+export async function enviarAvisoDePrueba(demora = 0): Promise<{ enviados: number; programado_en?: number }> {
+  const res = await fetchWithAuth(`${BASE_URL}/dispositivos/prueba?demora=${demora}`, { method: "POST" })
   if (!res.ok) throw new Error((await res.json()).detail || "No se pudo enviar el aviso de prueba")
   return res.json()
 }
@@ -122,10 +122,24 @@ export async function bajaDispositivo(token: string) {
 
 async function detalleError(res: Response, porDefecto: string): Promise<string> {
   try {
-    return (await res.json()).detail || porDefecto
+    const detail = (await res.json()).detail
+    if (Array.isArray(detail)) return detail.map((d: { msg?: string }) => d.msg).filter(Boolean).join("; ") || porDefecto
+    return typeof detail === "string" && detail ? detail : porDefecto
   } catch {
     return porDefecto
   }
+}
+
+/** Llamada JSON autenticada genérica (la usa el panel de administración). Lanza Error con el detalle del servidor. */
+export async function apiJson<T>(ruta: string, opciones: { method?: string; body?: unknown } = {}): Promise<T> {
+  const { method = "GET", body } = opciones
+  const res = await fetchWithAuth(`${BASE_URL}${ruta}`, {
+    method,
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(await detalleError(res, `Error ${res.status}`))
+  return res.json()
 }
 
 /** Foto de perfil como data URL (null si el usuario no tiene). */

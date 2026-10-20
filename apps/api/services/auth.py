@@ -10,7 +10,7 @@ from fastapi import Depends, HTTPException, Request, status, Response
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
-from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, ADMIN_EMAILS
 from models.database import get_db
 from models.user import User
 
@@ -103,6 +103,11 @@ def clear_token_cookie(response: Response):
     )
 
 
+def es_admin(user: User) -> bool:
+    """Admin = rol en la base de datos o correo listado en ADMIN_EMAILS (este ultimo no se puede quitar desde el panel)."""
+    return bool(user.is_admin) or (user.email or "").lower() in ADMIN_EMAILS
+
+
 def get_current_user(
     request: Request,
     token: str | None = Depends(oauth2_scheme),
@@ -142,6 +147,10 @@ def get_current_user(
         and user.token_version is not None
         and version_token != user.token_version
     ):
+        raise credentials_exception
+
+    if user.activo is False:
+        # Cuenta suspendida por un administrador: se cierran tambien las sesiones ya abiertas
         raise credentials_exception
 
     return user

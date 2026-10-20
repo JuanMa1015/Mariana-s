@@ -71,6 +71,10 @@ TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 # Restablecimiento de contraseña: minutos de vigencia del enlace enviado por correo
 PASSWORD_RESET_MINUTES = _entero("PASSWORD_RESET_MINUTES", 30)
 
+# Administradores por correo (separados por coma). No hay usuario ni contraseña por defecto: el admin
+# es una cuenta normal cuyo correo aparece aqui, o a la que otro admin le dio el rol desde el panel.
+ADMIN_EMAILS = {e.strip().lower() for e in os.getenv("ADMIN_EMAILS", "").split(",") if e.strip()}
+
 # Push movil (Firebase Cloud Messaging). JSON completo de la cuenta de servicio de Firebase;
 # vacio = push desactivado (correo y Telegram siguen funcionando).
 FCM_SERVICE_ACCOUNT_JSON = os.getenv("FCM_SERVICE_ACCOUNT_JSON", "")

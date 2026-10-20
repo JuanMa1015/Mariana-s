@@ -19,11 +19,13 @@ import ErrorBoundary from './components/ErrorBoundary.tsx'
 import { getMe } from './api'
 import { initSentry } from './sentry'
 import { iniciarTema } from './theme'
+import AvisosPush from './components/AvisosPush.tsx'
 import { OlvidePage, RestablecerPage } from './components/RecuperarPassword.tsx'
 
 const App = lazy(() => import('./App.tsx'))
 const NovedadesPage = lazy(() => import('./components/NovedadesPage.tsx'))
 const AjustesPage = lazy(() => import('./components/AjustesPage.tsx'))
+const AdminPage = lazy(() => import('./components/AdminPage.tsx'))
 
 initSentry()
 
@@ -46,6 +48,7 @@ const BackButton = () => {
 
 const ProtectedRoute = ({ children }: { children: ReactNode }) => {
   const [ok, setOk] = useState<boolean | null>(null)
+  const navigate = useNavigate()
 
   useEffect(() => {
     getMe().then(() => setOk(true)).catch(() => setOk(false))
@@ -59,7 +62,13 @@ const ProtectedRoute = ({ children }: { children: ReactNode }) => {
     return <Navigate to="/login" replace />
   }
 
-  return children
+  // Avisos push activos en todas las pantallas privadas; al tocar un aviso se abre el proceso
+  return (
+    <>
+      <AvisosPush onAbrirProceso={(llave) => navigate(`/procesos/${llave}`)} />
+      {children}
+    </>
+  )
 }
 
 createRoot(document.getElementById('root')!).render(
@@ -83,6 +92,13 @@ createRoot(document.getElementById('root')!).render(
             <ProtectedRoute>
               <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
                 <App />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
+                <AdminPage />
               </Suspense>
             </ProtectedRoute>
           } />
