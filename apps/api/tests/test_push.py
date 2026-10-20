@@ -118,7 +118,7 @@ def test_avisar_por_push_agrupa_si_son_muchos(monkeypatch):
 
     enviados.clear()
     assert sync._avisar_por_push([{**n, "proceso_id": i} for i in range(4)]) == {0, 1, 2, 3}
-    assert len(enviados) == 1 and "4 procesos" in enviados[0][2]
+    assert len(enviados) == 1 and "4 procesos" in enviados[0][1] and enviados[0][4:] == () 
 
     enviados.clear()
     assert sync._avisar_por_push([{**n, "user_id": None}]) == set() and enviados == []
@@ -182,3 +182,55 @@ async def test_prueba_con_demora_responde_antes_de_enviar(client, auth_headers, 
     assert r.json() == {"enviados": 0, "programado_en": 15}
     assert esperas == [15] and len(enviados) == 1
     assert (await client.post("/dispositivos/prueba?demora=999", headers=auth_headers)).status_code == 422
+
+
+# ── Contenido del aviso ────────────────────────────────────────────────────
+NOVEDAD = {
+    "llave_proceso": "05001311001220240061100",
+    "alias": "Pérez vs. Bancolombia",
+    "despacho": "JUZGADO 012 DE FAMILIA DE MEDELLÍN",
+    "actuaciones": [
+        {"actuacion": "Auto admite demanda", "anotacion": "x", "fecha_actuacion": "2026-10-18", "con_documentos": False},
+        {"actuacion": "Auto que fija fecha de audiencia", "anotacion": "Se fija audiencia inicial para el 12 de noviembre", "fecha_actuacion": "2026-10-20T00:00:00", "con_documentos": True},
+        {"actuacion": "Constancia secretarial", "anotacion": "Se agrega memorial", "fecha_actuacion": "2026-10-21T00:00:00", "con_documentos": True},
+    ],
+}
+
+
+def test_el_aviso_muestra_radicado_cliente_y_la_actuacion_mas_reciente():
+    from services.push import armar_aviso
+
+    titulo, cuerpo = armar_aviso(NOVEDAD)
+    lineas = cuerpo.split("\n")
+    assert titulo == "Nueva actuación · Pérez vs. Bancolombia"
+    assert lineas[0] == "05001 31 10 012 2024 00611 00"  # lo primero que se ve con el aviso plegado
+    assert lineas[1] == "Constancia secretarial"  # la mas reciente (ultima de la lista)
+    assert "JUZGADO 012 DE FAMILIA DE MEDELLÍN" in lineas and "Anotación: Se agrega memorial" in lineas
+    assert lineas[-1] == "21 oct 2026 · con documentos · +2 más"
+
+
+def test_el_aviso_se_degrada_bien_sin_datos_y_recorta_lo_largo():
+    from services.push import armar_aviso
+
+    titulo, cuerpo = armar_aviso({"llave_proceso": "05001311001220240061100"}, prueba=True)
+    assert titulo == "[Prueba] Nueva actuación" and cuerpo.split("\n") == ["05001 31 10 012 2024 00611 00", "Hay una actuación nueva"]
+    largo = {"llave_proceso": "1", "actuaciones": [{"actuacion": "A" * 500, "anotacion": "B" * 500}]}
+    _, cuerpo = armar_aviso(largo)
+    assert all(len(linea) <= 175 for linea in cuerpo.split("\n")) and cuerpo.count("…") == 2
+
+
+def test_el_resumen_lista_hasta_cinco_radicados():
+    from services.push import armar_resumen
+
+    notifs = [{**NOVEDAD, "llave_proceso": f"0500131100122024006110{i}", "alias": None if i else "Pérez"} for i in range(7)]
+    titulo, cuerpo = armar_resumen(notifs)
+    lineas = cuerpo.split("\n")
+    assert titulo == "7 procesos con novedades" and len(lineas) == 6 and lineas[-1] == "y 2 más"
+    assert lineas[0].endswith("· Pérez")
+
+
+def test_el_tag_solo_se_envia_cuando_se_pide():
+    from services.push import _mensaje
+
+    assert "tag" not in _mensaje("t", "a", "b", None)["message"]["android"]["notification"]
+    assert _mensaje("t", "a", "b", "123", "123")["message"]["android"]["notification"]["tag"] == "123"

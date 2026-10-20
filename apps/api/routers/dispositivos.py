@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from models.database import get_db
 from models.dispositivo import Dispositivo
-from models.proceso import Proceso
 from models.user import User
 from services.auth import get_current_user
 from services import push
@@ -80,23 +79,15 @@ def enviar_aviso_de_prueba(
         raise HTTPException(status_code=503, detail="Las notificaciones push no están configuradas en el servidor")
     if not db.query(Dispositivo).filter(Dispositivo.user_id == current_user.id).count():
         raise HTTPException(status_code=409, detail="No hay celulares registrados. Activa los avisos en la app primero")
-    proceso = (
-        db.query(Proceso)
-        .filter(Proceso.user_id == current_user.id)
-        .order_by(Proceso.fecha_ultima_actuacion.desc().nullslast(), Proceso.id)
-        .first()
-    )
-    llave = proceso.llave_proceso if proceso else None
-    detalle = f"{llave}: " if llave else ""
-    titulo, cuerpo = "Novedad judicial (prueba)", f"{detalle}Auto que fija fecha de audiencia (aviso simulado)"
+    titulo, cuerpo, llave = push.ejemplo_de_aviso(db, current_user.id)
     if demora:
         # Con demora, el aviso sale despues de responder: da tiempo de cerrar la app antes de que llegue
         tareas.add_task(_enviar_tras_espera, demora, current_user.id, titulo, cuerpo, llave)
         return {"enviados": 0, "programado_en": demora}
-    res = push.notificar_usuario_detalle(current_user.id, titulo, cuerpo, llave)
+    res = push.notificar_usuario_detalle(current_user.id, titulo, cuerpo, llave, tag="prueba")
     return {"enviados": res.aceptados, "errores": res.errores, "caducados": len(res.tokens_invalidos)}
 
 
 def _enviar_tras_espera(segundos: int, user_id: int, titulo: str, cuerpo: str, llave: str | None) -> None:
     time.sleep(segundos)
-    push.notificar_usuario(user_id, titulo, cuerpo, llave)
+    push.notificar_usuario(user_id, titulo, cuerpo, llave, tag="prueba")
