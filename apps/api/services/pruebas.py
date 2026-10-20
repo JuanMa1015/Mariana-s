@@ -340,8 +340,15 @@ def prueba_push(db: Session, admin: User, p: dict) -> Pasos:
             threading.Timer(demora, push.notificar_usuario, args=(usuario_id, titulo, cuerpo)).start()
             r.ok("Aviso programado", f"llegará en {demora} s: cierra la app para probar con ella cerrada")
         else:
-            enviados = push.notificar_usuario(usuario_id, titulo, cuerpo)
-            r.ok("Aviso enviado", f"entregado a {enviados} celular(es)") if enviados else r.fallo("Aviso enviado", "FCM no aceptó ningún token (se limpian los inválidos)")
+            res = push.notificar_usuario_detalle(usuario_id, titulo, cuerpo)
+            if res.aceptados:
+                r.ok("Aviso aceptado por FCM", f"{res.aceptados} de {res.dispositivos} celular(es)")
+            else:
+                r.fallo("Aviso aceptado por FCM", "ningún celular lo recibió: " + ("; ".join(res.errores) or f"{len(res.tokens_invalidos)} token(s) caducado(s), ya borrados: la persona debe abrir la app para volver a registrarse"))
+            if res.aceptados and res.errores:
+                r.aviso("Algunos celulares fallaron", "; ".join(res.errores))
+            if res.tokens_invalidos and res.aceptados:
+                r.aviso("Celulares caducados", f"{len(res.tokens_invalidos)} token(s) borrados")
     return r
 
 

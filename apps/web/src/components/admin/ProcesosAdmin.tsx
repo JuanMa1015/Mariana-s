@@ -17,6 +17,7 @@ interface ProcesoAdmin {
   ultima_sincronizacion: string | null
   fallos_consecutivos: number | null
   notificacion_pendiente: boolean | null
+  canales_notificados: string | null
 }
 
 function FormProceso({ proceso, onCerrar, onGuardado }: { proceso?: ProcesoAdmin; onCerrar: () => void; onGuardado: () => void }) {
@@ -103,6 +104,7 @@ export default function ProcesosAdmin() {
                 {p.notificado ? <Insignia tono="verde">Al día</Insignia> : <Insignia tono="ambar">Con novedad</Insignia>}
                 {!!p.fallos_consecutivos && <Insignia tono="rojo">{p.fallos_consecutivos} fallo(s)</Insignia>}
                 {p.notificacion_pendiente && <Insignia tono="ambar">Aviso pendiente</Insignia>}
+                {!p.notificado && !p.notificacion_pendiente && <Insignia tono={p.canales_notificados?.includes("push") ? "verde" : "gris"}>{p.canales_notificados ? `Avisó: ${p.canales_notificados.replace("email", "correo").replaceAll("+", " + ")}` : "Sin registro de aviso"}</Insignia>}
               </td>
               <td className="px-3 py-2.5 text-xs text-slate-600">{fecha(p.ultima_sincronizacion)}</td>
               <td className="px-3 py-2.5">

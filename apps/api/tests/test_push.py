@@ -72,8 +72,31 @@ def test_enviar_a_tokens_reporta_invalidos(monkeypatch):
         return _Resp(404, texto="UNREGISTERED") if kw["json"]["message"]["token"] == TOKEN_B else _Resp()
 
     monkeypatch.setattr(push.httpx, "post", post)
-    assert push.enviar_a_tokens([TOKEN_A, TOKEN_B], "t", "c", "05001310301720240048000") == [TOKEN_B]
+    res = push.enviar_a_tokens([TOKEN_A, TOKEN_B], "t", "c", "05001310301720240048000")
+    assert (res.dispositivos, res.aceptados, res.tokens_invalidos, res.errores) == (2, 1, [TOKEN_B], [])
     assert any("/projects/proyecto-x/messages:send" in u for u in llamadas)
+
+
+def test_un_rechazo_de_fcm_no_cuenta_como_entregado(monkeypatch):
+    """Antes, un 403 de FCM o un fallo de autenticacion se contaban como avisos enviados."""
+    from services import push
+
+    monkeypatch.setattr(push, "_cuenta", _cuenta_falsa)
+    monkeypatch.setitem(push._acceso, "token", None)
+
+    def post(url, **kw):
+        if "oauth2" in url:
+            return _Resp(datos={"access_token": "acc", "expires_in": 3600})
+        return _Resp(403, texto="PERMISSION_DENIED: Firebase Cloud Messaging API has not been used")
+
+    monkeypatch.setattr(push.httpx, "post", post)
+    res = push.enviar_a_tokens([TOKEN_A], "t", "c")
+    assert res.aceptados == 0 and "FCM 403" in res.errores[0] and res.tokens_invalidos == []
+
+    monkeypatch.setitem(push._acceso, "token", None)
+    monkeypatch.setattr(push.httpx, "post", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("sin red")))
+    res = push.enviar_a_tokens([TOKEN_A], "t", "c")
+    assert res.aceptados == 0 and "autenticación" in res.errores[0]
 
 
 def test_push_desactivado_sin_credenciales():
@@ -87,19 +110,37 @@ def test_avisar_por_push_agrupa_si_son_muchos(monkeypatch):
     from services import push, sync
 
     enviados = []
-    monkeypatch.setattr(push, "notificar_usuario", lambda *a, **k: enviados.append(a))
-    n = {"llave_proceso": "05001310301720240048000", "user_id": 7, "actuaciones": [{"actuacion": "Auto admite demanda"}]}
+    monkeypatch.setattr(push, "notificar_usuario", lambda *a, **k: enviados.append(a) or 1)
+    n = {"llave_proceso": "05001310301720240048000", "user_id": 7, "proceso_id": 1, "actuaciones": [{"actuacion": "Auto admite demanda"}]}
 
-    sync._avisar_por_push([n, n])
+    assert sync._avisar_por_push([n, {**n, "proceso_id": 2}]) == {1, 2}
     assert len(enviados) == 2 and enviados[0][0] == 7 and "Auto admite demanda" in enviados[0][2]
 
     enviados.clear()
-    sync._avisar_por_push([n] * 4)
+    assert sync._avisar_por_push([{**n, "proceso_id": i} for i in range(4)]) == {0, 1, 2, 3}
     assert len(enviados) == 1 and "4 procesos" in enviados[0][2]
 
     enviados.clear()
-    sync._avisar_por_push([{**n, "user_id": None}])
-    assert enviados == []
+    assert sync._avisar_por_push([{**n, "user_id": None}]) == set() and enviados == []
+
+
+def test_el_canal_push_se_registra_solo_si_el_celular_lo_acepto(monkeypatch):
+    from services import push, sync
+
+    monkeypatch.setattr(sync.time, "sleep", lambda s: None)
+    monkeypatch.setattr(sync, "notificar_cambio_radicado", lambda **k: {"email": True, "telegram": False})
+    n = {
+        "proceso_id": 5, "llave_proceso": "05001310301720240048000", "despacho": "", "departamento": "", "fecha_ultima_actuacion": None,
+        "sujetos_procesales": "", "categoria": "General", "actuaciones": [], "email": "a@example.com", "telegram_chat_id": None, "user_id": 7,
+    }
+    monkeypatch.setattr(push, "notificar_usuario", lambda *a, **k: 1)
+    assert sync._enviar_notificaciones_acumuladas({"a@example.com": [n]}, []) == {5: "email+push"}
+    monkeypatch.setattr(push, "notificar_usuario", lambda *a, **k: 0)  # sin celulares o FCM lo rechazo
+    assert sync._enviar_notificaciones_acumuladas({"a@example.com": [n]}, []) == {5: "email"}
+    # Si el correo falla la novedad sigue pendiente (aunque el push haya llegado)
+    monkeypatch.setattr(sync, "notificar_cambio_radicado", lambda **k: {"email": False, "telegram": False})
+    monkeypatch.setattr(push, "notificar_usuario", lambda *a, **k: 1)
+    assert sync._enviar_notificaciones_acumuladas({"a@example.com": [n]}, []) == {}
 
 
 @pytest.mark.asyncio
@@ -118,9 +159,9 @@ async def test_prueba_requiere_push_configurado_y_dispositivo(client, auth_heade
     db.add(Dispositivo(user_id=test_user.id, token=TOKEN_A))
     db.commit()
     enviados = []
-    monkeypatch.setattr(push, "notificar_usuario", lambda *a, **k: enviados.append(a) or 1)
+    monkeypatch.setattr(push, "notificar_usuario_detalle", lambda *a, **k: enviados.append(a) or push.ResultadoPush(dispositivos=1, aceptados=1))
     r = await client.post("/dispositivos/prueba", headers=auth_headers)
-    assert r.status_code == 200 and r.json() == {"enviados": 1}
+    assert r.status_code == 200 and r.json() == {"enviados": 1, "errores": [], "caducados": 0}
     assert enviados[0][0] == test_user.id and "simulado" in enviados[0][2]
 
 
