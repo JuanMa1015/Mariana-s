@@ -8,7 +8,7 @@ vi.mock("react-router-dom", async () => {
   return { ...actual, useNavigate: () => mockNavigate }
 })
 
-vi.mock("../api", () => ({ getNovedadesDetalle: vi.fn() }))
+vi.mock("../api", () => ({ getNovedadesDetalle: vi.fn(), marcarTodoLeido: vi.fn() }))
 
 const NOVEDADES_MOCK = {
   total: 2,
@@ -60,6 +60,34 @@ beforeEach(async () => {
 })
 
 describe("NovedadesPage", () => {
+  it("pide confirmación antes de marcar todas y recarga al confirmar", async () => {
+    const api = await import("../api")
+    vi.mocked(api.getNovedadesDetalle).mockResolvedValueOnce(NOVEDADES_MOCK).mockResolvedValueOnce({ total: 0, novedades: [] })
+    vi.mocked(api.marcarTodoLeido).mockResolvedValueOnce({ marcados: 2 })
+    const { default: NovedadesPage } = await import("./NovedadesPage")
+    render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
+    fireEvent.click(await screen.findByRole("button", { name: "Marcar todo como leído" }))
+    expect(api.marcarTodoLeido).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }))
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Marcar todo como leído" }))
+    fireEvent.click(screen.getByRole("button", { name: "Sí, marcar todo" }))
+    expect(await screen.findByText(/todo al día/i)).toBeInTheDocument()
+    expect(api.marcarTodoLeido).toHaveBeenCalledTimes(1)
+  })
+
+  it("mantiene la confirmación y permite reintentar si falla el marcado", async () => {
+    const api = await import("../api")
+    vi.mocked(api.getNovedadesDetalle).mockResolvedValue(NOVEDADES_MOCK)
+    vi.mocked(api.marcarTodoLeido).mockRejectedValueOnce(new Error("sin conexión"))
+    const { default: NovedadesPage } = await import("./NovedadesPage")
+    render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
+    fireEvent.click(await screen.findByRole("button", { name: "Marcar todo como leído" }))
+    fireEvent.click(screen.getByRole("button", { name: "Sí, marcar todo" }))
+    await waitFor(() => expect(screen.getByRole("button", { name: "Sí, marcar todo" })).toBeEnabled())
+    expect(screen.getByRole("alertdialog")).toBeInTheDocument()
+    expect(api.getNovedadesDetalle).toHaveBeenCalledTimes(1)
+  })
   it("muestra cinco actuaciones y permite revelar las siguientes sin afectar otros procesos", async () => {
     const actuaciones = Array.from({ length: 12 }, (_, i) => ({
       ...NOVEDADES_MOCK.novedades[0].actuaciones[0],

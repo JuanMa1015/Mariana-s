@@ -27,6 +27,13 @@ beforeEach(async () => {
 })
 
 describe("Register", () => {
+  it("enfoca el campo inválido antes de intentar crear una cuenta", async () => {
+    const { default: Register } = await import("./Register")
+    const vista = render(<BrowserRouter><Register /></BrowserRouter>)
+    fireEvent.submit(vista.container.querySelector("form")!)
+    expect(screen.getByLabelText(/correo electrónico/i)).toHaveFocus()
+    expect((await import("../api")).registerUser).not.toHaveBeenCalled()
+  })
   it("debe renderizar el formulario con todos los campos", async () => {
     const { default: Register } = await import("./Register")
     render(<BrowserRouter><Register /></BrowserRouter>)

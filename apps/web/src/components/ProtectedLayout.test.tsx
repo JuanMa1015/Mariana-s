@@ -37,3 +37,12 @@ it("conserva el destino del expediente cuando la sesión vence", async () => {
   abrir()
   expect(await screen.findByText("Entrar para /procesos/123?q=cliente")).toBeInTheDocument()
 })
+
+it("abandona el expediente si una petición detecta la sesión vencida", async () => {
+  vi.mocked(getMe).mockResolvedValueOnce({ email: "abogada@example.test" })
+  abrir()
+  await screen.findByRole("heading", { name: "Expediente" })
+  fireEvent(window, new Event("session-expired"))
+  expect(await screen.findByText("Entrar para /procesos/123?q=cliente")).toBeInTheDocument()
+  expect(screen.queryByRole("heading", { name: "Expediente" })).not.toBeInTheDocument()
+})

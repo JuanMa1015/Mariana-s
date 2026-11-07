@@ -1,5 +1,5 @@
 import { it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter, MemoryRouter } from 'react-router-dom'
 import Login from './Login'
@@ -39,6 +39,16 @@ function renderLogin() {
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+})
+
+it('enfoca el primer campo inválido sin enviar credenciales vacías', () => {
+  const vista = renderLogin()
+  fireEvent.submit(vista.container.querySelector('form')!)
+  expect(screen.getByLabelText('Correo o Usuario')).toHaveFocus()
+  expect(mockLoginUser).not.toHaveBeenCalled()
+  fireEvent.change(screen.getByLabelText('Correo o Usuario'), { target: { value: 'abogada' } })
+  fireEvent.submit(vista.container.querySelector('form')!)
+  expect(screen.getByLabelText('Contraseña', { exact: true })).toHaveFocus()
 })
 
 it('vuelve al expediente solicitado después del login', async () => {

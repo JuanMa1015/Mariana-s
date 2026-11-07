@@ -1,7 +1,21 @@
-import { beforeEach, expect, it } from "vitest"
+import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import { clearCache, getCache, setCache, setCacheUser } from "./cache"
 
 beforeEach(() => { localStorage.clear(); clearCache() })
+afterEach(() => vi.useRealTimers())
+
+it("caduca los resultados para no presentar consultas antiguas como actuales", () => {
+  vi.useFakeTimers()
+  setCache("procesos", ["expediente"])
+  vi.advanceTimersByTime(5 * 60 * 1000 + 1)
+  expect(getCache("procesos")).toBeNull()
+})
+
+it("limita la memoria sin eliminar la entrada recién consultada", () => {
+  for (let i = 0; i < 61; i++) setCache(`pagina-${i}`, i)
+  expect(getCache("pagina-0")).toBeNull()
+  expect(getCache("pagina-60")).toBe(60)
+})
 
 it("no guarda expedientes en disco y aísla las cuentas", () => {
   setCacheUser("primera@example.test")

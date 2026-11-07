@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
-vi.mock("../api", () => ({ updateProceso: vi.fn() }))
+vi.mock("../api", () => ({ updateProceso: vi.fn(), getProceso: vi.fn() }))
 
 const mockToast = { loading: vi.fn(() => "tid"), success: vi.fn(), error: vi.fn() }
 vi.mock("react-hot-toast", () => ({ default: mockToast }))
@@ -58,6 +58,21 @@ beforeEach(async () => {
 })
 
 describe("DetalleView", () => {
+  it("reinicia la revisión y las actuaciones adicionales al cambiar de expediente", async () => {
+    const { default: DetalleView } = await import("./DetalleView")
+    const api = await import("../api")
+    vi.mocked(api.updateProceso).mockResolvedValueOnce({})
+    vi.mocked(api.getProceso).mockResolvedValueOnce({ actuaciones: [{ ...DETALLE_MOCK.actuaciones[1], id_reg_actuacion: 1, actuacion: "Actuación adicional" }] })
+    const vista = render(<DetalleView detalle={{ ...DETALLE_MOCK, total_actuaciones: 3 }} onVolver={onVolver} />)
+    fireEvent.click(screen.getByRole("button", { name: /cargar más/i }))
+    expect(await screen.findByText("Actuación adicional")).toBeInTheDocument()
+    expect(api.getProceso).toHaveBeenCalledWith(DETALLE_MOCK.llave_proceso, 2)
+    fireEvent.click(screen.getByText(/marcar como leído/i))
+    expect(await screen.findByText("Revisado")).toBeInTheDocument()
+    vista.rerender(<DetalleView detalle={{ ...DETALLE_MOCK, llave_proceso: "05001400300520230010000" }} onVolver={onVolver} />)
+    expect(screen.getByText("Por revisar")).toBeInTheDocument()
+    expect(screen.queryByText("Actuación adicional")).not.toBeInTheDocument()
+  })
   it("debe renderizar el radicado y datos principales", async () => {
     const { default: DetalleView } = await import("./DetalleView")
     render(<DetalleView detalle={DETALLE_MOCK} onVolver={onVolver} />)

@@ -1,7 +1,63 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockFetch = vi.fn()
+const guardarDocumento = vi.hoisted(() => vi.fn())
+vi.mock("../utils/documentos", () => ({ guardarDocumento }))
 globalThis.fetch = mockFetch
+
+it("consulta novedades y el estado de sincronización antes de confirmar su revisión", async () => {
+  const api = await import("./index")
+  mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ total: 2, marcados: 2, en_curso: false }) })
+  await api.getNovedades()
+  await api.getNovedadesDetalle(25, 25)
+  await api.postSync()
+  await api.getSyncEstado()
+  await expect(api.marcarTodoLeido()).resolves.toMatchObject({ marcados: 2 })
+  expect(mockFetch.mock.calls.map(([url]) => new URL(url).pathname)).toEqual([
+    "/procesos/novedades", "/procesos/novedades-detalle", "/procesos/sync", "/procesos/sync/estado", "/procesos/marcar-todo-leido",
+  ])
+  expect(new URL(mockFetch.mock.calls[1][0]).searchParams.get("skip")).toBe("25")
+  expect(mockFetch.mock.calls[4][1].method).toBe("POST")
+})
+
+it("descarga el documento autenticado antes de enviarlo al sistema de archivos", async () => {
+  const documento = new Blob(["%PDF-documento"], { type: "application/pdf" })
+  mockFetch.mockResolvedValueOnce({ ok: true, status: 200, blob: async () => documento })
+  guardarDocumento.mockResolvedValueOnce("descargas")
+  const api = await import("./index")
+  await expect(api.descargarDocumento(42, "auto.pdf")).resolves.toBe("descargas")
+  expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("/procesos/documento/42"), expect.objectContaining({ credentials: "include" }))
+  expect(guardarDocumento).toHaveBeenCalledWith(documento, "auto.pdf")
+})
+
+it("no guarda una respuesta de error como si fuera un documento", async () => {
+  mockFetch.mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({ detail: "Documento no disponible" }) })
+  const api = await import("./index")
+  await expect(api.descargarDocumento(42, "auto.pdf")).rejects.toMatchObject({ status: 404, message: "Documento no disponible" })
+  expect(guardarDocumento).not.toHaveBeenCalled()
+})
+
+it("presenta los errores de validación del servidor como texto legible", async () => {
+  mockFetch.mockResolvedValueOnce({ ok: false, status: 422, json: async () => ({ detail: [{ msg: "Correo inválido" }, { msg: "Contraseña demasiado corta" }] }) })
+  const api = await import("./index")
+  await expect(api.registerUser({ email: "mal", password: "1" })).rejects.toThrow("Correo inválido; Contraseña demasiado corta")
+})
+
+it("ofrece un error comprensible cuando el servidor no devuelve JSON", async () => {
+  mockFetch.mockResolvedValueOnce({ ok: false, status: 400, json: async () => { throw new SyntaxError("HTML") } })
+  const api = await import("./index")
+  await expect(api.getProceso("123")).rejects.toMatchObject({ status: 400, message: "No se pudo cargar el expediente." })
+})
+
+it("consulta las siguientes actuaciones y actualiza su revisión sin perder el identificador", async () => {
+  const api = await import("./index")
+  mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ actuaciones: [] }) })
+  await api.getProceso("123", 50, 25)
+  expect(mockFetch).toHaveBeenLastCalledWith(expect.stringContaining("/procesos/123?skip=50&limit=25"), expect.any(Object))
+  mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ notificado: true }) })
+  await expect(api.updateProceso("123", { notificado: true })).resolves.toEqual({ notificado: true })
+  expect(mockFetch).toHaveBeenLastCalledWith(expect.stringContaining("/procesos/123"), expect.objectContaining({ method: "PATCH", body: JSON.stringify({ notificado: true }) }))
+})
 
 beforeEach(() => {
   vi.clearAllMocks()
