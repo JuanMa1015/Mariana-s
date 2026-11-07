@@ -5,10 +5,25 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-07
+
+### Añadido
+- Android muestra una notificación al guardar un documento en Descargas. Desde el aviso puedes abrir el archivo.
+
 ### Cambiado
+- La app móvil incorpora una navegación común, una cabecera más compacta y una lista de novedades que muestra las actuaciones de cinco en cinco.
+- Los formularios y diálogos mejoran el manejo del foco. La lista de procesos usa una tabla accesible en escritorio y tarjetas en móvil.
 - **Avisos push más útiles:** muestran el radicado, el nombre del cliente (alias), la actuación nueva, el despacho, la anotación, la fecha y si trae documentos. Plegado se ve el radicado; al desplegar el aviso, el resto. Si el mismo proceso vuelve a tener novedad, el aviso reemplaza al anterior en vez de apilarse, y cuando llegan más de tres a la vez se agrupan en un solo aviso.
 - «Enviar prueba» y la prueba de push del panel usan el mismo formato, con los datos reales del proceso más reciente del usuario y la marca «[Prueba]».
 - El contenido se arma en el servidor: no requiere instalar una APK nueva.
+
+### Corregido
+- Los documentos se guardan en Descargas en Android y se pueden exportar desde el menú del sistema en iOS.
+- Al volver de un expediente se conservan los filtros de la lista. Si falla la conexión, puedes reintentar la consulta. Si vence la sesión, puedes volver al expediente después de ingresar.
+
+### Seguridad
+- El token de sesión móvil pasa al almacenamiento seguro del dispositivo. Al actualizar desde una versión que aún guarda el token anterior, tendrás que volver a iniciar sesión.
+- La caché de expedientes queda en memoria y se limpia al cambiar de cuenta o cerrar sesión.
 
 ## [0.4.1] - 2026-10-20
 
