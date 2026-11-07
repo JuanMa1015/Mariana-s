@@ -7,6 +7,8 @@ on:
       - "apps/api/**"
       - "apps/web/**"
       - "infra/docker/**"
+      - ".github/workflows/docker-publish.yml"
+      - "sonar-project.properties"
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -34,8 +36,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements-dev.txt
       - name: Run tests
-        # Falla si la cobertura baja del 80% (hoy ~87%)
-        run: pytest -v --no-header --tb=short --cov=. --cov-report=term-missing --cov-fail-under=80
+        # Mantener el umbral existente; exportar el informe para SonarQube Cloud.
+        working-directory: .
+        env:
+          DATABASE_URL: sqlite://
+        run: pytest apps/api/tests -v --no-header --tb=short --cov --cov-config=apps/api/.coveragerc --cov-report=term-missing --cov-report=xml:apps/api/coverage.xml --cov-fail-under=80
+      - uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: apps/api/coverage.xml
+          if-no-files-found: error
 
   api:
     if: github.event_name == 'push'
@@ -88,7 +98,47 @@ jobs:
       - name: Type-check and build
         run: npm run build
       - name: Run tests
-        run: npx vitest run --reporter=verbose
+        run: npm run test:coverage -- --reporter=verbose
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-coverage
+          path: apps/web/coverage/lcov.info
+          if-no-files-found: error
+
+  sonar:
+    needs: [test, test-web]
+    # Forks do not receive SONAR_TOKEN. Never run untrusted PRs with elevated events.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate SonarQube Cloud configuration
+        run: |
+          test -n "$SONAR_TOKEN" || { echo "Missing SONAR_TOKEN secret"; exit 1; }
+          test -n "$SONAR_PROJECT_KEY" || { echo "Missing SONAR_PROJECT_KEY variable"; exit 1; }
+          test -n "$SONAR_ORGANIZATION" || { echo "Missing SONAR_ORGANIZATION variable"; exit 1; }
+      - uses: actions/download-artifact@v4
+        with:
+          name: api-coverage
+          path: apps/api
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-coverage
+          path: apps/web/coverage
+      - uses: SonarSource/sonarqube-scan-action@v8
+        with:
+          args: >-
+            -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
+            -Dsonar.host.url=https://sonarcloud.io
 
   web:
     if: github.event_name == 'push'

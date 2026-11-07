@@ -37,3 +37,6 @@ google-services.json
 *firebase-adminsdk*.json
 
 .coverage
+coverage.xml
+coverage/
+.scannerwork/
