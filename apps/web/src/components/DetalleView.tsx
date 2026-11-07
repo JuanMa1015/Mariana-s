@@ -1,7 +1,8 @@
+import BotonDocumento from "./BotonDocumento"
 import { useState } from "react"
 import toast from "react-hot-toast"
-import { getProceso, updateProceso, descargarDocumento } from "../api"
-import { formatearFechaCorta } from "../utils/fechas"
+import { getProceso, updateProceso } from "../api"
+import { formatearFechaCorta, formatearConsulta } from "../utils/fechas"
 import { formatearRadicado } from "../utils/radicado"
 import { CategoriaBadge, EstadoBadge } from "./Badges"
 import type { Actuacion, DetalleProceso, DocumentoActuacion } from "../types"
@@ -83,14 +84,6 @@ const DocumentosList = ({ docs }: { docs: DocumentoActuacion[] }) => {
   const [open, setOpen] = useState(false)
   if (!docs.length) return null
 
-  const descargar = async (id: number, nombre: string) => {
-    try {
-      await descargarDocumento(id, nombre)
-    } catch {
-      toast.error("No se pudo descargar el documento")
-    }
-  }
-
   return (
     <div className="mt-2">
       <button
@@ -111,14 +104,7 @@ const DocumentosList = ({ docs }: { docs: DocumentoActuacion[] }) => {
                 <p className="font-medium text-slate-700 truncate">{doc.nombre}</p>
                 {doc.descripcion && <p className="text-slate-500 truncate">{doc.descripcion}</p>}
               </div>
-              <button
-                type="button"
-                onClick={() => descargar(doc.id_reg_documento, doc.nombre)}
-                aria-label={`Descargar ${doc.nombre}`}
-                className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-indigo-600 shadow-sm ring-1 ring-indigo-200 transition hover:bg-indigo-50"
-              >
-                Descargar
-              </button>
+              <BotonDocumento id={doc.id_reg_documento} nombre={doc.nombre} />
             </li>
           ))}
         </ul>
@@ -176,6 +162,7 @@ const ActuacionCard = ({ actuacion, isLatest, isLast }: { actuacion: Actuacion; 
 // ── Main component ──────────────────────────────────────────────────────────────
 export default function DetalleView({ detalle, onVolver, onActualizado }: Props) {
   const [marcando, setMarcando] = useState(false)
+  const [leidoLocal, setLeidoLocal] = useState(false)
   // Paginas adicionales de actuaciones cargadas con "Cargar mas"
   const [extras, setExtras] = useState<Actuacion[]>([])
   const [cargandoMas, setCargandoMas] = useState(false)
@@ -186,6 +173,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
   if (llaveRenderizada !== detalle.llave_proceso) {
     setLlaveRenderizada(detalle.llave_proceso)
     setExtras([])
+    setLeidoLocal(false)
     setCargandoMas(false)
   }
 
@@ -202,6 +190,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
     setMarcando(true)
     try {
       await updateProceso(detalle.llave_proceso, { notificado: true })
+      setLeidoLocal(true)
       toast.success("Marcado como leído")
       if (onActualizado) onActualizado()
     } catch (err) {
@@ -218,6 +207,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
   const hayMas = typeof total === "number" && total > cargadas
 
   const cargarMas = async () => {
+    if (cargandoMas) return
     setCargandoMas(true)
     try {
       const siguiente = await getProceso(detalle.llave_proceso, cargadas)
@@ -246,7 +236,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
           Volver
         </button>
         <div className="flex items-center gap-2">
-          {!detalle.notificado && (
+          {!detalle.notificado && !leidoLocal && (
             <button
               type="button"
               onClick={handleMarcarLeido}
@@ -288,7 +278,7 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
       </div>
 
       {/* ── Hero card ── */}
-      <div className="relative overflow-hidden rounded-2xl border border-indigo-200 bg-gradient-to-br from-indigo-100 to-indigo-50 p-6 shadow-sm">
+      <div className="relative overflow-hidden rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
         <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-indigo-300/20" />
         <div className="pointer-events-none absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-indigo-300/10" />
 
@@ -298,18 +288,24 @@ export default function DetalleView({ detalle, onVolver, onActualizado }: Props)
               <IconScale />
             </div>
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-600">{detalle.alias || "Proceso judicial"}</p>
-              <h2 className="mt-0.5 font-mono text-lg font-bold tracking-widest text-slate-800 leading-tight">
+              <p className="text-lg font-bold text-slate-900">{detalle.alias || "Proceso judicial"}</p>
+              <h2 className="mt-0.5 break-all font-mono text-sm font-semibold tracking-wide text-slate-800 leading-tight">
                 {formatearRadicado(detalle.llave_proceso)}
               </h2>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <CategoriaBadge categoria={detalle.categoria} />
-            <EstadoBadge notificado={detalle.notificado} />
+            <EstadoBadge notificado={detalle.notificado || leidoLocal} />
           </div>
         </div>
 
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <p className="text-xs font-semibold text-slate-600">Última actuación registrada</p>
+          <p className="mt-1 text-base font-semibold text-slate-900">{actuacionesBase[0]?.actuacion || "Sin actuaciones registradas"}</p>
+          <p className="mt-2 text-sm text-slate-700">Última consulta completada: {formatearConsulta(detalle.ultima_sincronizacion)}</p>
+          {Boolean(detalle.fallos_consecutivos) && <p role="status" className="mt-1 text-sm text-amber-800">La consulta más reciente falló. Estas actuaciones corresponden a la información obtenida anteriormente.</p>}
+        </div>
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl bg-white/60 border border-indigo-200 px-4 py-3">
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-indigo-600">Última actuación</p>

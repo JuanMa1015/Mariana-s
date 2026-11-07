@@ -1,5 +1,8 @@
 import { Capacitor } from "@capacitor/core"
 import { SecureStorage } from "@aparajita/capacitor-secure-storage"
+import { ApiError } from "./errors"
+import { clearCache } from "./cache"
+import { guardarDocumento } from "../utils/documentos"
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
@@ -34,18 +37,20 @@ async function fetchBase(url: string, options: RequestInit = {}, autenticada = f
     }
   }
   const merged: RequestInit = { ...options, credentials: "include", headers }
-  return fetch(url, merged)
+  return fetch(url, { ...merged, signal: options.signal ?? AbortSignal.timeout(20000) })
 }
 
 async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos = 3) {
-  for (let intento = 0; intento < reintentos; intento++) {
+  const lectura = !options.method || ["GET", "HEAD", "OPTIONS"].includes(options.method.toUpperCase())
+  const intentos = lectura ? reintentos : 1
+  for (let intento = 0; intento < intentos; intento++) {
     let res: Response
     try {
       res = await fetchBase(url, options, true)
     } catch (err) {
-      if (intento < reintentos - 1) {
+      if (intento < intentos - 1) {
         const espera = 1000 * 2 ** intento
-        console.warn(`fetch falló (red), reintento ${intento + 1}/${reintentos} en ${espera}ms:`, err)
+        console.warn(`fetch falló (red), reintento ${intento + 1}/${intentos} en ${espera}ms:`, err)
         await _esperar(espera)
         continue
       }
@@ -53,14 +58,18 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos 
     }
 
     if (res.status === 401) {
-      await borrarToken()
-      window.location.href = "/login"
-      throw new Error("Unauthorized")
+      clearCache()
+      try {
+        await borrarToken()
+      } finally {
+        window.dispatchEvent(new Event("session-expired"))
+      }
+      throw new ApiError("Tu sesión venció. Inicia sesión para continuar.", 401)
     }
 
-    if (res.status >= 500 && res.status < 600 && intento < reintentos - 1) {
+    if (res.status >= 500 && res.status < 600 && intento < intentos - 1) {
       const espera = 1000 * 2 ** intento
-      console.warn(`API respondió ${res.status}, reintento ${intento + 1}/${reintentos} en ${espera}ms`)
+      console.warn(`API respondió ${res.status}, reintento ${intento + 1}/${intentos} en ${espera}ms`)
       await _esperar(espera)
       continue
     }
@@ -82,9 +91,10 @@ export async function loginUser(payload: { credential: string; password: string 
   } catch {
     throw new Error("Error de conexión. Revisa tu internet.")
   }
-  if (!res.ok) throw new Error((await res.json()).detail || "Error en login")
+  if (!res.ok) throw new ApiError(await detalleError(res, "No se pudo iniciar sesión."), res.status)
   const data = await res.json()
   await guardarToken(data)
+  clearCache()
   return data
 }
 
@@ -99,9 +109,10 @@ export async function registerUser(payload: { email: string; password: string; u
   } catch {
     throw new Error("Error de conexión. Revisa tu internet.")
   }
-  if (!res.ok) throw new Error((await res.json()).detail || "Error en registro")
+  if (!res.ok) throw new ApiError(await detalleError(res, "No se pudo crear la cuenta."), res.status)
   const data = await res.json()
   await guardarToken(data)
+  clearCache()
   return data
 }
 
@@ -112,14 +123,14 @@ export async function registrarDispositivo(token: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token, plataforma: Capacitor.getPlatform() === "ios" ? "ios" : "android" }),
   })
-  return res.json()
+  return leerJson(res)
 }
 
 /** Pide al servidor un aviso push de ejemplo (simula una novedad); `demora` da tiempo de cerrar la app. */
 export async function enviarAvisoDePrueba(demora = 0): Promise<{ enviados: number; programado_en?: number; errores?: string[]; caducados?: number }> {
   const res = await fetchWithAuth(`${BASE_URL}/dispositivos/prueba?demora=${demora}`, { method: "POST" })
   if (!res.ok) throw new Error((await res.json()).detail || "No se pudo enviar el aviso de prueba")
-  return res.json()
+  return leerJson(res)
 }
 
 /** Deja de enviar push a este celular (se llama antes de cerrar sesión). */
@@ -129,7 +140,7 @@ export async function bajaDispositivo(token: string) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ token }),
   })
-  return res.json()
+  return leerJson(res)
 }
 
 async function detalleError(res: Response, porDefecto: string): Promise<string> {
@@ -142,6 +153,11 @@ async function detalleError(res: Response, porDefecto: string): Promise<string> 
   }
 }
 
+async function leerJson(res: Response) {
+  if (!res.ok) throw new ApiError(await detalleError(res, "No se pudo completar la solicitud."), res.status)
+  return res.json()
+}
+
 /** Llamada JSON autenticada genérica (la usa el panel de administración). Lanza Error con el detalle del servidor. */
 export async function apiJson<T>(ruta: string, opciones: { method?: string; body?: unknown } = {}): Promise<T> {
   const { method = "GET", body } = opciones
@@ -151,7 +167,7 @@ export async function apiJson<T>(ruta: string, opciones: { method?: string; body
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   if (!res.ok) throw new Error(await detalleError(res, `Error ${res.status}`))
-  return res.json()
+  return leerJson(res)
 }
 
 /** Foto de perfil como data URL (null si el usuario no tiene). */
@@ -189,14 +205,14 @@ export async function cambiarUsuario(username: string, password: string): Promis
     body: JSON.stringify({ username, password }),
   })
   if (!res.ok) throw new Error(await detalleError(res, "No se pudo cambiar el usuario"))
-  return res.json()
+  return leerJson(res)
 }
 
 /** Envía al correo de la cuenta el enlace para elegir una nueva contraseña. */
 export async function solicitarCambioPassword(): Promise<{ email: string }> {
   const res = await fetchWithAuth(`${BASE_URL}/cuenta/password/solicitar`, { method: "POST" })
   if (!res.ok) throw new Error(await detalleError(res, "No se pudo enviar el correo"))
-  return res.json()
+  return leerJson(res)
 }
 
 export async function olvidePassword(email: string): Promise<void> {
@@ -229,13 +245,13 @@ export async function restablecerPassword(token: string, password: string): Prom
 
 export async function getMe() {
   const res = await fetchWithAuth(`${BASE_URL}/auth/me`)
-  return res.json()
+  return leerJson(res)
 }
 
 export async function logoutUser() {
   try {
     const res = await fetchWithAuth(`${BASE_URL}/auth/logout`, { method: "POST" })
-    return await res.json()
+    return await leerJson(res)
   } finally {
     await borrarToken()
   }
@@ -251,7 +267,7 @@ export async function getProcesos(despacho?: string, departamento?: string, skip
   params.append("skip", String(skip))
   params.append("limit", String(limit))
   const res = await fetchWithAuth(`${BASE_URL}/procesos/?${params}`)
-  return res.json()
+  return leerJson(res)
 }
 
 export async function getProceso(llaveProceso: string, skip?: number, limit?: number) {
@@ -260,23 +276,23 @@ export async function getProceso(llaveProceso: string, skip?: number, limit?: nu
   if (limit !== undefined) params.append("limit", String(limit))
   const qs = params.toString()
   const res = await fetchWithAuth(`${BASE_URL}/procesos/${llaveProceso}${qs ? `?${qs}` : ""}`)
-  if (!res.ok) throw new Error((await res.json()).detail || "Error fetching")
-  return res.json()
+  if (!res.ok) throw new ApiError(await detalleError(res, "No se pudo cargar el expediente."), res.status)
+  return leerJson(res)
 }
 
 export async function getNovedades() {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/novedades`)
-  return res.json()
+  return leerJson(res)
 }
 
 export async function postSync() {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/sync`, { method: "POST" })
-  return res.json()
+  return leerJson(res)
 }
 
 export async function getSyncEstado() {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/sync/estado`)
-  return res.json()
+  return leerJson(res)
 }
 
 export async function postAddRadicado(payload: { llave_proceso: string; despacho?: string; departamento?: string; sujetos_procesales?: string; categoria?: string }) {
@@ -286,18 +302,18 @@ export async function postAddRadicado(payload: { llave_proceso: string; despacho
     body: JSON.stringify(payload),
   })
   if (!res.ok) return { created: false, detail: (await res.json()).detail || "Failed to add" }
-  return res.json()
+  return leerJson(res)
 }
 
 export async function deleteProceso(llaveProceso: string) {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/${llaveProceso}`, { method: "DELETE" })
   if (!res.ok) throw new Error((await res.json()).detail || "Delete failed")
-  return res.json()
+  return leerJson(res)
 }
 
 export async function getNovedadesDetalle(skip = 0, limit = 50) {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/novedades-detalle?skip=${skip}&limit=${limit}`)
-  return res.json()
+  return leerJson(res)
 }
 
 export async function updateProceso(llaveProceso: string, payload: Partial<{ llave_proceso: string; despacho: string; departamento: string; sujetos_procesales: string; categoria: string; alias: string; notificado: boolean; fecha_ultima_actuacion: string }>) {
@@ -307,24 +323,17 @@ export async function updateProceso(llaveProceso: string, payload: Partial<{ lla
     body: JSON.stringify(payload),
   })
   if (!res.ok) throw new Error((await res.json()).detail || "Update failed")
-  return res.json()
+  return leerJson(res)
 }
 
 export async function marcarTodoLeido() {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/marcar-todo-leido`, { method: "POST" })
-  return res.json()
+  return leerJson(res)
 }
 
 export async function descargarDocumento(id: number, nombre: string) {
   const res = await fetchWithAuth(`${BASE_URL}/procesos/documento/${id}`)
-  if (!res.ok) throw new Error("No se pudo descargar el documento")
+  if (!res.ok) throw new ApiError(await detalleError(res, "No se pudo descargar el documento."), res.status)
   const blob = await res.blob()
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement("a")
-  a.href = url
-  a.download = nombre
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  return guardarDocumento(blob, nombre)
 }

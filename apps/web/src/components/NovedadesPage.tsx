@@ -1,24 +1,18 @@
 import { useState, useEffect } from "react"
-import { getNovedadesDetalle, marcarTodoLeido, descargarDocumento } from "../api"
+import { getNovedadesDetalle, marcarTodoLeido } from "../api"
 import { formatearFechaCorta } from "../utils/fechas"
 import { formatearRadicado } from "../utils/radicado"
 import toast from "react-hot-toast"
 import type { NovedadesDetalle, NovedadDetalle, Actuacion } from "../types"
 import { useNavigate } from "react-router-dom"
+import BotonDocumento from "./BotonDocumento"
+import Modal from "./Modal"
+import { removeCache } from "../api/cache"
 import { useTitle } from "../hooks/useTitle"
 
 function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"] }) {
   const [open, setOpen] = useState(false)
   if (!documentos?.length) return <span className="text-slate-400">—</span>
-
-  const descargarDocumentoClick = (id: number, nombre: string) => async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    try {
-      await descargarDocumento(id, nombre)
-    } catch {
-      toast.error("No se pudo descargar el documento")
-    }
-  }
 
   return (
     <div className="relative">
@@ -34,9 +28,7 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
         {documentos.length}
       </button>
       {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-96 rounded-xl border border-sky-100 bg-white p-3 shadow-lg">
+        <Modal titulo="Documentos de la actuación" onClose={() => setOpen(false)}>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-sky-600">Documentos</p>
             <div className="space-y-2">
               {documentos.map((doc) => (
@@ -47,29 +39,23 @@ function DocumentosPopover({ documentos }: { documentos: Actuacion["documentos"]
                       {doc.descripcion && <p className="mt-0.5 text-slate-500">{doc.descripcion}</p>}
                       {doc.fecha_carga && <p className="mt-0.5 text-[10px] text-slate-400">{formatearFechaCorta(doc.fecha_carga) ?? "—"}</p>}
                     </div>
-                    <button
-                      onClick={descargarDocumentoClick(doc.id_reg_documento, doc.nombre)}
-                      aria-label={`Descargar ${doc.nombre}`}
-                      className="shrink-0 rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-sky-600 shadow-sm ring-1 ring-sky-200 transition hover:bg-sky-50"
-                    >
-                      Descargar
-                    </button>
+                    <BotonDocumento id={doc.id_reg_documento} nombre={doc.nombre} />
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        </>
+        </Modal>
       )}
     </div>
   )
 }
 
 function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
+  const [visibles, setVisibles] = useState(5)
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-xs">
-        <thead>
+      <table className="block w-full border-collapse text-sm sm:table sm:text-xs">
+        <thead className="hidden sm:table-header-group">
           <tr className="border-b border-indigo-100 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             <th className="px-3 py-2">Fecha actuación</th>
             <th className="px-3 py-2">Actuación</th>
@@ -80,52 +66,63 @@ function ActuacionesTable({ actuaciones }: { actuaciones: Actuacion[] }) {
             <th className="px-3 py-2 text-center">Docs</th>
           </tr>
         </thead>
-        <tbody>
-          {actuaciones.map((a, i) => (
+        <tbody className="block sm:table-row-group">
+          {actuaciones.slice(0, visibles).map((a, i) => (
             <tr
               key={a.id_reg_actuacion}
-              className={`border-b border-indigo-50 transition hover:bg-indigo-50/50 ${i === 0 ? "bg-amber-50/40" : ""}`}
+              className={`grid grid-cols-2 border-b border-indigo-50 py-3 transition sm:table-row sm:py-0 hover:bg-indigo-50/50 ${i === 0 ? "bg-amber-50/40" : ""}`}
             >
-              <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-700">
+              <td className="col-span-2 block px-3 py-2.5 font-medium text-slate-700 sm:table-cell">
                 {i === 0 && (
                   <span className="mr-1.5 inline-block rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-amber-700">Última</span>
                 )}
                 {formatearFechaCorta(a.fecha_actuacion) ?? "—"}
               </td>
-              <td className="px-3 py-2.5 font-medium text-slate-800">{a.actuacion}</td>
-              <td className="max-w-xs px-3 py-2.5 text-slate-600">
+              <td className="col-span-2 block px-3 py-2.5 font-semibold text-slate-800 sm:table-cell">{a.actuacion}</td>
+              <td className="col-span-2 block px-3 py-2.5 text-slate-600 sm:table-cell sm:max-w-xs">
                 {a.anotacion ? (
-                  <span className="line-clamp-3" title={a.anotacion}>{a.anotacion}</span>
+                  <span className="whitespace-pre-line break-words" title={a.anotacion}>{a.anotacion}</span>
                 ) : "—"}
               </td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFechaCorta(a.fecha_inicial) ?? "—"}</td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFechaCorta(a.fecha_final) ?? "—"}</td>
-              <td className="whitespace-nowrap px-3 py-2.5 text-slate-500">{formatearFechaCorta(a.fecha_registro) ?? "—"}</td>
-              <td className="px-3 py-2.5 text-center">
+              <td className="block px-3 py-2.5 text-slate-600 sm:table-cell"><span className="block text-xs font-semibold sm:hidden">Inicio</span>{formatearFechaCorta(a.fecha_inicial) ?? "—"}</td>
+              <td className="block px-3 py-2.5 text-slate-600 sm:table-cell"><span className="block text-xs font-semibold sm:hidden">Fin</span>{formatearFechaCorta(a.fecha_final) ?? "—"}</td>
+              <td className="block px-3 py-2.5 text-slate-600 sm:table-cell"><span className="block text-xs font-semibold sm:hidden">Registro</span>{formatearFechaCorta(a.fecha_registro) ?? "—"}</td>
+              <td className="block px-3 py-2.5 sm:table-cell sm:text-center">
                 <DocumentosPopover documentos={a.documentos} />
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {actuaciones.length > 5 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-3 pt-4">
+          <p role="status" className="text-xs text-slate-600">Mostrando {Math.min(visibles, actuaciones.length)} de {actuaciones.length} actuaciones</p>
+          {visibles < actuaciones.length && (
+            <button type="button" onClick={() => setVisibles((cantidad) => cantidad + 5)}
+              className="min-h-11 rounded-xl border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700">
+              Ver más actuaciones
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
 
 function InsigniaAviso({ novedad, intentosMax = 5 }: { novedad: NovedadDetalle; intentosMax?: number }) {
-  const base = "shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+  const base = "text-xs font-medium"
 
   if (novedad.notificacion_pendiente) {
     const intentos = novedad.intentos_notificacion ?? 0
     if (intentos >= intentosMax) {
       return (
-        <span className={`${base} bg-rose-100 text-rose-700`} title="Agotamos los reintentos del aviso; la novedad sigue visible aquí">
+        <span className={`${base} text-rose-700`} title="Agotamos los reintentos del aviso; la novedad sigue visible aquí">
           No se pudo avisar
         </span>
       )
     }
     return (
-      <span className={`${base} bg-amber-100 text-amber-700`} title="Estamos intentando enviar el aviso a tus canales">
+      <span className={`${base} text-amber-800`} title="Estamos intentando enviar el aviso a tus canales">
         Sin avisar<span className="hidden sm:inline">{intentos > 0 ? ` · reintento ${intentos}` : ""}</span>
       </span>
     )
@@ -134,19 +131,19 @@ function InsigniaAviso({ novedad, intentosMax = 5 }: { novedad: NovedadDetalle; 
   switch (novedad.canales_notificados) {
     case "email+telegram":
       return (
-        <span className={`${base} bg-emerald-100 text-emerald-700`} title="El aviso llegó por correo y por Telegram">
+        <span className={`${base} text-slate-600`} title="El aviso llegó por correo y por Telegram">
           Avisado<span className="hidden sm:inline">: Correo y Telegram</span>
         </span>
       )
     case "email":
       return (
-        <span className={`${base} bg-emerald-100 text-emerald-700`} title="El aviso llegó por correo">
+        <span className={`${base} text-slate-600`} title="El aviso llegó por correo">
           Correo<span className="hidden sm:inline"> avisado</span>
         </span>
       )
     case "telegram":
       return (
-        <span className={`${base} bg-emerald-100 text-emerald-700`} title="El aviso llegó por Telegram">
+        <span className={`${base} text-slate-600`} title="El aviso llegó por Telegram">
           Telegram<span className="hidden sm:inline"> avisado</span>
         </span>
       )
@@ -156,7 +153,7 @@ function InsigniaAviso({ novedad, intentosMax = 5 }: { novedad: NovedadDetalle; 
         const nombres = { email: "Correo", telegram: "Telegram", push: "App" } as Record<string, string>
         const lista = novedad.canales_notificados.split("+").map((c) => nombres[c] ?? c)
         return (
-          <span className={`${base} bg-emerald-100 text-emerald-700`} title={`El aviso llegó por ${lista.join(", ")}`}>
+          <span className={`${base} text-slate-600`} title={`El aviso llegó por ${lista.join(", ")}`}>
             Avisado<span className="hidden sm:inline">: {lista.join(", ")}</span>
           </span>
         )
@@ -176,6 +173,7 @@ export default function NovedadesPage() {
   const [error, setError] = useState(false)
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [marcando, setMarcando] = useState(false)
+  const [confirmarTodo, setConfirmarTodo] = useState(false)
   const [skip, setSkip] = useState(0)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -186,6 +184,10 @@ export default function NovedadesPage() {
     getNovedadesDetalle(skip, limit)
       .then((d) => {
         if (!active) return
+        if (d.total > 0 && skip >= d.total) {
+          setSkip(Math.max(0, Math.floor((d.total - 1) / limit) * limit))
+          return
+        }
         setError(false)
         setData(d)
       })
@@ -201,49 +203,23 @@ export default function NovedadesPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / limit)) : 1
   const currentPage = Math.floor(skip / limit) + 1
 
-  const handleMarcarTodo = () => {
-    toast((t) => (
-      <div className="flex flex-col gap-3">
-        <p className="text-sm font-semibold text-slate-800">¿Marcar todos como leído?</p>
-        <p className="text-xs text-slate-500">
-          {data ? `Se marcarán ${data.total} proceso${data.total !== 1 ? "s" : ""} como leído${data.total !== 1 ? "s" : ""}.` : "Se marcarán todos los procesos pendientes."}
-        </p>
-        <div className="flex gap-2">
-          <button
-            className="flex-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 transition"
-            onClick={async () => {
-              toast.dismiss(t.id)
-              setMarcando(true)
-              try {
-                const res = await marcarTodoLeido()
-                toast.success(`${res.marcados} proceso${res.marcados !== 1 ? "s" : ""} marcado${res.marcados !== 1 ? "s" : ""} como leido${res.marcados !== 1 ? "s" : ""}`)
-                setExpanded(new Set())
-                if (skip === 0) {
-                  // Ya estamos en la primera pagina: recargar manualmente
-                  getNovedadesDetalle(0, limit).then(setData).catch(() => setError(true))
-                } else {
-                  // Volver a la primera pagina; el useEffect recarga solo
-                  setLoading(true)
-                  setSkip(0)
-                }
-              } catch {
-                toast.error("Error al marcar como leido")
-              } finally {
-                setMarcando(false)
-              }
-            }}
-          >
-            Sí, marcar todo
-          </button>
-          <button
-            className="flex-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
-            onClick={() => toast.dismiss(t.id)}
-          >
-            Cancelar
-          </button>
-        </div>
-      </div>
-    ), { duration: Infinity, style: { background: "#fff", padding: "16px", borderRadius: "16px" } })
+  const handleMarcarTodo = async () => {
+    if (marcando) return
+    setMarcando(true)
+    try {
+      const res = await marcarTodoLeido()
+      removeCache("novedades")
+      toast.success(`${res.marcados} procesos marcados como leídos`)
+      setConfirmarTodo(false)
+      setExpanded(new Set())
+      setLoading(true)
+      setSkip(0)
+      setReloadKey((k) => k + 1)
+    } catch {
+      toast.error("No se pudieron marcar los procesos. Vuelve a intentar.")
+    } finally {
+      setMarcando(false)
+    }
   }
 
   const toggleExpand = (llave: string) => {
@@ -272,7 +248,7 @@ export default function NovedadesPage() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-5 sm:px-5">
+      <main id="contenido" tabIndex={-1} className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-5 sm:px-5">
         {loading ? (
           <div className="flex flex-1 items-center justify-center py-20">
             <div className="flex flex-col items-center gap-3 text-slate-500">
@@ -300,7 +276,7 @@ export default function NovedadesPage() {
           <div className="flex flex-1 items-center justify-center">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-8 text-center text-sm">
               <p className="font-semibold text-emerald-700">¡Todo al día!</p>
-              <p className="mt-1 text-emerald-600">No hay novedades pendientes de revisar.</p>
+              <p className="mt-1 text-emerald-600">No hay novedades pendientes de revisar en la última consulta. La verificación de cada expediente puede tener una fecha diferente.</p>
             </div>
           </div>
         ) : (
@@ -311,7 +287,7 @@ export default function NovedadesPage() {
               </p>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleMarcarTodo}
+                  onClick={() => setConfirmarTodo(true)}
                   disabled={marcando}
                   className="whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-40"
                 >
@@ -351,6 +327,8 @@ export default function NovedadesPage() {
                   >
                     <button
                       onClick={() => toggleExpand(nov.llave_proceso)}
+                      aria-expanded={isOpen}
+                      aria-controls={`actuaciones-${nov.llave_proceso}`}
                       className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-left sm:px-5"
                     >
                       <svg
@@ -365,43 +343,29 @@ export default function NovedadesPage() {
                       </span>
                       {nov.alias && <span className="max-w-[16rem] truncate text-sm font-semibold text-slate-800">{nov.alias}</span>}
 
-                      {nov.tipo_novedad && (
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
-                          nov.tipo_novedad === "nuevo" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                        }`}>
-                          {nov.tipo_novedad === "nuevo" ? "Nuevo" : "Actualización"}
+                      {nov.actuaciones[0] && (
+                        <span className="mt-2 w-full text-base font-semibold leading-snug text-slate-900">{nov.actuaciones[0].actuacion}</span>
+                      )}
+                      <span className="w-full text-sm text-slate-600">{nov.despacho}</span>
+                      <span className="text-sm font-medium text-slate-700">{formatearFechaCorta(nov.fecha_ultima_actuacion) ?? "Sin fecha"}</span>
+                      <span className="text-xs text-slate-500">{nov.actuaciones.length} actuaciones</span>
+                      <span className="mt-2 flex w-full flex-wrap items-center gap-x-3 gap-y-1 border-t border-slate-100 pt-2">
+                        <span className="text-xs font-semibold text-amber-800">Pendiente de revisión</span>
+                        <InsigniaAviso novedad={nov} intentosMax={data.intentos_max_aviso} />
+                      </span>
+                      {(nov.categoria || nov.tipo_novedad) && (
+                        <span className="w-full text-xs text-slate-500">
+                          {[nov.categoria, nov.tipo_novedad ? (nov.tipo_novedad === "nuevo" ? "Nuevo" : "Actualización") : null].filter(Boolean).join(" · ")}
                         </span>
                       )}
-
-                      {nov.categoria && (
-                        <span className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider ${
-                          nov.categoria === "Trabajo" ? "bg-sky-100 text-sky-700" : nov.categoria === "Consultorio" ? "bg-amber-100 text-amber-700" : "bg-indigo-100 text-indigo-700"
-                        }`}>
-                          {nov.categoria}
-                        </span>
-                      )}
-
-                      <InsigniaAviso novedad={nov} intentosMax={data.intentos_max_aviso} />
-
-                      <span className="hidden min-w-0 flex-1 truncate text-xs text-slate-500 sm:block">
-                        {nov.despacho}
-                      </span>
-
-                      <span className="ml-auto shrink-0 text-[11px] font-medium text-amber-600">
-                        {formatearFechaCorta(nov.fecha_ultima_actuacion) ?? "—"}
-                      </span>
-
-                      <span className="whitespace-nowrap rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700" title={`${nov.actuaciones.length} actuaciones nuevas`}>
-                        {nov.actuaciones.length} act.
-                      </span>
                     </button>
 
                     {isOpen && (
-                      <div className="border-t border-indigo-100 px-4 pb-3 pt-3 sm:px-5">
+                      <div id={`actuaciones-${nov.llave_proceso}`} className="border-t border-indigo-100 px-4 pb-3 pt-3 sm:px-5">
                         <ActuacionesTable actuaciones={nov.actuaciones} />
                         <div className="mt-3 flex justify-end">
                           <button
-                            onClick={() => navigate(`/procesos/${nov.llave_proceso}`)}
+                            onClick={() => navigate(`/procesos/${nov.llave_proceso}`, { state: { from: "/novedades" } })}
                             className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-semibold text-indigo-700 transition hover:bg-indigo-100"
                           >
                             Ver detalle completo →
@@ -416,6 +380,13 @@ export default function NovedadesPage() {
           </>
         )}
       </main>
+      {confirmarTodo && <Modal titulo="¿Marcar todos los procesos como leídos?" role="alertdialog" onClose={() => { if (!marcando) setConfirmarTodo(false) }}>
+        <p className="text-sm text-slate-700">Se marcarán {data?.total ?? 0} procesos, incluidos los de otras páginas. La entrega de un aviso y tu revisión del expediente se registran por separado.</p>
+        <div className="mt-4 flex flex-wrap gap-3">
+          <button disabled={marcando} onClick={() => { void handleMarcarTodo() }} className="min-h-11 rounded-xl bg-indigo-600 px-4 text-sm font-semibold text-white">{marcando ? "Marcando…" : "Sí, marcar todo"}</button>
+          <button disabled={marcando} onClick={() => setConfirmarTodo(false)} className="min-h-11 rounded-xl border px-4 text-sm font-semibold">Cancelar</button>
+        </div>
+      </Modal>}
     </div>
   )
 }

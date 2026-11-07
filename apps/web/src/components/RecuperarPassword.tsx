@@ -31,6 +31,7 @@ export function OlvidePage() {
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (enviando) return
     setEnviando(true)
     try {
       await olvidePassword(email.trim())
@@ -77,6 +78,7 @@ export function RestablecerPage() {
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (guardando) return
     if (password.length < 8) return setError("La contraseña debe tener al menos 8 caracteres")
     if (password !== confirmar) return setError("Las contraseñas no coinciden")
     setError("")

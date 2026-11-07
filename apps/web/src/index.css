@@ -129,3 +129,17 @@ body::before {
 .dark [class*="from-white"] { --tw-gradient-from: var(--surface); }
 .dark [class*="via-white"] { --tw-gradient-via: var(--surface); }
 .dark [class*="to-white"] { --tw-gradient-to: var(--surface); }
+
+/* Un mismo recorrido de lectura y navegación para escritorio y móvil. */
+.skip-link { position: fixed; top: -10rem; left: 1rem; z-index: 100; padding: .75rem 1rem; background: white; color: #3730a3; border: 2px solid #3730a3; }
+.skip-link:focus { top: 1rem; }
+:where(main, section[id]) { scroll-margin-top: 1rem; }
+@media (max-width: 639px) {
+  .private-layout { padding-bottom: calc(4rem + env(safe-area-inset-bottom)); }
+  .private-layout button, .private-layout select, .private-layout a { min-height: 44px; }
+  .private-layout th, .private-layout td { overflow-wrap: anywhere; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+@media print { .private-layout { padding-bottom: 0; } }

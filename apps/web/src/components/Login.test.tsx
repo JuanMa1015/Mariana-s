@@ -1,7 +1,7 @@
 import { it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, MemoryRouter } from 'react-router-dom'
 import Login from './Login'
 
 const mockNavigate = vi.fn()
@@ -39,6 +39,16 @@ function renderLogin() {
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
+})
+
+it('vuelve al expediente solicitado después del login', async () => {
+  mockLoginUser.mockResolvedValueOnce({ email: 'prueba@example.test', username: 'prueba' })
+  render(<MemoryRouter initialEntries={[{ pathname: '/login', state: { from: '/procesos/123?categoria=Trabajo' } }]}><Login /></MemoryRouter>)
+  const user = userEvent.setup()
+  await user.type(screen.getByLabelText('Correo o Usuario'), 'prueba')
+  await user.type(screen.getByLabelText('Contraseña', { exact: true }), 'prueba-local')
+  await user.click(screen.getByRole('button', { name: 'Ingresar' }))
+  expect(mockNavigate).toHaveBeenCalledWith('/procesos/123?categoria=Trabajo')
 })
 
 it('should render login form', () => {

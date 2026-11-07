@@ -1,7 +1,7 @@
 import { it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, MemoryRouter, Routes, Route } from 'react-router-dom'
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
@@ -37,9 +37,28 @@ beforeEach(() => {
   vi.clearAllMocks()
   fetchMock.mockResolvedValue(new Response(null, { status: 200 }))
   vi.stubGlobal('fetch', fetchMock)
+  vi.stubGlobal('scrollTo', vi.fn())
   mockGetProcesos.mockResolvedValue({ total: 0, procesos: [] })
   mockGetNovedades.mockResolvedValue({ total: 0, novedades: [] })
   mockPostSync.mockRejectedValue(new Error("Error de conexión"))
+})
+
+it("permite reintentar un expediente cuando su consulta falla", async () => {
+  mockGetProceso.mockRejectedValue(new Error("red caída"))
+  const App = (await import('./App')).default
+  render(<MemoryRouter initialEntries={["/procesos/123"]}><Routes><Route path="/procesos/:llaveProceso" element={<App />} /></Routes></MemoryRouter>)
+  expect(await screen.findByRole("button", { name: "Reintentar expediente" })).toBeInTheDocument()
+  expect(screen.queryByText("Cargando proceso...")).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole("button", { name: "Reintentar expediente" }))
+  await vi.waitFor(() => expect(mockGetProceso).toHaveBeenCalledTimes(2))
+})
+
+it("muestra una lista fallida con reintento en lugar de un esqueleto permanente", async () => {
+  mockGetProcesos.mockRejectedValue(new Error("red caída"))
+  const App = (await import('./App')).default
+  render(<BrowserRouter><App /></BrowserRouter>)
+  expect(await screen.findByRole("button", { name: "Reintentar lista" })).toBeInTheDocument()
+  expect(screen.queryByText("No hay novedades pendientes en la última consulta.")).not.toBeInTheDocument()
 })
 
 afterEach(() => {
@@ -87,9 +106,9 @@ it("tras varios fallos explica que los datos no se perdieron y ofrece reintentar
   // Ping inicial + 3 reintentos del intervalo (60s cada uno) = 4 fallos seguidos.
   // El ultimo flush adicional deja drenar el render agendado por React
   // (MessageChannel tambien queda bajo fake timers).
-  await vi.advanceTimersByTimeAsync(0)
-  for (let i = 0; i < 3; i++) await vi.advanceTimersByTimeAsync(60000)
-  await vi.advanceTimersByTimeAsync(0)
+  await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+  for (let i = 0; i < 3; i++) await act(async () => { await vi.advanceTimersByTimeAsync(60000) })
+  await act(async () => { await vi.advanceTimersByTimeAsync(0) })
 
   expect(screen.getByText(/tus procesos no se han perdido/i)).toBeInTheDocument()
   expect(screen.getByText(/última visita/i)).toBeInTheDocument()
@@ -102,11 +121,11 @@ it("al recuperarse la conexion quita el aviso y recarga la lista", async () => {
   const App = (await import('./App')).default
   render(<BrowserRouter><App /></BrowserRouter>)
 
-  await vi.advanceTimersByTimeAsync(0)
+  await act(async () => { await vi.advanceTimersByTimeAsync(0) })
   expect(await vi.waitFor(() => screen.getByText(/conectando con la aplicación/i))).toBeInTheDocument()
 
   // Siguiente ping exitoso (60s despues): el aviso desaparece y se recarga
-  await vi.advanceTimersByTimeAsync(60000)
+  await act(async () => { await vi.advanceTimersByTimeAsync(60000) })
   expect(screen.queryByText(/conectando con la aplicación/i)).not.toBeInTheDocument()
   await vi.waitFor(() => expect(mockGetProcesos).toHaveBeenCalledTimes(2))
 })

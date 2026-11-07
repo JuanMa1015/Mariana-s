@@ -72,13 +72,13 @@ describe("DetalleView", () => {
   it("debe mostrar 'Con novedad' cuando notificado es false", async () => {
     const { default: DetalleView } = await import("./DetalleView")
     render(<DetalleView detalle={DETALLE_MOCK} onVolver={onVolver} />)
-    expect(screen.getByText("Con novedad")).toBeInTheDocument()
+    expect(screen.getByText("Por revisar")).toBeInTheDocument()
   })
 
   it("debe mostrar 'Al día' cuando notificado es true", async () => {
     const { default: DetalleView } = await import("./DetalleView")
     render(<DetalleView detalle={{ ...DETALLE_MOCK, notificado: true }} onVolver={onVolver} />)
-    expect(screen.getByText("Al día")).toBeInTheDocument()
+    expect(screen.getByText("Revisado")).toBeInTheDocument()
   })
 
   it("debe llamar onVolver al hacer clic en Volver", async () => {
@@ -91,7 +91,7 @@ describe("DetalleView", () => {
   it("debe mostrar las actuaciones en timeline", async () => {
     const { default: DetalleView } = await import("./DetalleView")
     render(<DetalleView detalle={DETALLE_MOCK} onVolver={onVolver} />)
-    expect(screen.getByText("Auto admite demanda")).toBeInTheDocument()
+    expect(screen.getAllByText("Auto admite demanda").length).toBeGreaterThan(0)
     expect(screen.getByText("Presenta demanda")).toBeInTheDocument()
   })
 

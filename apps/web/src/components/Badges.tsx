@@ -18,8 +18,8 @@ export function CategoriaBadge({ categoria }: { categoria?: string | null }) {
 /** "Con novedad" = hay actuaciones nuevas sin revisar; "Al día" = ya revisado. */
 export function EstadoBadge({ notificado }: { notificado: boolean }) {
   const e = notificado
-    ? { caja: "border-emerald-200 bg-emerald-50 text-emerald-700", punto: "bg-emerald-500", label: "Al día" }
-    : { caja: "border-amber-200 bg-amber-50 text-amber-700", punto: "bg-amber-500", label: "Con novedad" }
+    ? { caja: "border-emerald-200 bg-emerald-50 text-emerald-700", punto: "bg-emerald-500", label: "Revisado" }
+    : { caja: "border-amber-200 bg-amber-50 text-amber-700", punto: "bg-amber-500", label: "Por revisar" }
   return (
     <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs font-semibold ${e.caja}`}>
       <span className={`h-1.5 w-1.5 rounded-full ${e.punto}`} />

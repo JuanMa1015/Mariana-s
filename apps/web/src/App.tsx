@@ -3,21 +3,21 @@ import { getProceso, getProcesos, getNovedades, postAddRadicado, postSync, getSy
 import { getCache, setCache, removeCache } from "./api/cache"
 import toast from "react-hot-toast"
 import type { Orden, DetalleProceso, ListaProcesos, ListaNovedades, ResultadoSync, SyncEstado, SyncIniciado } from "./types"
-import BottomNav from "./components/BottomNav"
 import AvisoPermisoPush from "./components/AvisoPermisoPush"
 import Avatar from "./components/Avatar"
 import { useAvatar } from "./hooks/useAvatar"
 import { cerrarSesion } from "./session"
 import TablaProcesos from "./components/TablaProcesos"
 import DetalleView from "./components/DetalleView"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom"
 import { captureException } from "./sentry"
 import { formatearFechaCorta } from "./utils/fechas"
+import { ApiError } from "./api/errors"
 import { useTitle } from "./hooks/useTitle"
 
 function tiempoRelativo(fecha: string | null | undefined): string {
   if (!fecha) return "Aún sin sincronizar"
-  const t = new Date(fecha).getTime()
+  const t = new Date(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(fecha) ? fecha : fecha + "Z").getTime()
   if (isNaN(t)) return "Aún sin sincronizar"
   const min = Math.floor((Date.now() - t) / 60000)
   if (min < 1) return "hace un momento"
@@ -34,8 +34,11 @@ function fetchProcesosNovedades(skip: number, limit: number, categoria?: string,
   ])
 }
 
+const posicionesLista = new Map<string, number>()
+
 export default function App() {
   const navigate = useNavigate()
+  const location = useLocation()
   useTitle("Mis procesos")
   const username = localStorage.getItem("username") || localStorage.getItem("email")?.split("@")[0] || "Mariana"
 
@@ -46,30 +49,55 @@ export default function App() {
     if (h < 18) return "Buenas tardes"
     return "Buenas noches"
   }, [])
-  const [page, setPage] = useState(1)
-  const [limit, setLimit] = useState(25)
-  const [filtroCategoria, setFiltroCategoria] = useState("")
-  const [busquedaInput, setBusquedaInput] = useState("")
-  const [busqueda, setBusqueda] = useState("")
-
-  // Debounce de la busqueda: dispara la peticion 300ms despues de dejar de escribir
+  const [params, setParams] = useSearchParams()
+  const page = Math.min(100000, Math.max(1, Number.parseInt(params.get("pagina") || "1", 10) || 1))
+  const limit = [25, 50, 100].includes(Number(params.get("limite"))) ? Number(params.get("limite")) : 25
+  const filtroCategoria = ["General", "Trabajo", "Consultorio"].includes(params.get("categoria") || "") ? params.get("categoria")! : ""
+  const orden: Orden = params.get("orden") === "reciente" || params.get("orden") === "antigua" ? params.get("orden") as Orden : "novedad"
+  const busqueda = params.get("q") || ""
+  const [busquedaInput, setBusquedaInput] = useState(busqueda)
+  const [busquedaAnterior, setBusquedaAnterior] = useState(busqueda)
+  if (busquedaAnterior !== busqueda) {
+    setBusquedaAnterior(busqueda)
+    setBusquedaInput(busqueda)
+  }
+  const actualizarFiltros = (cambios: Record<string, string | number>) => {
+    const siguiente = new URLSearchParams(params)
+    for (const [key, value] of Object.entries(cambios)) {
+      if (value === "") siguiente.delete(key)
+      else siguiente.set(key, String(value))
+    }
+    setParams(siguiente, { replace: true })
+  }
   useEffect(() => {
-    const t = setTimeout(() => setBusqueda(busquedaInput), 300)
-    return () => clearTimeout(t)
-  }, [busquedaInput])
+    if (busquedaInput === busqueda) return
+    const timer = setTimeout(() => {
+      setParams((prev) => {
+        const siguiente = new URLSearchParams(prev)
+        if (busquedaInput) siguiente.set("q", busquedaInput)
+        else siguiente.delete("q")
+        siguiente.set("pagina", "1")
+        return siguiente
+      }, { replace: true })
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [busquedaInput, busqueda, setParams])
 
-  const [orden, setOrden] = useState<Orden>("novedad")
   const cacheKey = `lista:${page}:${limit}:${filtroCategoria || ""}:${busqueda || ""}:${orden}`
 
   const [procesos, setProcesos] = useState<ListaProcesos | null>(() => getCache<ListaProcesos>(cacheKey))
   const [novedades, setNovedades] = useState<ListaNovedades | null>(() => getCache<ListaNovedades>("novedades"))
   const [newRadicado, setNewRadicado] = useState({ llave_proceso: "", categoria: "General" })
-  const [detalle, setDetalle] = useState<{ llave: string; data: DetalleProceso | null } | null>(null)
+  const [detalle, setDetalle] = useState<{ llave: string; data: DetalleProceso | null; error?: string } | null>(null)
+  const [reintentoDetalle, setReintentoDetalle] = useState(0)
+  const [errorLista, setErrorLista] = useState("")
+  const [consultadoEn, setConsultadoEn] = useState<string | null>(null)
+  const [agregando, setAgregando] = useState(false)
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<ResultadoSync | null>(null)
 
   const [loadedKey, setLoadedKey] = useState<string | null>(() => (getCache<ListaProcesos>(cacheKey) ? cacheKey : null))
-  const loadingLista = loadedKey !== cacheKey
+  const loadingLista = loadedKey !== cacheKey && !errorLista
 
   const ultimaSync = useMemo(() => {
     // El backend devuelve la maxima sincronizacion de TODOS los radicados;
@@ -106,19 +134,22 @@ export default function App() {
     try {
       const [p, n] = await fetchProcesosNovedades(skip, limit, filtroCategoria || undefined, busqueda || undefined, orden)
       if (seq !== fetchSeq.current) return
+      setErrorLista("")
+      setConsultadoEn(new Date().toLocaleString("es-CO", { timeZone: "America/Bogota" }))
       setProcesos(p)
       setNovedades(n)
       setLoadedKey(cacheKey)
       setCache(cacheKey, p)
       setCache("novedades", n)
     } catch {
-      /* keep showing cached data on error */
+      if (seq === fetchSeq.current) setErrorLista("No pudimos actualizar esta lista. Revisa tu conexión y vuelve a intentar.")
     }
   }, [page, limit, filtroCategoria, busqueda, orden, cacheKey])
 
   useEffect(() => {
     // Se difiere a microtask para no disparar un render en cascada sincrono
-    void Promise.resolve().then(() => cargarLista())
+    void Promise.resolve().then(() => { setErrorLista(""); return cargarLista() })
+    return () => { fetchSeq.current += 1 }
   }, [cargarLista])
 
   // ── Estado de conexion ────────────────────────────────────────────────────────
@@ -166,27 +197,43 @@ export default function App() {
 
 
   const currentDetalle = detalle && detalle.llave === llaveProceso ? detalle.data : null
-  const loadingDetalle = esDetalle && currentDetalle === null
+  const errorDetalle = detalle?.llave === llaveProceso ? detalle?.error : undefined
+  const loadingDetalle = esDetalle && currentDetalle === null && !errorDetalle
 
   useEffect(() => {
     if (!esDetalle || !llaveProceso) return
+    let activa = true
+    void Promise.resolve().then(() => { if (activa) setDetalle(null) })
     getProceso(llaveProceso)
-      .then((d) => setDetalle({ llave: llaveProceso, data: d }))
-      .catch(() => setDetalle({ llave: llaveProceso, data: null }))
-  }, [esDetalle, llaveProceso])
+      .then((d) => { if (activa) setDetalle({ llave: llaveProceso, data: d }) })
+      .catch((error: unknown) => {
+        if (activa) setDetalle({ llave: llaveProceso, data: null, error: error instanceof ApiError && error.status === 404
+          ? "El expediente no existe o ya no está en tu lista de seguimiento."
+          : "No pudimos cargar el expediente. Revisa tu conexión y vuelve a intentar." })
+      })
+    return () => { activa = false }
+  }, [esDetalle, llaveProceso, reintentoDetalle])
 
   const abrirDetalle = (llave: string) => {
-    navigate(`/procesos/${llave}`)
+    posicionesLista.set(cacheKey, window.scrollY)
+    navigate(`/procesos/${llave}?${params.toString()}`)
   }
 
   const volverLista = () => {
-    navigate("/procesos")
+    navigate(location.state?.from === "/novedades" ? "/novedades" : `/procesos?${params.toString()}`)
   }
+
+  useEffect(() => {
+    if (esDetalle || loadingLista) return
+    const frame = requestAnimationFrame(() => window.scrollTo({ top: posicionesLista.get(cacheKey) ?? 0 }))
+    return () => cancelAnimationFrame(frame)
+  }, [esDetalle, loadingLista, cacheKey])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const el = document.activeElement
       const enInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement
+      if (el?.closest('[role="dialog"], [role="alertdialog"]')) return
       if (enInput) {
         if (e.key === "Escape") (document.activeElement as HTMLElement).blur()
         return
@@ -199,12 +246,12 @@ export default function App() {
         searchRef.current?.focus()
       } else if (e.key === "Escape" && esDetalle) {
         e.preventDefault()
-        navigate("/procesos")
+        navigate(`/procesos?${params.toString()}`)
       }
     }
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [navigate, esDetalle])
+  }, [navigate, esDetalle, params])
 
   const handleSync = useCallback(async () => {
     if (syncing) return
@@ -213,7 +260,7 @@ export default function App() {
     const loadingToast = toast.loading("Sincronizando con Rama Judicial...")
     try {
       const inicio: SyncIniciado = await postSync()
-      if (!inicio.iniciado) {
+      if (!inicio.iniciado && !inicio.en_curso) {
         toast(inicio.mensaje || "Ya hay una sincronización en curso", { id: loadingToast })
         return
       }
@@ -230,10 +277,15 @@ export default function App() {
         }
         const result: ResultadoSync = estado.resultado
         setSyncResult(result)
-        toast.success(
-          `Sincronización completa: ${result.nuevos} nuevos, ${result.actualizados} actualizados, ${result.total_consultados} consultados`,
-          { id: loadingToast, duration: 5000 },
-        )
+        const incompleta = (result.errores_app ?? 0) > 0 || (result.errores_rama ?? 0) > 0 || Boolean(result.radicados_saltados_rama?.length)
+        if (incompleta) {
+          toast.error("Consulta parcial. Algunos expedientes siguen pendientes de verificar.", { id: loadingToast, duration: 7000 })
+        } else {
+          toast.success(
+            `Sincronización completa: ${result.nuevos} nuevos, ${result.actualizados} actualizados, ${result.total_consultados} consultados`,
+            { id: loadingToast, duration: 5000 },
+          )
+        }
         removeCache(cacheKey)
         removeCache("novedades")
         await cargarLista()
@@ -260,12 +312,16 @@ export default function App() {
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 text-slate-900">
       <header className="border-b border-indigo-100 bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-        <div className="mx-auto flex w-full max-w-none items-center justify-between px-4 py-3 sm:px-5">
-          <div>
+        <div className="mx-auto flex w-full max-w-none items-center justify-between gap-3 px-4 py-3 sm:px-5">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-500">Mariana's</p>
-            <h1 className="text-xl font-bold tracking-tight text-slate-800 sm:text-2xl">{saludo}, {username}</h1>
+            <h1 className="text-lg font-bold tracking-tight text-slate-800 sm:text-2xl">
+              <span className="sm:hidden">Mis procesos</span>
+              <span className="hidden sm:inline">{saludo}, {username}</span>
+            </h1>
+            <p className="truncate text-xs text-slate-600 sm:hidden">{username}</p>
           </div>
-          <div className="hidden items-center gap-2 sm:flex sm:gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <button
               onClick={handleSync}
               disabled={syncing}
@@ -275,12 +331,12 @@ export default function App() {
               <svg className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
               </svg>
-              <span className="hidden sm:inline">{syncing ? "Sincronizando..." : "Sincronizar"}</span>
+              <span>{syncing ? "Sincronizando..." : "Sincronizar"}</span>
             </button>
             <button
               onClick={() => navigate("/novedades")}
               aria-label="Ver novedades"
-              className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:px-4 sm:py-2 sm:text-sm"
+              className="hidden items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:inline-flex sm:px-4 sm:py-2 sm:text-sm"
             >
               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
@@ -292,7 +348,7 @@ export default function App() {
               target="_blank"
               rel="noreferrer"
               aria-label="Abrir consulta oficial en Rama Judicial"
-              className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:px-4 sm:py-2 sm:text-sm"
+              className="hidden items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:inline-flex sm:px-4 sm:py-2 sm:text-sm"
             >
               <span className="hidden sm:inline">Consulta oficial</span>
               <span aria-hidden="true">↗</span>
@@ -300,7 +356,7 @@ export default function App() {
             <button
               onClick={handleLogout}
               aria-label="Cerrar sesión"
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 sm:px-4 sm:py-2 sm:text-sm"
+              className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 sm:px-4 sm:py-2 sm:text-sm"
             >
               Salir
             </button>
@@ -310,14 +366,14 @@ export default function App() {
             onClick={() => navigate("/ajustes")}
             aria-label="Perfil y ajustes"
             title="Perfil y ajustes"
-            className="ml-3 rounded-full ring-2 ring-transparent transition hover:ring-indigo-200 focus-visible:ring-indigo-300"
+            className="shrink-0 rounded-full ring-2 ring-transparent transition hover:ring-indigo-200 focus-visible:ring-indigo-300 sm:ml-3"
           >
             <Avatar nombre={username} url={avatar} tamano="h-10 w-10" />
           </button>
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-none flex-1 min-h-0 flex-col gap-3 px-4 py-4 pb-24 sm:px-5 sm:py-5 sm:pb-5">
+      <main id="contenido" tabIndex={-1} className="mx-auto flex w-full max-w-none flex-1 min-h-0 flex-col gap-3 px-4 py-4 pb-24 sm:px-5 sm:py-5 sm:pb-5">
         <AvisoPermisoPush />
         {estadoConexion === "conectando" && (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm no-print">
@@ -351,18 +407,30 @@ export default function App() {
                 </div>
               </div>
             ) : currentDetalle ? (
-              <DetalleView detalle={currentDetalle} onVolver={volverLista} onActualizado={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista() }} />
+              <DetalleView detalle={currentDetalle} onVolver={volverLista} onActualizado={() => { setReintentoDetalle((i) => i + 1); removeCache(cacheKey); removeCache("novedades"); void cargarLista() }} />
             ) : (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
-                No se encontró el radicado solicitado.
+              <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-6 text-sm text-rose-700">
+                <p>{errorDetalle}</p>
+                <div className="mt-4 flex gap-3">
+                  <button className="rounded-xl border px-4 py-3 font-semibold" onClick={() => { setDetalle(null); setReintentoDetalle((i) => i + 1) }}>Reintentar expediente</button>
+                  <button className="rounded-xl border px-4 py-3 font-semibold" onClick={volverLista}>Volver a procesos</button>
+                </div>
               </div>
             )}
           </section>
         ) : (
           <>
+        {errorLista && (
+          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p>{errorLista}</p>
+            {loadedKey === cacheKey && <p>Mostrando la última lista disponible en esta sesión.</p>}
+            <button className="mt-2 min-h-11 rounded-lg border px-3 font-semibold" onClick={() => { void cargarLista() }}>Reintentar lista</button>
+          </div>
+        )}
+        {consultadoEn && <p role="status" className="text-xs text-slate-600">Lista consultada el {consultadoEn}. Revisa la fecha de verificación de cada expediente.</p>}
         {syncResult && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 shadow-sm no-print">
-            <span className="font-semibold">Sincronización completada:</span>{' '}
+            <span className="font-semibold">Resultado de la consulta:</span>{' '}
             {syncResult.nuevos} nuevo{syncResult.nuevos !== 1 ? "s" : ""},{" "}
             {syncResult.actualizados} actualizado{syncResult.actualizados !== 1 ? "s" : ""},{" "}
             {syncResult.total_consultados} consultado{syncResult.total_consultados !== 1 ? "s" : ""}
@@ -378,7 +446,7 @@ export default function App() {
               <>
                 <span className="mx-2 inline-block h-3 w-px bg-emerald-300" />
                 <span className="font-medium text-amber-600">
-                  {((syncResult.errores_rama ?? 0) + (syncResult.radicados_saltados_rama?.length ?? 0))} por Rama Judicial (la app está bien)
+                  {((syncResult.errores_rama ?? 0) + (syncResult.radicados_saltados_rama?.length ?? 0))} pendientes por fallos de Rama Judicial
                 </span>
               </>
             ) : null}
@@ -399,15 +467,15 @@ export default function App() {
                 Revisar novedades
               </button>
             </div>
-          ) : (
+          ) : novedades && !errorLista ? (
             <div role="status" className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800 shadow-sm">
-              Todos tus procesos están al día.
+              No hay novedades pendientes en la última consulta.
             </div>
-          )}
+          ) : null}
           <p className="px-1 text-xs text-slate-600">
-            {procesos?.total ?? 0} proceso{(procesos?.total ?? 0) !== 1 ? "s" : ""} {hayFiltro ? "coinciden con tu búsqueda" : "guardados"}
+            {procesos?.total ?? 0} proceso{(procesos?.total ?? 0) !== 1 ? "s" : ""} {hayFiltro ? ((procesos?.total ?? 0) === 1 ? "coincide con tu búsqueda" : "coinciden con tu búsqueda") : "guardados"}
             {" · "}
-            {ultimaSync ? `Última sincronización ${tiempoRelativo(ultimaSync)}` : "Aún sin sincronizar: agrega un radicado y pulsa Sincronizar"}
+            {ultimaSync ? `Consulta más reciente entre tus procesos ${tiempoRelativo(ultimaSync)}` : "Aún sin sincronizar: agrega un radicado y pulsa Sincronizar"}
           </p>
         </section>
 
@@ -456,6 +524,8 @@ export default function App() {
                   toast.error("El radicado debe tener 23 dígitos")
                   return
                 }
+                if (agregando) return
+                setAgregando(true)
                 const loadingToast = toast.loading("Agregando radicado...")
                 try {
                   const res = await postAddRadicado(newRadicado)
@@ -471,11 +541,14 @@ export default function App() {
                 } catch (err) {
                   captureException(err)
                   toast.error(err instanceof Error ? err.message : "Error al agregar", { id: loadingToast })
+                } finally {
+                  setAgregando(false)
                 }
               }}
+              disabled={agregando}
               className="rounded-2xl border border-indigo-500 bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700 active:scale-95"
             >
-              Agregar
+              {agregando ? "Agregando…" : "Agregar"}
             </button>
           </div>
         </section>
@@ -494,7 +567,8 @@ export default function App() {
                 {["", "General", "Trabajo", "Consultorio"].map((cat) => (
                 <button
                   key={cat}
-                  onClick={() => { setFiltroCategoria(cat); setPage(1) }}
+                  onClick={() => actualizarFiltros({ categoria: cat, pagina: 1 })}
+                  aria-pressed={filtroCategoria === cat}
                   className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-semibold transition ${
                     filtroCategoria === cat
                       ? "bg-indigo-200 text-indigo-800"
@@ -516,7 +590,7 @@ export default function App() {
                 title="Buscar (atajo: /)"
                 placeholder="Buscar radicado o cliente"
                 value={busquedaInput}
-                onChange={(e) => { setBusquedaInput(e.target.value); setPage(1) }}
+                onChange={(e) => setBusquedaInput(e.target.value)}
                 className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
               />
               <kbd className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[11px] text-slate-600 sm:block" aria-hidden="true">/</kbd>
@@ -535,15 +609,15 @@ export default function App() {
                   </div>
                 ))}
               </div>
-            ) : procesos ? (
-              <TablaProcesos hayFiltro={hayFiltro} orden={orden} onOrden={(o) => { setOrden(o); setPage(1) }} procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista() }} />
+            ) : procesos && loadedKey === cacheKey ? (
+              <TablaProcesos hayFiltro={hayFiltro} orden={orden} onOrden={(o) => actualizarFiltros({ orden: o, pagina: 1 })} procesos={procesos.procesos} onOpenDetalle={abrirDetalle} onDelete={() => { removeCache(cacheKey); removeCache("novedades"); cargarLista() }} />
             ) : null}
           </div>
         </section>
         <div className="flex items-center justify-between px-1 pt-1 text-xs text-slate-500">
           <button
             type="button"
-            onClick={() => setPage((current) => Math.max(1, current - 1))}
+            onClick={() => actualizarFiltros({ pagina: Math.max(1, page - 1) })}
             disabled={page <= 1}
             className="rounded-full border border-indigo-200 bg-white px-3 py-1.5 font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -556,7 +630,7 @@ export default function App() {
             <select
               aria-label="Procesos por página"
               value={limit}
-              onChange={(e) => { setLimit(Number(e.target.value)); setPage(1) }}
+              onChange={(e) => actualizarFiltros({ limite: Number(e.target.value), pagina: 1 })}
               className="rounded-full border border-indigo-200 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-600 outline-none transition hover:bg-indigo-50"
             >
               <option value={25}>25/pág</option>
@@ -566,7 +640,7 @@ export default function App() {
           </div>
           <button
             type="button"
-            onClick={() => setPage((current) => current + 1)}
+            onClick={() => actualizarFiltros({ pagina: page + 1 })}
             disabled={page >= (procesos?.total_paginas ?? 1)}
             className="rounded-full border border-indigo-200 bg-white px-3 py-1.5 font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -577,14 +651,7 @@ export default function App() {
         )}
       </main>
 
-      <BottomNav
-        enDetalle={esDetalle}
-        syncing={syncing}
-        onProcesos={() => volverLista()}
-        onNovedades={() => navigate("/novedades")}
-        onSync={() => { void handleSync() }}
-        onAjustes={() => navigate("/ajustes")}
-      />
+
     </div>
   )
 }

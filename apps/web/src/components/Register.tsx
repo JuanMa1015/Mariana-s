@@ -12,17 +12,23 @@ export default function Register() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [errores, setErrores] = useState<ErroresRegistro>({})
+  const [enviando, setEnviando] = useState(false)
   const navigate = useNavigate()
   useTitle("Crear cuenta")
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (enviando) return
     const nuevos: ErroresRegistro = {}
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) nuevos.email = "Ingresa un correo electrónico válido"
     if (password.length < 8) nuevos.password = "La contraseña debe tener al menos 8 caracteres"
     if (/^\d/.test(username)) nuevos.username = "El usuario no puede empezar por número"
     setErrores(nuevos)
-    if (Object.keys(nuevos).length > 0) return
+    if (Object.keys(nuevos).length > 0) {
+      document.getElementById(nuevos.email ? "reg-email" : nuevos.username ? "reg-username" : "reg-password")?.focus()
+      return
+    }
+    setEnviando(true)
 
     const loadingToast = toast.loading("Creando cuenta...")
     try {
@@ -35,11 +41,13 @@ export default function Register() {
       const msg = err instanceof Error ? err.message : "Error al registrarse"
       setErrores({ general: msg })
       toast.error(msg, { id: loadingToast })
+    } finally {
+      setEnviando(false)
     }
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-900 px-4">
+    <div className="flex min-h-dvh items-center py-8 justify-center bg-slate-50 text-slate-900 px-4">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Mariana's</p>
@@ -117,7 +125,6 @@ export default function Register() {
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 className="absolute inset-y-0 right-0 flex items-center pr-4 text-violet-500 hover:text-violet-700"
-                tabIndex={-1}
               >
                 {showPassword ? (
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -142,7 +149,7 @@ export default function Register() {
               {errores.general}
             </p>
           )}
-          <button type="submit" className="mt-2 w-full rounded-2xl border border-violet-500 bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-95 focus-visible:outline-none">
+          <button type="submit" disabled={enviando} aria-busy={enviando} className="mt-2 w-full rounded-2xl border border-violet-500 bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-95 focus-visible:outline-none">
             Registrarse
           </button>
         </form>

@@ -166,7 +166,7 @@ export default function AjustesPage() {
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-5">
+      <main id="contenido" tabIndex={-1} className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-4 px-4 py-5">
         <section className={tarjeta} aria-labelledby="t-perfil">
           <h2 id="t-perfil" className="text-sm font-bold text-slate-800">Perfil</h2>
           <div className="mt-4 flex items-center gap-4">

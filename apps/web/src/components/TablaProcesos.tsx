@@ -1,9 +1,8 @@
-import { useState, useCallback, useRef, useEffect, useId, type CSSProperties } from "react"
-import { VariableSizeList } from "react-window"
+import { useState, useCallback, useEffect, useId } from "react"
 import type { Proceso, Orden } from "../types"
 import toast from "react-hot-toast"
 import { deleteProceso, updateProceso } from "../api"
-import { formatearFechaCorta } from "../utils/fechas"
+import { formatearFechaCorta, formatearConsulta } from "../utils/fechas"
 import { formatearRadicado } from "../utils/radicado"
 import { CategoriaBadge, EstadoBadge } from "./Badges"
 import Modal from "./Modal"
@@ -16,28 +15,6 @@ interface FilaData {
   handleCopy: (e: React.MouseEvent, llave: string) => void
   pedirBorrar: (e: React.MouseEvent, llave: string) => void
   abrirEditor: (llave: string) => void
-}
-
-interface ListChildProps {
-  index: number
-  style: CSSProperties
-  data: FilaData
-}
-
-const useContainerHeight = (ref: React.RefObject<HTMLDivElement | null>) => {
-  const [height, setHeight] = useState(400)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    const ro = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        setHeight(entry.contentRect.height)
-      }
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [ref])
-  return height
 }
 
 // La tabla de 8 columnas necesita ~960px; por debajo se usan tarjetas.
@@ -66,11 +43,6 @@ interface Props {
   orden?: Orden
   onOrden?: (orden: Orden) => void
 }
-
-const ROW_HEIGHT = 73
-// Suficiente para el panel de informacion expandido (grid de 2/3 columnas);
-// un valor menor recortaba el contenido en pantallas medianas/angostas.
-const EXPANDED_HEIGHT = 560
 
 const IconExternalLink = () => (
   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
@@ -131,17 +103,14 @@ function Acciones({ p, data, compacto = false }: { p: Proceso; data: FilaData; c
   )
 }
 
-function Row({ index, style, data }: ListChildProps) {
-  const { procesos, abierto, toggleExpand } = data
-  const p = procesos[index]
+function Row({ p, data }: { p: Proceso; data: FilaData }) {
+  const { abierto, toggleExpand } = data
   const isOpen = abierto === p.llave_proceso
   const barra = p.notificado ? "bg-emerald-500" : "bg-amber-400"
   const alternar = () => toggleExpand(p.llave_proceso)
 
   return (
-    <div style={style}>
-      <table className="w-full text-left text-sm border-separate border-spacing-0">
-        <tbody>
+    <>
           <tr
             tabIndex={0}
             aria-expanded={isOpen}
@@ -189,6 +158,8 @@ function Row({ index, style, data }: ListChildProps) {
               {p.fecha_ultima_actuacion ? (
                 <><p className="text-sm font-semibold text-slate-800">{formatearFechaCorta(p.fecha_ultima_actuacion)}</p><p className="text-[11px] text-slate-500 mt-0.5">Último cambio</p></>
               ) : <span className="text-xs text-slate-500 italic">Sin actualización</span>}
+              <p className="mt-2 text-xs text-slate-600">Consulta completada: {formatearConsulta(p.ultima_sincronizacion)}</p>
+              {Boolean(p.fallos_consecutivos) && <p className="mt-1 text-xs font-medium text-amber-800">Consulta posterior fallida</p>}
             </td>
             <td className="px-5 py-4 align-middle"><EstadoBadge notificado={p.notificado} /></td>
             <td className="px-5 py-4 align-middle"><Acciones p={p} data={data} /></td>
@@ -212,6 +183,8 @@ function Row({ index, style, data }: ListChildProps) {
                       { label: "Privado", value: p.es_privado ? "Sí" : "No" },
                       { label: "Fecha del proceso", value: p.fecha_proceso },
                       { label: "Registrado el", value: p.creado_en ? new Date(p.creado_en).toLocaleString("es-CO") : null },
+                      { label: "Última consulta a Rama Judicial", value: formatearConsulta(p.ultima_sincronizacion) },
+                      { label: "Estado de la consulta", value: p.fallos_consecutivos ? "Consulta fallida, pendiente de verificar" : p.ultima_sincronizacion ? "Consulta completada" : "Pendiente" },
                       { label: "Última actualización", value: p.actualizado_en ? new Date(p.actualizado_en).toLocaleString("es-CO") : null },
                     ].map(({ label, value }) => (
                       <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-3.5">
@@ -226,9 +199,7 @@ function Row({ index, style, data }: ListChildProps) {
               </td>
             </tr>
           )}
-        </tbody>
-      </table>
-    </div>
+    </>
   )
 }
 
@@ -248,6 +219,8 @@ function Tarjeta({ p, data }: { p: Proceso; data: FilaData }) {
       <p className="mt-1 text-xs text-slate-500">
         {p.fecha_ultima_actuacion ? `Última actuación: ${formatearFechaCorta(p.fecha_ultima_actuacion)}` : "Sin actuaciones"}
       </p>
+      <p className="mt-2 text-xs text-slate-600">Última consulta completada: {formatearConsulta(p.ultima_sincronizacion)}</p>
+      {Boolean(p.fallos_consecutivos) && <p className="mt-1 text-xs font-medium text-amber-800">La última consulta falló. Información pendiente de verificar.</p>}
       <div className="mt-3"><Acciones p={p} data={data} compacto /></div>
     </li>
   )
@@ -274,9 +247,6 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete, hayFi
   const [porBorrar, setPorBorrar] = useState<string | null>(null)
   const editProceso = procesos.find(p => p.llave_proceso === editando)
   const [editForm, setEditForm] = useState({ llave_proceso: "", categoria: "", alias: "" })
-  const containerRef = useRef<HTMLDivElement>(null)
-  const listRef = useRef<VariableSizeList>(null)
-  const listHeight = useContainerHeight(containerRef)
   const esEscritorio = useEsEscritorio()
   const idRadicado = useId()
   const idAlias = useId()
@@ -345,10 +315,6 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete, hayFi
     }
   }
 
-  const itemSize = useCallback((index: number) => {
-    return abierto === procesos[index]?.llave_proceso ? ROW_HEIGHT + EXPANDED_HEIGHT : ROW_HEIGHT
-  }, [abierto, procesos])
-
   const itemData: FilaData = {
     procesos,
     abierto,
@@ -377,35 +343,19 @@ export default function TablaProcesos({ procesos, onOpenDetalle, onDelete, hayFi
             </select>
           </div>
         )}
-        {esEscritorio && procesos.length > 0 && (
-          <table className="w-full min-w-[960px] text-left text-sm border-separate border-spacing-0 shrink-0">
-            <thead className="sticky top-0 z-10">
-              <tr>
-                {["Radicado", "Despacho", "Departamento", "Categoría", "Sujetos", "Última actuación", "Estado", "Acciones"].map((col) => (
-                  <th key={col} className="bg-slate-100 px-5 py-3.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600 first:rounded-tl-2xl last:rounded-tr-2xl">
-                    {col}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-          </table>
-        )}
-        <div ref={containerRef} className={`min-h-0 flex-1 ${esEscritorio ? "" : "overflow-y-auto px-3 pb-3"}`}>
+        <div className="min-h-0 flex-1 overflow-auto px-3 pb-3">
           {procesos.length === 0 ? (
             <EstadoVacio hayFiltro={hayFiltro} />
           ) : esEscritorio ? (
-            <VariableSizeList
-              ref={listRef}
-              height={listHeight}
-              itemCount={procesos.length}
-              itemSize={itemSize}
-              width="100%"
-              itemData={itemData}
-              overscanCount={5}
-              style={{ minWidth: "960px" }}
-            >
-              {Row}
-            </VariableSizeList>
+            <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+              <caption className="sr-only">Procesos en seguimiento, fecha de actuación y estado de revisión</caption>
+              <thead><tr>
+                {["Radicado", "Despacho", "Departamento", "Categoría", "Sujetos", "Última actuación y consulta", "Revisión", "Acciones"].map((col) => (
+                  <th scope="col" key={col} className="bg-slate-100 px-5 py-3 text-xs font-semibold text-slate-700">{col}</th>
+                ))}
+              </tr></thead>
+              <tbody>{procesos.map((p) => <Row key={p.llave_proceso} p={p} data={itemData} />)}</tbody>
+            </table>
           ) : (
             <ul className="flex flex-col gap-3">
               {procesos.map((p) => <Tarjeta key={p.llave_proceso} p={p} data={itemData} />)}

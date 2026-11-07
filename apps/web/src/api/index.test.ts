@@ -71,21 +71,20 @@ describe('fetchWithAuth (via getProcesos)', () => {
     expect(call[1]?.credentials).toBe('include')
   })
 
-  it('should redirect on 401', async () => {
-    const originalLocation = window.location
-    Object.defineProperty(window, 'location', {
-      value: { ...originalLocation, href: '' },
-      writable: true,
-    })
-
-    mockFetch.mockResolvedValueOnce({
-      status: 401,
-      json: () => Promise.resolve({ detail: 'Unauthorized' }),
-    })
-
+  it('notifica la sesión vencida sin tratar el error como datos de procesos', async () => {
+    const expirar = vi.fn()
+    window.addEventListener('session-expired', expirar)
+    mockFetch.mockResolvedValueOnce({ status: 401, json: async () => ({ detail: 'Unauthorized' }) })
     const { getProcesos } = await import('./index')
-    await expect(getProcesos()).rejects.toThrow('Unauthorized')
-    expect(window.location.href).toBe('/login')
+    await expect(getProcesos()).rejects.toMatchObject({ status: 401 })
+    expect(expirar).toHaveBeenCalledTimes(1)
+    window.removeEventListener('session-expired', expirar)
+  })
+
+  it('rechaza respuestas HTTP fallidas de sesión', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 403, json: async () => ({ detail: 'Cuenta inactiva' }) })
+    const { getMe } = await import('./index')
+    await expect(getMe()).rejects.toMatchObject({ status: 403, message: 'Cuenta inactiva' })
   })
 
   it('should retry on 5xx errors', async () => {
@@ -105,6 +104,12 @@ describe('fetchWithAuth (via getProcesos)', () => {
 })
 
 describe('postAddRadicado', () => {
+  it('no repite automáticamente una escritura si falla la conexión', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('timeout'))
+    const { postAddRadicado } = await import('./index')
+    await expect(postAddRadicado({ llave_proceso: '123' })).rejects.toThrow('Error de conexión')
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+  })
   it('should POST and return created response', async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,

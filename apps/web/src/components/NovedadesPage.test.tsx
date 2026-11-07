@@ -60,6 +60,31 @@ beforeEach(async () => {
 })
 
 describe("NovedadesPage", () => {
+  it("muestra cinco actuaciones y permite revelar las siguientes sin afectar otros procesos", async () => {
+    const actuaciones = Array.from({ length: 12 }, (_, i) => ({
+      ...NOVEDADES_MOCK.novedades[0].actuaciones[0],
+      id_reg_actuacion: i + 1,
+      actuacion: `Actuación de prueba ${i + 1}`,
+      anotacion: `Anotación de prueba ${i + 1}`,
+    }))
+    vi.mocked((await import("../api")).getNovedadesDetalle).mockResolvedValue({
+      ...NOVEDADES_MOCK, novedades: [{ ...NOVEDADES_MOCK.novedades[0], actuaciones }],
+    })
+    const { default: NovedadesPage } = await import("./NovedadesPage")
+    render(<BrowserRouter><NovedadesPage /></BrowserRouter>)
+    fireEvent.click(await screen.findByText(/05001 31 03 017 2024 00480 00/))
+    expect(screen.getByText("Anotación de prueba 5")).toBeInTheDocument()
+    expect(screen.queryByText("Anotación de prueba 6")).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Ver más actuaciones" }))
+    expect(screen.getByText("Anotación de prueba 10")).toBeInTheDocument()
+    expect(screen.queryByText("Anotación de prueba 11")).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole("button", { name: "Ver más actuaciones" }))
+    expect(screen.getByText("Anotación de prueba 12")).toBeInTheDocument()
+    expect(screen.queryByRole("button", { name: "Ver más actuaciones" })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText(/05001 31 03 017 2024 00480 00/))
+    fireEvent.click(screen.getByText(/05001 31 03 017 2024 00480 00/))
+    expect(screen.queryByText("Anotación de prueba 6")).not.toBeInTheDocument()
+  })
   it("debe mostrar spinner mientras carga", async () => {
     vi.mocked((await import("../api")).getNovedadesDetalle).mockReturnValue(new Promise(() => {}))
     const { default: NovedadesPage } = await import("./NovedadesPage")
@@ -95,7 +120,7 @@ describe("NovedadesPage", () => {
     })
     fireEvent.click(screen.getByText(/05001 31 03 017 2024 00480 00/))
     await waitFor(() => {
-      expect(screen.getByText("Auto admite demanda")).toBeInTheDocument()
+      expect(screen.getAllByText("Auto admite demanda").length).toBeGreaterThan(0)
     })
   })
 

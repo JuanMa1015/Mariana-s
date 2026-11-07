@@ -5,6 +5,7 @@ import { bajarAvatar } from "../api"
 // undefined = aún no cargada; null = el usuario no tiene foto.
 let url: string | null | undefined
 let cargando = false
+let generacion = 0
 const suscriptores = new Set<() => void>()
 
 const publicar = (nueva: string | null) => {
@@ -13,14 +14,18 @@ const publicar = (nueva: string | null) => {
 }
 
 export async function recargarAvatar(): Promise<void> {
+  const actual = generacion
   try {
-    publicar(await bajarAvatar())
+    const imagen = await bajarAvatar()
+    if (actual === generacion) publicar(imagen)
   } catch {
-    publicar(null)
+    if (actual === generacion) publicar(null)
   }
 }
 
 export function limpiarAvatar(): void {
+  generacion += 1
+  cargando = false
   publicar(null)
   url = undefined
 }
