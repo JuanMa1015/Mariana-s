@@ -1,0 +1,11 @@
+[run]
+relative_files = True
+source = apps/api
+omit =
+    apps/api/tests/*
+    apps/api/.venv/*
+
+[report]
+omit =
+    apps/api/tests/*
+    apps/api/.venv/*

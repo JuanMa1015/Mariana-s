@@ -1,3 +1,8 @@
+SonarQube Cloud
+
+- `docker-publish.yml` genera cobertura Python/XML y TypeScript/LCOV y ejecuta el analisis despues de las pruebas.
+- Configuracion externa y verificacion: [docs/sonarcloud.md](../../docs/sonarcloud.md).
+
 Sync workflow
 
 - Se ejecuta cada hora via cron (`0 * * * *`).
