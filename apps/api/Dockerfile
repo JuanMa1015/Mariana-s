@@ -13,8 +13,20 @@ RUN apt-get update \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# copy project
-COPY . /app
+COPY main.py config.py alembic.ini ./
+COPY alembic/ ./alembic/
+COPY models/ ./models/
+COPY routers/ ./routers/
+COPY scraper/ ./scraper/
+COPY services/ ./services/
+
+# Keep application files root-owned and grant write access to SQLite's directory.
+RUN groupadd --system api \
+    && useradd --system --gid api --no-create-home api \
+    && install -d -o api -g api -m 0750 /app/data
+
+ENV DATABASE_URL=sqlite:////app/data/marianas.db
+USER api
 
 EXPOSE 8000
 
