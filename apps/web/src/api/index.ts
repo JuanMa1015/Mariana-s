@@ -1,25 +1,37 @@
 import { Capacitor } from "@capacitor/core"
+import { SecureStorage } from "@aparajita/capacitor-secure-storage"
 
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000"
 
 // App movil: las cookies cross-site no son fiables en el WebView, asi que se usa Bearer.
-// ponytail: token en localStorage; migrar a almacenamiento seguro (Keychain/Keystore) si se endurece.
 const nativa = Capacitor.isNativePlatform()
 const TOKEN_KEY = "mariana_token"
-const guardarToken = (data: { access_token?: string }) => {
-  if (nativa && data.access_token) localStorage.setItem(TOKEN_KEY, data.access_token)
+
+// Descarta el token legado. La siguiente sesión debe obtenerlo del servidor.
+if (nativa) localStorage.removeItem(TOKEN_KEY)
+
+async function guardarToken(data: { access_token?: string }) {
+  if (nativa && data.access_token) {
+    await SecureStorage.set(TOKEN_KEY, data.access_token, false, false)
+  }
+}
+
+async function borrarToken() {
+  if (nativa) await SecureStorage.remove(TOKEN_KEY, false)
 }
 
 function _esperar(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function fetchBase(url: string, options: RequestInit = {}) {
+async function fetchBase(url: string, options: RequestInit = {}, autenticada = false) {
   const headers = new Headers(options.headers || {})
   if (nativa) {
     headers.set("X-Client", "native")
-    const token = localStorage.getItem(TOKEN_KEY)
-    if (token) headers.set("Authorization", `Bearer ${token}`)
+    if (autenticada) {
+      const token = await SecureStorage.get(TOKEN_KEY, false, false)
+      if (typeof token === "string" && token) headers.set("Authorization", `Bearer ${token}`)
+    }
   }
   const merged: RequestInit = { ...options, credentials: "include", headers }
   return fetch(url, merged)
@@ -29,7 +41,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos 
   for (let intento = 0; intento < reintentos; intento++) {
     let res: Response
     try {
-      res = await fetchBase(url, options)
+      res = await fetchBase(url, options, true)
     } catch (err) {
       if (intento < reintentos - 1) {
         const espera = 1000 * 2 ** intento
@@ -41,7 +53,7 @@ async function fetchWithAuth(url: string, options: RequestInit = {}, reintentos 
     }
 
     if (res.status === 401) {
-      localStorage.removeItem(TOKEN_KEY)
+      await borrarToken()
       window.location.href = "/login"
       throw new Error("Unauthorized")
     }
@@ -72,7 +84,7 @@ export async function loginUser(payload: { credential: string; password: string 
   }
   if (!res.ok) throw new Error((await res.json()).detail || "Error en login")
   const data = await res.json()
-  guardarToken(data)
+  await guardarToken(data)
   return data
 }
 
@@ -89,7 +101,7 @@ export async function registerUser(payload: { email: string; password: string; u
   }
   if (!res.ok) throw new Error((await res.json()).detail || "Error en registro")
   const data = await res.json()
-  guardarToken(data)
+  await guardarToken(data)
   return data
 }
 
@@ -221,9 +233,12 @@ export async function getMe() {
 }
 
 export async function logoutUser() {
-  const res = await fetchWithAuth(`${BASE_URL}/auth/logout`, { method: "POST" })
-  localStorage.removeItem(TOKEN_KEY)
-  return res.json()
+  try {
+    const res = await fetchWithAuth(`${BASE_URL}/auth/logout`, { method: "POST" })
+    return await res.json()
+  } finally {
+    await borrarToken()
+  }
 }
 
 export async function getProcesos(despacho?: string, departamento?: string, skip = 0, limit = 10, categoria?: string, q?: string, orden?: string) {
