@@ -21,17 +21,21 @@ type Seccion = (typeof SECCIONES)[number]["id"]
 export default function AdminPage() {
   useTitle("Administración")
   const navigate = useNavigate()
-  const [acceso, setAcceso] = useState<"cargando" | "permitido" | "denegado">("cargando")
+  const [acceso, setAcceso] = useState<"cargando" | "permitido" | "denegado" | "error">("cargando")
   const [yoId, setYoId] = useState<number | null>(null)
+  const [intento, setIntento] = useState(0)
   const [seccion, setSeccion] = useState<Seccion>("resumen")
 
   useEffect(() => {
+    let activa = true
     getMe()
-      .then((me) => { setYoId(me.id ?? null); setAcceso(me.es_admin ? "permitido" : "denegado") })
-      .catch(() => setAcceso("denegado"))
-  }, [])
+      .then((me) => { if (activa) { setYoId(me.id ?? null); setAcceso(me.es_admin ? "permitido" : "denegado") } })
+      .catch(() => { if (activa) setAcceso("error") })
+    return () => { activa = false }
+  }, [intento])
 
   if (acceso === "cargando") return <div className="flex min-h-screen items-center justify-center text-slate-500">Verificando permisos…</div>
+  if (acceso === "error") return <main id="contenido" tabIndex={-1} className="p-6 text-slate-800"><p role="alert">No pudimos verificar tus permisos. Revisa tu conexión.</p><button className="mt-4 min-h-11 rounded-xl border px-4" onClick={() => { setAcceso("cargando"); setIntento((i) => i + 1) }}>Reintentar</button></main>
   if (acceso === "denegado") return <Navigate to="/procesos" replace />
 
   return (
@@ -62,7 +66,7 @@ export default function AdminPage() {
         </nav>
       </header>
 
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-5">
+      <main id="contenido" tabIndex={-1} className="mx-auto w-full max-w-6xl flex-1 px-4 py-5">
         {seccion === "resumen" && <ResumenAdmin irAPruebas={() => setSeccion("pruebas")} />}
         {seccion === "usuarios" && <UsuariosAdmin yoId={yoId} />}
         {seccion === "procesos" && <ProcesosAdmin />}

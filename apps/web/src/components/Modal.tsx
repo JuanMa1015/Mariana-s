@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react"
+import { createPortal } from "react-dom"
 
 interface Props {
   titulo: string
@@ -21,10 +22,16 @@ export default function Modal({ titulo, onClose, children, role = "dialog" }: Pr
   useEffect(() => {
     const previo = document.activeElement as HTMLElement | null
     const cont = ref.current
+    const overflow = document.body.style.overflow
+    document.body.style.overflow = "hidden"
+    const fondo = Array.from(document.body.children)
+      .filter((el): el is HTMLElement => el instanceof HTMLElement && !el.contains(cont))
+      .map((el) => ({ el, inert: el.inert }))
+    for (const { el } of fondo) el.inert = true
     // En confirmaciones el foco inicial va al último botón (Cancelar), la opción segura.
     const items = cont?.querySelectorAll<HTMLElement>(FOCUSABLE)
     const inicial = role === "alertdialog" ? items?.[items.length - 1] : items?.[0]
-    inicial?.focus()
+    ;(inicial ?? cont)?.focus()
 
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -47,23 +54,27 @@ export default function Modal({ titulo, onClose, children, role = "dialog" }: Pr
     document.addEventListener("keydown", onKey)
     return () => {
       document.removeEventListener("keydown", onKey)
+      document.body.style.overflow = overflow
+      for (const { el, inert } of fondo) el.inert = inert
       previo?.focus?.()
     }
   }, [role])
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm" onClick={onClose}>
       <div
         ref={ref}
+        tabIndex={-1}
         role={role}
         aria-modal="true"
         aria-labelledby={tituloId}
-        className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
+        className="max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 id={tituloId} className="mb-4 text-lg font-bold text-slate-800">{titulo}</h3>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -95,8 +95,8 @@ describe("TablaProcesos", () => {
         <TablaProcesos procesos={PROCESOS_MOCK} onOpenDetalle={onOpenDetalle} />
       </div>,
     )
-    expect(screen.getByText("Con novedad")).toBeInTheDocument()
-    expect(screen.getByText("Al día")).toBeInTheDocument()
+    expect(screen.getByText("Por revisar")).toBeInTheDocument()
+    expect(screen.getByText("Revisado")).toBeInTheDocument()
   })
 
   it("debe expandir fila al hacer clic y mostrar detalle", async () => {

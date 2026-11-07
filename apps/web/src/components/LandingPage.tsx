@@ -13,15 +13,15 @@ function Bolt({ className = "h-5 w-5" }: { className?: string }) {
 
 const FEATURES = [
   {
-    titulo: "Monitoreo automático cada hora",
-    desc: "Revisamos la Rama Judicial por ti, radicado por radicado. Tú no vuelves a entrar a consultas lentas ni a refrescar pantallas.",
+    titulo: "Consultas automáticas por prioridad",
+    desc: "Consultamos tus radicados por lotes. La frecuencia depende de su actividad y de la disponibilidad de la Rama Judicial.",
     icono: (
       <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
     ),
   },
   {
     titulo: "Alertas por correo y Telegram",
-    desc: "Cuando aparece una actuación nueva recibes el aviso al instante en tus canales, con fechas, anotación y documentos.",
+    desc: "Cuando detectamos una actuación nueva, intentamos enviarte un aviso con sus fechas, anotación y documentos. Puedes revisar su estado en Novedades.",
     icono: (
       <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
     ),
@@ -48,8 +48,8 @@ const FEATURES = [
     ),
   },
   {
-    titulo: "Privado y seguro",
-    desc: "Tus procesos solo los ves tú: contraseñas cifradas con bcrypt, sesión por cookie segura y límites anti-abuso.",
+    titulo: "Acceso personal a tus procesos",
+    desc: "Accede con tu cuenta y revisa tus procesos, sus actuaciones y el estado de los avisos desde un solo lugar.",
     icono: (
       <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
     ),
@@ -88,19 +88,19 @@ export default function LandingPage() {
               Para abogados, consultorios y despachos
             </p>
             <h1 className="mt-4 text-4xl font-black leading-tight tracking-tight text-slate-900 sm:text-5xl">
-              Tus procesos judiciales, <span className="text-violet-600">vigilados 24/7</span> sin abrir la Rama Judicial
+              Tus procesos judiciales, <span className="text-violet-600">novedades claras</span> en un solo lugar
             </h1>
             <p className="mt-4 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-              Mariana's revisa por ti cada radicado que sigues y te avisa por correo y Telegram en cuanto hay una actuación nueva.
-              Deja de perder novedades y deja de revisar manualmente.
+              Mariana's revisa por ti cada radicado que sigues y te avisa por correo y Telegram cuando detecta una actuación nueva.
+              Consulta la información detectada y conserva el acceso a la fuente oficial.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <Link to="/register" className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-violet-600/20 transition hover:bg-violet-700 active:scale-95">
                 Crear cuenta gratis
               </Link>
-              <Link to="#como-funciona" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+              <a href="#como-funciona" className="inline-flex items-center justify-center rounded-2xl border border-slate-300 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
                 Ver cómo funciona
-              </Link>
+              </a>
             </div>
             <p className="mt-4 text-xs text-slate-500">Configuración en 2 minutos · Sin tarjeta · Cancela cuando quieras</p>
           </div>
@@ -111,13 +111,13 @@ export default function LandingPage() {
             <div className="relative rotate-1 rounded-3xl border border-violet-100 bg-violet-50/80 p-4 shadow-xl shadow-violet-600/10 backdrop-blur transition hover:rotate-0">
               <div className="mb-3 flex items-center justify-between px-1">
                 <p className="text-xs font-bold uppercase tracking-widest text-violet-500">Novedades hoy</p>
-                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">En vivo</span>
+                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">Ejemplo</span>
               </div>
               <div className="space-y-2">
                 <MockFila radicado="08001…2600008100" badge="Nueva actuación" badgeColor="bg-amber-100 text-amber-800" juzgado="Juzgado 001 Administrativo Oral" fecha="hace 12 min" />
-                <MockFila radicado="05001…26000106500" badge="Notificada" badgeColor="bg-emerald-100 text-emerald-700" juzgado="Juzgado 105 Civil de Circuito" fecha="hace 1 h" />
+                <MockFila radicado="05001…26000106500" badge="Revisada" badgeColor="bg-emerald-100 text-emerald-700" juzgado="Juzgado 105 Civil de Circuito" fecha="hace 1 h" />
                 <MockFila radicado="25002…1600134500" badge="Nueva actuación" badgeColor="bg-amber-100 text-amber-800" juzgado="Juzgado 337 Laboral" fecha="hace 2 h" />
-                <MockFila radicado="13001…2200061600" badge="Notificada" badgeColor="bg-emerald-100 text-emerald-700" juzgado="Juzgado 123 Penal del Ciruito" fecha="ayer" />
+                <MockFila radicado="13001…2200061600" badge="Revisada" badgeColor="bg-emerald-100 text-emerald-700" juzgado="Juzgado 123 Penal del Ciruito" fecha="ayer" />
               </div>
               <p className="mt-3 px-1 text-[11px] text-slate-400">Correo y Telegram enviados automáticamente ✓</p>
             </div>
@@ -127,6 +127,7 @@ export default function LandingPage() {
 
       {/* ── Funciones ── */}
       <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6" aria-labelledby="titulo-funciones">
+        <p className="mb-6 text-center text-sm text-slate-600">El monitoreo depende de la información publicada por la Rama Judicial. Comprueba la fecha de consulta de cada proceso y verifica sus documentos en la fuente oficial.</p>
         <h2 id="titulo-funciones" className="text-center text-3xl font-black tracking-tight text-slate-900">Todo lo que un despacho necesita para no perder una novedad</h2>
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.map((f) => (
@@ -149,7 +150,7 @@ export default function LandingPage() {
             {[
               ["Crea tu cuenta", "Regístrate con tu correo en menos de dos minutos."],
               ["Agrega tus radicados", "Pega el número de 23 dígitos y organiza cada proceso por categoría."],
-              ["Recibe las alertas", "Mariana's vigila cada hora y te avisa ante cualquier actuación nueva."],
+              ["Recibe las alertas", "Mariana's consulta por lotes y te avisa cuando detecta una actuación nueva."],
             ].map(([t, d], i) => (
               <li key={t} className="relative rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
                 <span className="grid h-9 w-9 place-items-center rounded-full bg-violet-600 text-sm font-black text-white">{i + 1}</span>
@@ -164,7 +165,7 @@ export default function LandingPage() {
       {/* ── CTA final ── */}
       <section className="mx-auto w-full max-w-6xl px-4 py-16 text-center sm:px-6">
         <h2 className="text-3xl font-black tracking-tight text-slate-900">Empieza a monitorear hoy mismo</h2>
-        <p className="mx-auto mt-3 max-w-xl text-slate-600">Agrega tu primer radicado en minutos y relájate: las próximas novedades te llegan solas.</p>
+        <p className="mx-auto mt-3 max-w-xl text-slate-600">Agrega tu primer radicado en minutos y revisa aquí las próximas novedades detectadas.</p>
         <Link to="/register" className="mt-8 inline-flex items-center justify-center rounded-2xl bg-violet-600 px-8 py-4 text-base font-semibold text-white shadow-lg shadow-violet-600/25 transition hover:bg-violet-700 active:scale-95">
           Crear mi cuenta gratis
         </Link>

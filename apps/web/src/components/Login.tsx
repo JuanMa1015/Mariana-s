@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { loginUser } from "../api"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import toast from "react-hot-toast"
 import { useTitle } from "../hooks/useTitle"
 
@@ -13,15 +13,22 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(() => Boolean(localStorage.getItem("rememberedEmail")))
   const [errores, setErrores] = useState<ErroresLogin>({})
   const navigate = useNavigate()
+  const location = useLocation()
+  const [enviando, setEnviando] = useState(false)
   useTitle("Iniciar sesión")
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (enviando) return
     const nuevos: ErroresLogin = {}
     if (!credential.trim()) nuevos.credential = "Ingresa tu correo o nombre de usuario"
     if (!password) nuevos.password = "Ingresa tu contraseña"
     setErrores(nuevos)
-    if (Object.keys(nuevos).length > 0) return
+    if (Object.keys(nuevos).length > 0) {
+      document.getElementById(nuevos.credential ? "login-credential" : "login-password")?.focus()
+      return
+    }
+    setEnviando(true)
 
     const loadingToast = toast.loading("Iniciando sesión...")
     try {
@@ -34,11 +41,14 @@ export default function Login() {
         localStorage.removeItem("rememberedEmail")
       }
       toast.success("¡Bienvenido!", { id: loadingToast })
-      navigate("/procesos")
+      const destino: unknown = location.state?.from
+      navigate(typeof destino === "string" && /^\/(procesos(?:\/|\?|$)|novedades(?:\?|$)|ajustes(?:\?|$)|admin(?:\?|$))/.test(destino) ? destino : "/procesos")
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al iniciar sesión"
       setErrores({ general: msg })
       toast.error(msg, { id: loadingToast })
+    } finally {
+      setEnviando(false)
     }
   }
 
@@ -54,7 +64,7 @@ export default function Login() {
   }`
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 text-slate-900 px-4">
+    <div className="flex min-h-dvh items-center py-8 justify-center bg-slate-50 text-slate-900 px-4">
       <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
         <div className="mb-8 text-center">
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-500">Mariana's</p>
@@ -63,8 +73,9 @@ export default function Login() {
 
         <form onSubmit={handleLogin} className="flex flex-col gap-4">
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 mb-1 block">Correo o Usuario</label>
+            <label htmlFor="login-credential" className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 mb-1 block">Correo o Usuario</label>
             <input
+              id="login-credential" name="username" spellCheck={false} autoCapitalize="none"
               type="text"
               required
               autoComplete="username"
@@ -83,9 +94,10 @@ export default function Login() {
             )}
           </div>
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 mb-1 block">Contraseña</label>
+            <label htmlFor="login-password" className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600 mb-1 block">Contraseña</label>
             <div className="relative">
               <input
+                id="login-password" name="password"
                 type={showPassword ? "text" : "password"}
                 required
                 autoComplete="current-password"
@@ -103,7 +115,6 @@ export default function Login() {
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 className="absolute inset-y-0 right-0 flex items-center pr-4 text-violet-500 hover:text-violet-700"
-                tabIndex={-1}
               >
                 {showPassword ? (
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
@@ -136,9 +147,10 @@ export default function Login() {
             />
             <label htmlFor="remember" className="text-sm text-slate-600">Recordarme</label>
           </div>
+          <p className="text-xs text-slate-600">Recordarme guarda solo el correo o usuario en este dispositivo.</p>
           <p className="-mb-1 text-right text-sm"><Link to="/olvide" className="font-semibold text-violet-500 hover:underline">¿Olvidaste tu contraseña?</Link></p>
-          <button type="submit" className="mt-2 w-full rounded-2xl border border-violet-500 bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-95 focus-visible:outline-none">
-            Ingresar
+          <button type="submit" disabled={enviando} aria-busy={enviando} className="mt-2 w-full rounded-2xl border border-violet-500 bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 active:scale-95 focus-visible:outline-none">
+            {enviando ? "Ingresando…" : "Ingresar"}
           </button>
         </form>
 

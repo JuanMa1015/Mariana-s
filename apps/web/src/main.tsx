@@ -1,6 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { StrictMode, lazy, Suspense, useState, useEffect } from 'react'
-import type { ReactNode } from 'react'
+import { StrictMode, lazy, Suspense, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
@@ -16,10 +15,9 @@ import ThanksPage from './components/ThanksPage.tsx'
 import { PrivacyPage, TermsPage } from './components/LegalPages.tsx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
 
-import { getMe } from './api'
+import ProtectedLayout from './components/ProtectedLayout'
 import { initSentry } from './sentry'
 import { iniciarTema } from './theme'
-import AvisosPush from './components/AvisosPush.tsx'
 import { OlvidePage, RestablecerPage } from './components/RecuperarPassword.tsx'
 
 const App = lazy(() => import('./App.tsx'))
@@ -38,37 +36,17 @@ const BackButton = () => {
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return
     const h = CapApp.addListener('backButton', () => {
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+        return
+      }
       if (pathname === '/procesos' || pathname === '/login') void CapApp.exitApp()
-      else navigate(-1)
+      else if (window.history.state?.idx > 0) navigate(-1)
+      else navigate('/procesos', { replace: true })
     })
     return () => { void h.then((x) => x.remove()) }
   }, [pathname, navigate])
   return null
-}
-
-const ProtectedRoute = ({ children }: { children: ReactNode }) => {
-  const [ok, setOk] = useState<boolean | null>(null)
-  const navigate = useNavigate()
-
-  useEffect(() => {
-    getMe().then(() => setOk(true)).catch(() => setOk(false))
-  }, [])
-
-  if (ok === null) {
-    return <div className="flex min-h-screen items-center justify-center text-slate-500">Verificando sesión...</div>
-  }
-
-  if (!ok) {
-    return <Navigate to="/login" replace />
-  }
-
-  // Avisos push activos en todas las pantallas privadas; al tocar un aviso se abre el proceso
-  return (
-    <>
-      <AvisosPush onAbrirProceso={(llave) => navigate(`/procesos/${llave}`)} />
-      {children}
-    </>
-  )
 }
 
 createRoot(document.getElementById('root')!).render(
@@ -87,42 +65,13 @@ createRoot(document.getElementById('root')!).render(
           <Route path="/privacidad" element={<PrivacyPage />} />
           <Route path="/terminos" element={<TermsPage />} />
           <Route path="/gracias" element={<ThanksPage />} />
-          {/* Rutas privadas */}
-          <Route path="/procesos" element={
-            <ProtectedRoute>
-              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
-                <App />
-              </Suspense>
-            </ProtectedRoute>
-          } />
-          <Route path="/admin" element={
-            <ProtectedRoute>
-              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
-                <AdminPage />
-              </Suspense>
-            </ProtectedRoute>
-          } />
-          <Route path="/ajustes" element={
-            <ProtectedRoute>
-              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
-                <AjustesPage />
-              </Suspense>
-            </ProtectedRoute>
-          } />
-          <Route path="/novedades" element={
-            <ProtectedRoute>
-              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
-                <NovedadesPage />
-              </Suspense>
-            </ProtectedRoute>
-          } />
-          <Route path="/procesos/:llaveProceso" element={
-            <ProtectedRoute>
-              <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Cargando...</div>}>
-                <App />
-              </Suspense>
-            </ProtectedRoute>
-          } />
+          <Route element={<ProtectedLayout />}>
+            <Route path="/procesos" element={<Suspense fallback={<p role="status">Cargando procesos…</p>}><App /></Suspense>} />
+            <Route path="/procesos/:llaveProceso" element={<Suspense fallback={<p role="status">Cargando expediente…</p>}><App /></Suspense>} />
+            <Route path="/novedades" element={<Suspense fallback={<p role="status">Cargando novedades…</p>}><NovedadesPage /></Suspense>} />
+            <Route path="/ajustes" element={<Suspense fallback={<p role="status">Cargando ajustes…</p>}><AjustesPage /></Suspense>} />
+            <Route path="/admin" element={<Suspense fallback={<p role="status">Cargando administración…</p>}><AdminPage /></Suspense>} />
+          </Route>
         {/* 404 */}
         <Route path="*" element={<NotFoundPage />} />
         </Routes>
