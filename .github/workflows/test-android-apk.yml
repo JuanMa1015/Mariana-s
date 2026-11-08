@@ -1,0 +1,65 @@
+name: Android (APK de prueba)
+
+on:
+  push:
+    branches: [fix/ajustes-y-avisos]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+
+      - name: Preparar configuración de Firebase
+        env:
+          GS_B64: ${{ secrets.GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          [ -n "$GS_B64" ] || { echo "::error::Falta GOOGLE_SERVICES_JSON_BASE64"; exit 1; }
+          printf '%s' "$GS_B64" | base64 -d > android/app/google-services.json
+          node -e 'const config = require("./android/app/google-services.json"); if (!config.client?.some(c => c.client_info?.android_client_info?.package_name === "co.mariana.monitor")) throw new Error("Firebase no está configurado para co.mariana.monitor");'
+
+      - name: Compilar y sincronizar la app
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_PUSH_ENABLED: "true"
+        run: |
+          [ -n "$VITE_API_URL" ] || { echo "::error::Falta VITE_API_URL"; exit 1; }
+          npm run build
+          npx cap sync android
+
+      - name: Generar APK de prueba
+        working-directory: apps/web/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug :app:processDebugGoogleServices -PversionName="0.5.0-prueba-${GITHUB_SHA:0:7}"
+          cp app/build/outputs/apk/debug/app-debug.apk Marianas-prueba.apk
+          sha256sum Marianas-prueba.apk > Marianas-prueba.apk.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Marianas-prueba-${{ github.sha }}
+          path: |
+            apps/web/android/Marianas-prueba.apk
+            apps/web/android/Marianas-prueba.apk.sha256
+          if-no-files-found: error
+          retention-days: 7
