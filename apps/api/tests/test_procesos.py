@@ -1,3 +1,4 @@
+import httpx
 import pytest
 
 PREFIX = "/procesos"
@@ -321,6 +322,38 @@ async def test_documento_propietario_puede_descargar(client, auth_headers, test_
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("application/pdf")
     assert b"contenido-de-prueba" in response.content
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("fallo", "status_code", "mensaje"),
+    [
+        (404, 404, "ya no está disponible"),
+        (410, 404, "ya no está disponible"),
+        (503, 502, "no pudo entregar"),
+        (httpx.ReadTimeout, 504, "tardó demasiado"),
+        (httpx.ConnectError, 502, "No pudimos conectar"),
+    ],
+)
+async def test_descarga_distingue_fallos_de_rama(
+    client, auth_headers, test_user, db, monkeypatch, caplog, fallo, status_code, mensaje
+):
+    id_documento = 4_000_000_001
+    _crear_proceso_con_documento(db, test_user.id, id_documento)
+
+    def descargar(_id):
+        request = httpx.Request("GET", "https://rama.example.test/documento")
+        if isinstance(fallo, int):
+            httpx.Response(fallo, request=request).raise_for_status()
+        raise fallo("detalle privado de prueba", request=request)
+
+    monkeypatch.setattr("scraper.rama_client.descargar_documento", descargar)
+    response = await client.get(f"{PREFIX}/documento/{id_documento}", headers=auth_headers)
+
+    assert response.status_code == status_code
+    assert mensaje in response.json()["detail"]
+    assert f"Descarga de documento {id_documento}" in caplog.text
+    assert "detalle privado de prueba" not in caplog.text
 
 
 @pytest.mark.asyncio

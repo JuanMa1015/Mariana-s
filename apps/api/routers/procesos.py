@@ -4,6 +4,7 @@ import threading
 import time as _time
 from datetime import datetime
 
+import httpx
 from fastapi import APIRouter, Depends, Query, HTTPException, status, Request, BackgroundTasks
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, or_
@@ -311,7 +312,20 @@ def descargar_documento_endpoint(
     if not autorizado:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento no encontrado")
 
-    contenido, filename = _descargar(id_reg_documento)
+    try:
+        contenido, filename = _descargar(id_reg_documento)
+    except httpx.HTTPStatusError as exc:
+        codigo = exc.response.status_code
+        logger.warning("Descarga de documento %s: Rama Judicial respondió HTTP %s", id_reg_documento, codigo)
+        if codigo in (404, 410):
+            raise HTTPException(404, "El documento ya no está disponible en Rama Judicial.") from exc
+        raise HTTPException(502, "Rama Judicial no pudo entregar el documento. Intenta más tarde.") from exc
+    except httpx.TimeoutException as exc:
+        logger.warning("Descarga de documento %s: tiempo de espera agotado en Rama Judicial", id_reg_documento)
+        raise HTTPException(504, "Rama Judicial tardó demasiado en responder. Intenta más tarde.") from exc
+    except httpx.RequestError as exc:
+        logger.warning("Descarga de documento %s: fallo de conexión con Rama Judicial (%s)", id_reg_documento, type(exc).__name__)
+        raise HTTPException(502, "No pudimos conectar con Rama Judicial para descargar el documento.") from exc
     return StreamingResponse(
         iter([contenido]),
         media_type="application/pdf",
