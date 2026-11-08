@@ -46,7 +46,7 @@ export default function AdminPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-indigo-500">Mariana's</p>
             <h1 className="text-xl font-bold tracking-tight text-slate-800">Administración</h1>
           </div>
-          <button type="button" onClick={() => navigate("/ajustes")} className="min-h-10 rounded-full border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100">← Volver</button>
+          <button type="button" onClick={() => navigate("/ajustes")} className="min-h-11 rounded-full border border-indigo-200 bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100">Ajustes</button>
         </div>
         <nav aria-label="Secciones del panel" className="mx-auto w-full max-w-6xl overflow-x-auto px-4">
           <ul className="flex gap-1">

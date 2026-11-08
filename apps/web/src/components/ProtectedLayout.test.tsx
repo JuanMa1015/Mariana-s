@@ -14,14 +14,33 @@ function LoginDestino() {
   return <p>Entrar para {location.state?.from}</p>
 }
 
-function abrir() {
-  return render(<MemoryRouter initialEntries={["/procesos/123?q=cliente"]}><Routes>
-    <Route element={<ProtectedLayout />}><Route path="/procesos/:id" element={<h1>Expediente</h1>} /></Route>
+function abrir(ruta = "/procesos/123?q=cliente") {
+  return render(<MemoryRouter initialEntries={[ruta]}><Routes>
+    <Route element={<ProtectedLayout />}>
+      <Route path="/procesos" element={<h1>Mis procesos</h1>} />
+      <Route path="/procesos/:id" element={<h1>Expediente</h1>} />
+      <Route path="/novedades" element={<h1>Novedades</h1>} />
+      <Route path="/admin" element={<h1>Administración</h1>} />
+      <Route path="/ajustes" element={<h1>Ajustes</h1>} />
+    </Route>
     <Route path="/login" element={<LoginDestino />} />
   </Routes></MemoryRouter>)
 }
 
 beforeEach(() => vi.clearAllMocks())
+
+it.each(["/procesos", "/procesos/123", "/novedades"])("lleva la cuenta de gestión al panel desde %s", async (ruta) => {
+  vi.mocked(getMe).mockResolvedValueOnce({ email: "admin@example.test", es_admin: true })
+  abrir(ruta)
+  expect(await screen.findByRole("heading", { name: "Administración" })).toBeInTheDocument()
+  expect(screen.queryByRole("navigation", { name: "Navegación principal" })).not.toBeInTheDocument()
+})
+
+it("permite abrir los ajustes de la cuenta de gestión", async () => {
+  vi.mocked(getMe).mockResolvedValueOnce({ email: "admin@example.test", es_admin: true })
+  abrir("/ajustes")
+  expect(await screen.findByRole("heading", { name: "Ajustes" })).toBeInTheDocument()
+})
 
 it("ofrece reintentar al fallar la red sin pedir credenciales de nuevo", async () => {
   vi.mocked(getMe).mockRejectedValueOnce(new Error("sin conexión")).mockResolvedValueOnce({ email: "abogada@example.test" })

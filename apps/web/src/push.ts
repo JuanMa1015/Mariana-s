@@ -10,6 +10,24 @@ const TOKEN_KEY = "mariana_push_token"
 const CANAL = "novedades" // debe coincidir con CANAL_ANDROID del backend (services/push.py)
 
 export type EstadoPermiso = "prompt" | "granted" | "denied"
+export type EstadoRegistroPush = "pendiente" | "registrando" | "registrado" | "error"
+
+let estadoRegistro: EstadoRegistroPush = "pendiente"
+let esperaRegistro: ReturnType<typeof setTimeout> | undefined
+const suscriptoresRegistro = new Set<() => void>()
+
+export const estadoRegistroPush = () => estadoRegistro
+
+export function suscribirRegistroPush(avisar: () => void) {
+  suscriptoresRegistro.add(avisar)
+  return () => { suscriptoresRegistro.delete(avisar) }
+}
+
+function actualizarRegistro(estado: EstadoRegistroPush) {
+  clearTimeout(esperaRegistro)
+  estadoRegistro = estado
+  suscriptoresRegistro.forEach((avisar) => avisar())
+}
 
 const aEstado = (receive: string): EstadoPermiso =>
   receive === "granted" ? "granted" : receive === "denied" ? "denied" : "prompt"
@@ -25,6 +43,9 @@ export async function pedirPermiso(): Promise<EstadoPermiso> {
 
 /** Crea el canal de Android y registra el dispositivo en FCM; el token llega por el evento "registration". */
 export async function activarPush(): Promise<void> {
+  if (estadoRegistro === "registrando") return
+  actualizarRegistro("registrando")
+  esperaRegistro = setTimeout(() => actualizarRegistro("error"), 15000)
   try {
     await PushNotifications.createChannel({
       id: CANAL,
@@ -37,7 +58,12 @@ export async function activarPush(): Promise<void> {
   } catch {
     /* iOS no tiene canales */
   }
-  await PushNotifications.register()
+  try {
+    await PushNotifications.register()
+  } catch (error) {
+    actualizarRegistro("error")
+    throw error
+  }
 }
 
 interface Escuchas {
@@ -47,12 +73,26 @@ interface Escuchas {
 
 /** Conecta los eventos del plugin. Devuelve la función que los desconecta. */
 export async function escucharPush({ onAviso, onAbrirProceso }: Escuchas): Promise<() => void> {
+  let activo = true
+  let ultimoRegistro = 0
   const handles = await Promise.all([
     PushNotifications.addListener("registration", (t) => {
+      if (!activo) return
+      const intento = ++ultimoRegistro
+      actualizarRegistro("registrando")
       localStorage.setItem(TOKEN_KEY, t.value)
-      registrarDispositivo(t.value).catch(() => { /* se reintenta en el próximo arranque */ })
+      void registrarDispositivo(t.value).then((resultado) => {
+        if (activo && intento === ultimoRegistro) actualizarRegistro(resultado.registered === true ? "registrado" : "error")
+      }).catch(() => {
+        if (activo && intento === ultimoRegistro) actualizarRegistro("error")
+      })
     }),
-    PushNotifications.addListener("registrationError", (e) => console.warn("Push: registro fallido", e)),
+    PushNotifications.addListener("registrationError", () => {
+      if (activo) {
+        ultimoRegistro += 1
+        actualizarRegistro("error")
+      }
+    }),
     // Con la app abierta Android no muestra el aviso del sistema: se muestra dentro de la app
     PushNotifications.addListener("pushNotificationReceived", (n) => {
       onAviso([n.title, n.body].filter(Boolean).join(": "))
@@ -63,7 +103,11 @@ export async function escucharPush({ onAviso, onAbrirProceso }: Escuchas): Promi
       if (typeof llave === "string" && /^\d{23}$/.test(llave)) onAbrirProceso(llave)
     }),
   ])
-  return () => handles.forEach((h) => void h.remove())
+  return () => {
+    activo = false
+    actualizarRegistro("pendiente")
+    handles.forEach((h) => void h.remove())
+  }
 }
 
 /** Cierre de sesión: este celular deja de recibir avisos de la cuenta. Llamar antes de cerrar sesión. */

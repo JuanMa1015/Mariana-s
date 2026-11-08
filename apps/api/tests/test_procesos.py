@@ -328,8 +328,8 @@ async def test_documento_propietario_puede_descargar(client, auth_headers, test_
 @pytest.mark.parametrize(
     ("fallo", "status_code", "mensaje"),
     [
-        (404, 404, "ya no está disponible"),
-        (410, 404, "ya no está disponible"),
+        (404, 404, "no está disponible en este momento"),
+        (410, 404, "no está disponible en este momento"),
         (503, 502, "no pudo entregar"),
         (httpx.ReadTimeout, 504, "tardó demasiado"),
         (httpx.ConnectError, 502, "No pudimos conectar"),
