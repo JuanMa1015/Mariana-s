@@ -10,6 +10,7 @@ import { limpiarAvatar } from "../hooks/useAvatar"
 export default function ProtectedLayout() {
   const [estado, setEstado] = useState<"cargando" | "lista" | "error" | "vencida">("cargando")
   const [intento, setIntento] = useState(0)
+  const [esAdmin, setEsAdmin] = useState(false)
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -21,6 +22,7 @@ export default function ProtectedLayout() {
       if (!activa) return
       setCacheUser(usuario.email)
       limpiarAvatar()
+      setEsAdmin(Boolean(usuario.es_admin))
       setEstado("lista")
     }).catch((error: unknown) => {
       if (activa) setEstado(error instanceof ApiError && error.status === 401 ? "vencida" : "error")
@@ -49,12 +51,16 @@ export default function ProtectedLayout() {
       </main>
     )
   }
+  const ruta = location.pathname.replace(/\/+$/, "").toLowerCase()
+  if (esAdmin && ruta !== "/admin" && ruta !== "/ajustes") {
+    return <Navigate to="/admin" replace />
+  }
   return (
-    <div className="private-layout">
+    <div className={esAdmin ? undefined : "private-layout"}>
       <a href="#contenido" className="skip-link">Saltar al contenido</a>
-      <AvisosPush onAbrirProceso={(llave) => navigate(`/procesos/${llave}`)} />
-      <Outlet />
-      <BottomNav />
+      {!esAdmin && <AvisosPush onAbrirProceso={(llave) => navigate(`/procesos/${llave}`)} />}
+      <Outlet context={esAdmin} />
+      {!esAdmin && <BottomNav />}
     </div>
   )
 }

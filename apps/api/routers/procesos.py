@@ -318,7 +318,7 @@ def descargar_documento_endpoint(
         codigo = exc.response.status_code
         logger.warning("Descarga de documento %s: Rama Judicial respondió HTTP %s", id_reg_documento, codigo)
         if codigo in (404, 410):
-            raise HTTPException(404, "El documento ya no está disponible en Rama Judicial.") from exc
+            raise HTTPException(404, "El documento no está disponible en este momento en Rama Judicial.") from exc
         raise HTTPException(502, "Rama Judicial no pudo entregar el documento. Intenta más tarde.") from exc
     except httpx.TimeoutException as exc:
         logger.warning("Descarga de documento %s: tiempo de espera agotado en Rama Judicial", id_reg_documento)

@@ -40,7 +40,7 @@ const BackButton = () => {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
         return
       }
-      if (pathname === '/procesos' || pathname === '/login') void CapApp.exitApp()
+      if (pathname === '/procesos' || pathname === '/admin' || pathname === '/login') void CapApp.exitApp()
       else if (window.history.state?.idx > 0) navigate(-1)
       else navigate('/procesos', { replace: true })
     })
