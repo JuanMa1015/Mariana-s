@@ -5,6 +5,16 @@ Formato basado en [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/) y 
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-08
+
+### Cambiado
+- Ajustes muestra primero los avisos de actuaciones y distingue el permiso del celular del registro del dispositivo. Puedes reintentar el registro, enviar un aviso de prueba y confirmar si llegó.
+- Mi cuenta reúne el perfil y la contraseña. La confirmación del correo para cambiarla queda visible junto al botón. También se simplificó el selector de apariencia y se agrupó la consulta oficial en Ayuda y versión.
+- Las cuentas administradoras entran directamente al panel y conservan acceso a sus ajustes y al cierre de sesión.
+
+### Corregido
+- Cuando Rama Judicial no entrega un documento, la app distingue si el archivo no está disponible en ese momento, si falló la conexión o si se agotó el tiempo de espera.
+
 ## [0.5.0] - 2026-11-07
 
 ### Añadido
